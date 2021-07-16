@@ -5,6 +5,11 @@ using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI.Patterns
 {
+    public enum PatternType
+    { 
+        X_SYMETRIC, XY_SYMETRIC, DIAGONAL
+    }
+
     public class MirroredNeededBoards
     { 
         public Board Original { get; }
@@ -18,7 +23,7 @@ namespace OthelloAI.Patterns
             Original = source;
             Transposed = source.Transposed();
             HorizontalMirrored = source.HorizontalMirrored();
-            Rotated270 = Transposed.VerticalMirrored();
+            Rotated270 = HorizontalMirrored.Transposed();
             Rotated90 = Transposed.HorizontalMirrored();
         }
 
@@ -26,14 +31,54 @@ namespace OthelloAI.Patterns
         {
             tr = org.Transposed();
             hor = org.HorizontalMirrored();
-            rot90 = tr.VerticalMirrored();
+            rot90 = hor.Transposed();
             rot270 = tr.HorizontalMirrored();
         }
     }
 
-    public abstract class Pattern
+    public class Pattern
     {
-        public static readonly int[] TERNARY_TABLE = new int[1 << 20];
+        private abstract class EvaledBoardSelector
+        {
+            public abstract float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270);
+        }
+
+        private class EvaledBoardSelectorXSymmetric : EvaledBoardSelector
+        {
+            public override float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+            {
+                float result = eval[GetHash(org, mask)];
+                result += eval[GetHash(tr, mask)];
+                result += eval[GetHash(hor, mask)];
+                result += eval[GetHash(rot90, mask)];
+                return result;
+            }
+        }
+
+        private class EvaledBoardSelectorXYSymmetric : EvaledBoardSelector
+        {
+            public override float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+            {
+                float result = eval[GetHash(org, mask)];
+                result += eval[GetHash(tr, mask)];
+                result += eval[GetHash(hor, mask)];
+                result += eval[GetHash(rot270, mask)];
+                return result;
+            }
+        }
+
+        private class EvaledBoardSelectorDiagonal : EvaledBoardSelector
+        {
+            public override float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+            {
+                float result = eval[GetHash(org, mask)];
+                result += eval[GetHash(hor, mask)];
+
+                return result;
+            }
+        }
+
+        public static readonly unsafe int[] TERNARY_TABLE = new int[1 << 20];
 
         public static void InitTable()
         {
@@ -60,16 +105,30 @@ namespace OthelloAI.Patterns
 
         protected string FilePath { get; }
 
-        public abstract int HashLength { get; }
+        public int HashLength { get; }
         public int ArrayLength => POW3_TABLE[HashLength];
 
-        public abstract ulong Mask { get; }
+        public ulong Mask { get; }
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
 
-        public Pattern(string filePath)
+        protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
+
+        private EvaledBoardSelector Selector { get; }
+
+        public Pattern(string filePath, PatternType type, int length, ulong mask)
         {
             FilePath = filePath;
+            HashLength = length;
+            Mask = mask;
+
+            Selector = type switch
+            {
+                PatternType.X_SYMETRIC => new EvaledBoardSelectorXSymmetric(),
+                PatternType.XY_SYMETRIC => new EvaledBoardSelectorXYSymmetric(),
+                PatternType.DIAGONAL => new EvaledBoardSelectorDiagonal(),
+                _ => throw new NotImplementedException(),
+            };
         }
 
         public virtual void Init()
@@ -77,6 +136,7 @@ namespace OthelloAI.Patterns
             for (int i = 0; i < STAGES; i++)
             {
                 StageBasedEvaluations[i] = new float[GetArrayLength()];
+                StageBasedEvaluationsB[i] = new byte[GetArrayLength()];
             }
         }
 
@@ -89,7 +149,7 @@ namespace OthelloAI.Patterns
         {
             int stage = GetStage(board);
 
-            int hash = GetHash(board);
+            int hash = GetHash(board, Mask);
             int flipped = FlipStone(hash);
 
             StageBasedEvaluations[stage][hash] += add;
@@ -101,48 +161,20 @@ namespace OthelloAI.Patterns
             return POW3_TABLE[HashLength];
         }
 
-        public int GetBinHash(Board board, ulong mask)
+        public static int GetBinHash(in Board board, ulong mask)
         {
             return (int)(Bmi2.X64.ParallelBitExtract(board.bitB, mask) | (Bmi2.X64.ParallelBitExtract(board.bitW, mask) << 10));
         }
 
-        public int GetHash(Board board) 
+        public static int GetHash(in Board board, ulong mask) 
         {
-            return TERNARY_TABLE[GetBinHash(board, Mask)];
+            return TERNARY_TABLE[GetBinHash(board, mask)];
         }
 
-        public virtual float Eval(Board org, Board tr, Board hor, Board rot90, Board rot270, int stone)
+        public virtual float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270, int stone)
         {
-            float[] eval = StageBasedEvaluations[GetStage(org)];
-
-            float result = eval[GetHash(org)];
-            result += eval[GetHash(tr)];
-            result += eval[GetHash(hor)];
-            result += eval[GetHash(rot90)];
-            result += eval[GetHash(rot270)];
-
-            return result * stone;
-        }
-
-        public int ConvertHash(int hash)
-        {
-            int result = 0;
-            for (int i = 0; i < HashLength; i++)
-            {
-                int id = hash % 3;
-                switch (id)
-                {
-                    case 1:
-                        result |= 1 << i;
-                        break;
-
-                    case 2:
-                        result |= 1 << (i + HashLength);
-                        break;
-                }
-                hash /= 3;
-            }
-            return result;
+            byte[] eval = StageBasedEvaluationsB[GetStage(org)];
+            return Selector.Eval(eval, Mask, org, tr, hor, rot90, rot270) * stone;
         }
 
         public Board SetBoard(int hash)
@@ -186,8 +218,6 @@ namespace OthelloAI.Patterns
             return result;
         }
 
-        public abstract int GetHashMirrored(int hash);
-
         public static int Reverse(int value) => (int)Reverse((uint)value);
 
         public static uint Reverse(uint value)
@@ -212,6 +242,7 @@ namespace OthelloAI.Patterns
                 for (int i = 0; i < ArrayLength; i++)
                 {
                     StageBasedEvaluations[stage][i] = reader.ReadSingle();
+                    StageBasedEvaluationsB[stage][i] = (byte) (StageBasedEvaluations[stage][i] * 16 + 128);
                 }
             }
         }
@@ -231,7 +262,7 @@ namespace OthelloAI.Patterns
 
         public bool Test()
         {
-            return Enumerable.Range(0, GetArrayLength()).All(i => GetHash(SetBoard(i)) == i);
+            return Enumerable.Range(0, GetArrayLength()).All(i => GetHash(SetBoard(i), Mask) == i);
         }
 
         public void Info(int stage, float threshold)

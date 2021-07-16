@@ -42,7 +42,7 @@ namespace OthelloAI
                     //boards[i].print();
                 }
 
-                //Update(boards);
+                Update(boards);
                 gameCount++;
 
                 if (gameCount % 100 == 0)
@@ -81,7 +81,7 @@ namespace OthelloAI
 
                 if(board.stoneCount == 40)
                 {
-                    Console.WriteLine(e);
+                    //Console.WriteLine(e);
                 }
             }
         }
