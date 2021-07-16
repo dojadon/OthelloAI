@@ -11,13 +11,23 @@ namespace OthelloAI.Patterns
         public Board Transposed { get; }
         public Board HorizontalMirrored { get; }
         public Board Rotated90 { get; }
+        public Board Rotated270 { get; }
 
         public MirroredNeededBoards(Board source)
         {
             Original = source;
             Transposed = source.Transposed();
             HorizontalMirrored = source.HorizontalMirrored();
-            Rotated90 = Transposed.VerticalMirrored();
+            Rotated270 = Transposed.VerticalMirrored();
+            Rotated90 = Transposed.HorizontalMirrored();
+        }
+
+        public static void Create(Board org, out Board tr, out Board hor, out Board rot90, out Board rot270)
+        {
+            tr = org.Transposed();
+            hor = org.HorizontalMirrored();
+            rot90 = tr.VerticalMirrored();
+            rot270 = tr.HorizontalMirrored();
         }
     }
 
@@ -56,7 +66,6 @@ namespace OthelloAI.Patterns
         public abstract ulong Mask { get; }
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
-        protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
 
         public Pattern(string filePath)
         {
@@ -68,7 +77,6 @@ namespace OthelloAI.Patterns
             for (int i = 0; i < STAGES; i++)
             {
                 StageBasedEvaluations[i] = new float[GetArrayLength()];
-                StageBasedEvaluationsB[i] = new byte[1 << (HashLength * 2)];
             }
         }
 
@@ -103,14 +111,15 @@ namespace OthelloAI.Patterns
             return TERNARY_TABLE[GetBinHash(board, Mask)];
         }
 
-        public virtual float Eval(MirroredNeededBoards boards, int stone)
+        public virtual float Eval(Board org, Board tr, Board hor, Board rot90, Board rot270, int stone)
         {
-            float[] eval = StageBasedEvaluations[GetStage(boards.Original)];
+            float[] eval = StageBasedEvaluations[GetStage(org)];
 
-            float result = eval[GetHash(boards.Original)];
-            result += eval[GetHash(boards.Transposed)];
-            result += eval[GetHash(boards.HorizontalMirrored)];
-            result += eval[GetHash(boards.Rotated90)];
+            float result = eval[GetHash(org)];
+            result += eval[GetHash(tr)];
+            result += eval[GetHash(hor)];
+            result += eval[GetHash(rot90)];
+            result += eval[GetHash(rot270)];
 
             return result * stone;
         }
@@ -202,9 +211,7 @@ namespace OthelloAI.Patterns
             {
                 for (int i = 0; i < ArrayLength; i++)
                 {
-                    int win = Reverse(reader.ReadInt32());
-                    int game = Reverse(reader.ReadInt32());
-                    StageBasedEvaluationsB[stage][ConvertHash(i)] = (byte)(255 * (game < 10 ? 0.5F : ((float)win / game)));
+                    StageBasedEvaluations[stage][i] = reader.ReadSingle();
                 }
             }
         }
@@ -217,7 +224,7 @@ namespace OthelloAI.Patterns
             {
                 for (int i = 0; i < ArrayLength; i++)
                 {
-
+                    writer.Write(StageBasedEvaluations[stage][i]);
                 }
             }
         }
@@ -231,7 +238,7 @@ namespace OthelloAI.Patterns
         {
             for (int i = 0; i < GetArrayLength(); i++)
             {
-                if (StageBasedEvaluations[stage][i] != 0)
+                if (StageBasedEvaluations[stage][i]  > threshold)
                 {
                     InfoHash(stage, i);
                 }

@@ -28,10 +28,7 @@ namespace OthelloAI
         static void Main()
         {
             Pattern.InitTable();
-            /*ulong b = 0b00111110_00000010;
-            new Board(b, 0).print();
-            int hash = PATTERN_EDGE2X.GetHash(new Board(b, 0), PATTERN_EDGE2X.Mask);
-            PATTERN_EDGE2X.SetBoard(hash).print();*/
+            //ulong b = 0b00111110_00000010;
 
             foreach (Pattern p in PATTERNS)
             {
@@ -41,11 +38,13 @@ namespace OthelloAI
                 Console.WriteLine(p);
             }
 
-            var builder = new PatternEvaluationBuilder(PATTERNS);
-            builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log0.dat");
+            //PATTERN_EDGE2X.Info(30, 0.1F);
+
+           // var builder = new PatternEvaluationBuilder(PATTERNS);
+           // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log0.dat");
 
            //StartClient();
-           // StartGame();
+           StartGame();
         }
 
         static void StartClient()

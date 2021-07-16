@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 using System.IO;
-using Be.IO;
 
 namespace OthelloAI
 {
@@ -43,7 +42,7 @@ namespace OthelloAI
                     //boards[i].print();
                 }
 
-                Update(boards);
+                //Update(boards);
                 gameCount++;
 
                 if (gameCount % 100 == 0)
@@ -51,10 +50,9 @@ namespace OthelloAI
                     Console.WriteLine(gameCount);
                 }
 
-                if (gameCount > 5000)
+                if (gameCount % 5000 == 0)
                 {
-                    Patterns[0].Info(30, 0);
-                    break;
+                    Array.ForEach(Patterns, p => p.Save());
                 }
             }
         }
@@ -76,10 +74,15 @@ namespace OthelloAI
                 var tr_hor_ver = tr_hor.VerticalMirrored();
 
                 var boards = new MirroredBoards(board);
-                var neededBoards = new MirroredNeededBoards(board);
+                MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
-                float e = result - Patterns.Sum(p => p.Eval(neededBoards, 1));
+                float e = result - Patterns.Sum(p => p.Eval(board, b1, b2, b3, b4, 1));
                 Array.ForEach(Patterns, p => Array.ForEach(boards.Boards, b => p.UpdataEvaluation(b, e * alpha)));
+
+                if(board.stoneCount == 40)
+                {
+                    Console.WriteLine(e);
+                }
             }
         }
     }

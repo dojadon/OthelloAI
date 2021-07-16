@@ -25,17 +25,17 @@ namespace OthelloAI
             return eval;
             */
 
-            var boards = new MirroredNeededBoards(board);
+            MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
-            return Program.PATTERN_EDGE2X.Eval(boards, stone) * 2.4F
-                + Program.PATTERN_EDGE_BLOCK.Eval(boards, stone) * 1.2F
-                + Program.PATTERN_CORNER_BLOCK.Eval(boards, stone) * 1.8F
-                + Program.PATTERN_CORNER.Eval(boards, stone) * 1.5F
-                + Program.PATTERN_LINE1.Eval(boards, stone) * 1.2F
-                + Program.PATTERN_LINE2.Eval(boards, stone)
-                + Program.PATTERN_LINE3.Eval(boards, stone)
-                + Program.PATTERN_DIAGONAL8.Eval(boards, stone)
-                + Program.PATTERN_DIAGONAL7.Eval(boards, stone);
+            return Program.PATTERN_EDGE2X.Eval(board, b1, b2, b3, b4, stone) * 2.4F
+                + Program.PATTERN_EDGE_BLOCK.Eval(board, b1, b2, b3, b4, stone) * 1.2F
+                + Program.PATTERN_CORNER_BLOCK.Eval(board, b1, b2, b3, b4, stone) * 1.8F
+                + Program.PATTERN_CORNER.Eval(board, b1, b2, b3, b4, stone) * 1.5F
+                + Program.PATTERN_LINE1.Eval(board, b1, b2, b3, b4, stone) * 1.2F
+                + Program.PATTERN_LINE2.Eval(board, b1, b2, b3, b4, stone)
+                + Program.PATTERN_LINE3.Eval(board, b1, b2, b3, b4, stone)
+                + Program.PATTERN_DIAGONAL8.Eval(board, b1, b2, b3, b4, stone)
+                + Program.PATTERN_DIAGONAL7.Eval(board, b1, b2, b3, b4, stone);
         }
     }
 

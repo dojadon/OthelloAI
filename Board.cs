@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Numerics;
 using System.Runtime.Intrinsics.X86;
 using System.Runtime.Intrinsics;
+using System.Buffers.Binary;
 
 namespace OthelloAI
 {
@@ -85,35 +86,29 @@ namespace OthelloAI
             }
         }
 
-        public Board Rotated180() => new Board(Rotate180(bitB), Rotate180(bitW), stoneCount);
-
-        public static ulong Rotate180(ulong x)
-        {
-            ulong h1 = (0x5555555555555555);
-            ulong h2 = (0x3333333333333333);
-            ulong h4 = (0x0F0F0F0F0F0F0F0F);
-            ulong v1 = (0x00FF00FF00FF00FF);
-            ulong v2 = (0x0000FFFF0000FFFF);
-            x = ((x >> 1) & h1) | ((x & h1) << 1);
-            x = ((x >> 2) & h2) | ((x & h2) << 2);
-            x = ((x >> 4) & h4) | ((x & h4) << 4);
-            x = ((x >> 8) & v1) | ((x & v1) << 8);
-            x = ((x >> 16) & v2) | ((x & v2) << 16);
-            x = (x >> 32) | (x << 32);
-            return x;
-        }
-
         public Board HorizontalMirrored() => new Board(HorizontalMirror(bitB), HorizontalMirror(bitW), stoneCount);
 
-        public static ulong HorizontalMirror(ulong b)
+        public static ulong HorizontalMirror(ulong x)
         {
-            b = ((b >> 8) & 0x00FF00FF00FF00FFUL) | ((b << 8) & 0xFF00FF00FF00FF00UL);
-            b = ((b >> 16) & 0x0000FFFF0000FFFFUL) | ((b << 16) & 0xFFFF0000FFFF0000UL);
-            b = ((b >> 32) & 0x00000000FFFFFFFFUL) | ((b << 32) & 0xFFFFFFFF00000000UL);
-            return b;
+            return BinaryPrimitives.ReverseEndianness(x);
         }
 
         public Board VerticalMirrored() => new Board(VerticalMirror(bitB), VerticalMirror(bitW), stoneCount);
+
+        /*public static Board VerticalMirror(ulong b, ulong w)
+        {
+            Vector128<ulong> v = Vector128.Create(b, w);
+            v = Sse2.Or(Sse2.And(Sse2.ShiftRightLogical(v, 1), Vector128.Create(0x5555555555555555UL)),
+                    Sse2.And(Sse2.ShiftLeftLogical(v, 1), Vector128.Create(0xAAAAAAAAAAAAAAAAUL)));
+
+            v = Sse2.Or(Sse2.And(Sse2.ShiftRightLogical(v, 2), Vector128.Create(0x3333333333333333UL)),
+                    Sse2.And(Sse2.ShiftLeftLogical(v, 2), Vector128.Create(0xCCCCCCCCCCCCCCCCUL)));
+
+            v = Sse2.Or(Sse2.And(Sse2.ShiftRightLogical(v, 4), Vector128.Create(0x0F0F0F0F0F0F0F0FUL)),
+                    Sse2.And(Sse2.ShiftLeftLogical(v, 4), Vector128.Create(0xF0F0F0F0F0F0F0F0UL)));
+
+            return new Board(Avx2.Extract(v, 0));
+        }*/
 
         public static ulong VerticalMirror(ulong b)
         {
@@ -125,6 +120,12 @@ namespace OthelloAI
         }
 
         public Board Transposed() => new Board(Transpose(bitB), Transpose(bitW), stoneCount);
+
+        public static ulong TransposeAvx(ulong x)
+        {
+            Vector256<ulong> v = Avx2.ShiftLeftLogicalVariable(Vector256.Create(x), Vector256.Create(0ul, 1ul, 2ul, 3ul));
+            return ((ulong) Avx2.MoveMask(v.AsByte()) << 32)  | (uint) Avx2.MoveMask(Avx2.ShiftLeftLogical(v, 4).AsByte());
+        }
 
         public static ulong Transpose(ulong x)
         {
@@ -139,9 +140,6 @@ namespace OthelloAI
             t = k1 & (x ^ (x << 9));
             x ^= t ^ (t >> 9);
             return x;
-
-            //Vector256<ulong> v = Avx2.ShiftLeftLogicalVariable(Vector256.Create(b), Vector256.Create(0ul, 1ul, 2ul, 3ul));
-            //return ((ulong) Avx2.MoveMask(v.AsByte()) << 32)  | (uint) Avx2.MoveMask(Avx2.ShiftLeftLogical(v, 4).AsByte());
         }
 
         public static int BitCount(ulong v)
