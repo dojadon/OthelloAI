@@ -38,6 +38,8 @@ namespace OthelloAI.Patterns
 
     public class PatternEdge2X : Pattern
     {
+        public override int[] Positions { get; } = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 14};
+
         public PatternEdge2X(string filePath, PatternType type) : base(filePath, type, 10)
         {
         }
@@ -46,34 +48,12 @@ namespace OthelloAI.Patterns
         {
             return (int)((board.bitB & 0xFF) | ((board.bitB & 0x200) >> 1) | ((board.bitB & 0x4000) >> 5) | ((board.bitW & 0xFF) << 10) | ((board.bitW & 0x200) << 9) | ((board.bitW & 0x4000) << 5));
         }
-
-        public override Board SetBoard(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-            int[] postions = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 14 };
-
-            for (int i = 0; i < 10; i++)
-            {
-                int id = hash % 3;
-                switch (id)
-                {
-                    case 1:
-                        b |= Board.Mask(postions[i]);
-                        break;
-
-                    case 2:
-                        w |= Board.Mask(postions[i]);
-                        break;
-                }
-                hash /= 3;
-            }
-            return new Board(b, w);
-        }
     }
 
     public class PatternVerticalLine3 : Pattern
     {
+        public override int[] Positions { get; } = { 24, 25, 26, 27, 28, 29, 30, 31};
+
         public PatternVerticalLine3(string filePath, PatternType type) : base(filePath, type, 8)
         {
         }
@@ -82,33 +62,12 @@ namespace OthelloAI.Patterns
         {
             return (int)(((board.bitB & 0xFF000000) >> 24) | ((board.bitW & 0xFF000000) >> 14));
         }
-
-        public override Board SetBoard(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-
-            for (int i = 0; i < 8; i++)
-            {
-                int id = hash % 3;
-                switch (id)
-                {
-                    case 1:
-                        b |= 1UL << (i + 24);
-                        break;
-
-                    case 2:
-                        w |= 1UL << (i + 24);
-                        break;
-                }
-                hash /= 3;
-            }
-            return new Board(b, w);
-        }
     }
 
     public class PatternVerticalLine2 : Pattern
     {
+        public override int[] Positions { get; } = { 16, 17, 18, 19, 20, 21, 22, 23};
+
         public PatternVerticalLine2(string filePath, PatternType type) : base(filePath, type, 8)
         {
         }
@@ -117,33 +76,12 @@ namespace OthelloAI.Patterns
         {
             return (int)(((board.bitB & 0xFF0000) >> 16) | ((board.bitW & 0xFF0000) >> 6));
         }
-
-        public override Board SetBoard(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-
-            for (int i = 0; i < 8; i++)
-            {
-                int id = hash % 3;
-                switch (id)
-                {
-                    case 1:
-                        b |= 1UL << (i + 16);
-                        break;
-
-                    case 2:
-                        w |= 1UL << (i + 16);
-                        break;
-                }
-                hash /= 3;
-            }
-            return new Board(b, w);
-        }
     }
 
     public class PatternVerticalLine1 : Pattern
     {
+        public override int[] Positions { get; } = { 8, 9, 10, 11, 12, 13, 14, 15};
+
         public PatternVerticalLine1(string filePath, PatternType type) : base(filePath, type, 8)
         {
         }
@@ -152,70 +90,32 @@ namespace OthelloAI.Patterns
         {
             return (int)(((board.bitB & 0xFF00) >> 8) | ((board.bitW & 0xFF00) << 2));
         }
-
-        public override Board SetBoard(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-
-            for (int i = 0; i < 8; i++)
-            {
-                int id = hash % 3;
-                switch (id)
-                {
-                    case 1:
-                        b |= 1UL << (i + 8);
-                        break;
-
-                    case 2:
-                        w |= 1UL << (i + 8);
-                        break;
-                }
-                hash /= 3;
-            }
-            return new Board(b, w);
-        }
     }
 
     public class PatternBitMask : Pattern
     {
         public ulong Mask { get; }
 
+        public override int[] Positions { get; }
+
         public PatternBitMask(string filePath, PatternType type, int length, ulong mask) : base(filePath, type, length)
         {
             Mask = mask;
+            Positions = new int[length];
+
+            int index = 0;
+            for (int i = 0; i < 64; i++)
+            {
+                if (((mask >> i) & 1) != 0)
+                {
+                    Positions[index++] = i;
+                }
+            }
         }
 
         public override int GetBinHash(in Board board)
         {
             return (int)(Bmi2.X64.ParallelBitExtract(board.bitB, Mask) | (Bmi2.X64.ParallelBitExtract(board.bitW, Mask) << 10));
-        }
-
-        public override Board SetBoard(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-            ulong mask = Mask;
-
-            for (int i = 0; i < 64; i++)
-            {
-                if (((mask >> i) & 1) != 0)
-                {
-                    int id = hash % 3;
-                    switch (id)
-                    {
-                        case 1:
-                            b |= Board.Mask(i);
-                            break;
-
-                        case 2:
-                            w |= Board.Mask(i);
-                            break;
-                    }
-                    hash /= 3;
-                }
-            }
-            return new Board(b, w);
         }
     }
 
@@ -252,6 +152,8 @@ namespace OthelloAI.Patterns
 
         public int HashLength { get; }
         public int ArrayLength => POW3_TABLE[HashLength];
+
+        public abstract int[] Positions { get; }
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
 
@@ -305,7 +207,7 @@ namespace OthelloAI.Patterns
         {
             byte[] eval = StageBasedEvaluationsB[GetStage(org)];
 
-            int result = 0;
+            int result;
             int h1, h2, h3, h4;
 
             switch (Type)
@@ -331,8 +233,10 @@ namespace OthelloAI.Patterns
                     h2 = GetHash(hor);
                     result = eval[h1] + eval[h2];
                     break;
-            }
 
+                default:
+                    throw new NotImplementedException();
+            }
 
             /* int result = Type switch
              {
@@ -344,7 +248,28 @@ namespace OthelloAI.Patterns
             return result * stone;
         }
 
-        public abstract Board SetBoard(int hash);
+        public Board SetBoard(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+
+            for (int i = 0; i < HashLength; i++)
+            {
+                int id = hash % 3;
+                switch (id)
+                {
+                    case 1:
+                        b |= Board.Mask(Positions[i]);
+                        break;
+
+                    case 2:
+                        w |= Board.Mask(Positions[i]);
+                        break;
+                }
+                hash /= 3;
+            }
+            return new Board(b, w);
+        }
 
         public int FlipStone(int hash)
         {

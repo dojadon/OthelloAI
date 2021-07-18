@@ -54,6 +54,18 @@ namespace OthelloAI
         }
     }
 
+    readonly struct MoveEvaluation
+    {
+        public readonly ulong move;
+        public readonly float eval;
+
+        public MoveEvaluation(ulong move, float eval)
+        {
+            this.move = move;
+            this.eval = eval;
+        }
+    }
+
     public class PlayerNegascout : PlayerAlphaBetaBased
     {
         public int[] timeLimit;
@@ -166,6 +178,8 @@ namespace OthelloAI
 
             if (ShouldDoMoveOrdering(depth))
             {
+
+
                 movesEnumerable = movesEnumerable.OrderByDescending(m =>
                 {
                     return -Search(board.Reversed(m, stone), -stone, GetShallowSearchDepth(depth), -beta, -alpha, out _);
@@ -174,7 +188,7 @@ namespace OthelloAI
             }
             else
             {
-                return Negamax(board, stone, movesEnumerable, depth, alpha, beta, out result);
+                return Negamax(board, stone, new BitsEnumerable(moves), depth, alpha, beta, out result);
             }
         }
 
