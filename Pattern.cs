@@ -6,12 +6,12 @@ using System.Runtime.Intrinsics.X86;
 namespace OthelloAI.Patterns
 {
     public enum PatternType
-    { 
+    {
         X_SYMETRIC, XY_SYMETRIC, DIAGONAL
     }
 
     public class MirroredNeededBoards
-    { 
+    {
         public Board Original { get; }
         public Board Transposed { get; }
         public Board HorizontalMirrored { get; }
@@ -36,48 +36,191 @@ namespace OthelloAI.Patterns
         }
     }
 
-    public class Pattern
+    public class PatternEdge2X : Pattern
     {
-        private abstract class EvaledBoardSelector
+        public PatternEdge2X(string filePath, PatternType type) : base(filePath, type, 10)
         {
-            public abstract float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270);
         }
 
-        private class EvaledBoardSelectorXSymmetric : EvaledBoardSelector
+        public override int GetBinHash(in Board board)
         {
-            public override float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+            return (int)((board.bitB & 0xFF) | ((board.bitB & 0x200) >> 1) | ((board.bitB & 0x4000) >> 5) | ((board.bitW & 0xFF) << 10) | ((board.bitW & 0x200) << 9) | ((board.bitW & 0x4000) << 5));
+        }
+
+        public override Board SetBoard(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+            int[] postions = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 14 };
+
+            for (int i = 0; i < 10; i++)
             {
-                float result = eval[GetHash(org, mask)];
-                result += eval[GetHash(tr, mask)];
-                result += eval[GetHash(hor, mask)];
-                result += eval[GetHash(rot90, mask)];
-                return result;
-            }
-        }
+                int id = hash % 3;
+                switch (id)
+                {
+                    case 1:
+                        b |= Board.Mask(postions[i]);
+                        break;
 
-        private class EvaledBoardSelectorXYSymmetric : EvaledBoardSelector
+                    case 2:
+                        w |= Board.Mask(postions[i]);
+                        break;
+                }
+                hash /= 3;
+            }
+            return new Board(b, w);
+        }
+    }
+
+    public class PatternVerticalLine3 : Pattern
+    {
+        public PatternVerticalLine3(string filePath, PatternType type) : base(filePath, type, 8)
         {
-            public override float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
-            {
-                float result = eval[GetHash(org, mask)];
-                result += eval[GetHash(tr, mask)];
-                result += eval[GetHash(hor, mask)];
-                result += eval[GetHash(rot270, mask)];
-                return result;
-            }
         }
 
-        private class EvaledBoardSelectorDiagonal : EvaledBoardSelector
+        public override int GetBinHash(in Board board)
         {
-            public override float Eval(byte[] eval, ulong mask, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
-            {
-                float result = eval[GetHash(org, mask)];
-                result += eval[GetHash(hor, mask)];
-
-                return result;
-            }
+            return (int)(((board.bitB & 0xFF000000) >> 24) | ((board.bitW & 0xFF000000) >> 14));
         }
 
+        public override Board SetBoard(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+
+            for (int i = 0; i < 8; i++)
+            {
+                int id = hash % 3;
+                switch (id)
+                {
+                    case 1:
+                        b |= 1UL << (i + 24);
+                        break;
+
+                    case 2:
+                        w |= 1UL << (i + 24);
+                        break;
+                }
+                hash /= 3;
+            }
+            return new Board(b, w);
+        }
+    }
+
+    public class PatternVerticalLine2 : Pattern
+    {
+        public PatternVerticalLine2(string filePath, PatternType type) : base(filePath, type, 8)
+        {
+        }
+
+        public override int GetBinHash(in Board board)
+        {
+            return (int)(((board.bitB & 0xFF0000) >> 16) | ((board.bitW & 0xFF0000) >> 6));
+        }
+
+        public override Board SetBoard(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+
+            for (int i = 0; i < 8; i++)
+            {
+                int id = hash % 3;
+                switch (id)
+                {
+                    case 1:
+                        b |= 1UL << (i + 16);
+                        break;
+
+                    case 2:
+                        w |= 1UL << (i + 16);
+                        break;
+                }
+                hash /= 3;
+            }
+            return new Board(b, w);
+        }
+    }
+
+    public class PatternVerticalLine1 : Pattern
+    {
+        public PatternVerticalLine1(string filePath, PatternType type) : base(filePath, type, 8)
+        {
+        }
+
+        public override int GetBinHash(in Board board)
+        {
+            return (int)(((board.bitB & 0xFF00) >> 8) | ((board.bitW & 0xFF00) << 2));
+        }
+
+        public override Board SetBoard(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+
+            for (int i = 0; i < 8; i++)
+            {
+                int id = hash % 3;
+                switch (id)
+                {
+                    case 1:
+                        b |= 1UL << (i + 8);
+                        break;
+
+                    case 2:
+                        w |= 1UL << (i + 8);
+                        break;
+                }
+                hash /= 3;
+            }
+            return new Board(b, w);
+        }
+    }
+
+    public class PatternBitMask : Pattern
+    {
+        public ulong Mask { get; }
+
+        public PatternBitMask(string filePath, PatternType type, int length, ulong mask) : base(filePath, type, length)
+        {
+            Mask = mask;
+        }
+
+        public override int GetBinHash(in Board board)
+        {
+            return (int)(Bmi2.X64.ParallelBitExtract(board.bitB, Mask) | (Bmi2.X64.ParallelBitExtract(board.bitW, Mask) << 10));
+        }
+
+        public override Board SetBoard(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+            ulong mask = Mask;
+
+            for (int i = 0; i < 64; i++)
+            {
+                if (((mask >> i) & 1) != 0)
+                {
+                    int id = hash % 3;
+                    switch (id)
+                    {
+                        case 1:
+                            b |= Board.Mask(i);
+                            break;
+
+                        case 2:
+                            w |= Board.Mask(i);
+                            break;
+                    }
+                    hash /= 3;
+                }
+            }
+            return new Board(b, w);
+        }
+    }
+
+    public abstract class Pattern
+    {
         public static readonly unsafe int[] TERNARY_TABLE = new int[1 << 20];
 
         public static void InitTable()
@@ -86,14 +229,14 @@ namespace OthelloAI.Patterns
             {
                 int result = 0;
 
-                for(int i = 0; i < 10; i++)
+                for (int i = 0; i < 10; i++)
                 {
                     result += ((b >> i) & 1) * POW3_TABLE[i];
                 }
                 return result;
             }
 
-            for(int i = 0; i < TERNARY_TABLE.Length; i++)
+            for (int i = 0; i < TERNARY_TABLE.Length; i++)
             {
                 TERNARY_TABLE[i] = Convert(i) + Convert(i >> 10) * 2;
             }
@@ -105,30 +248,20 @@ namespace OthelloAI.Patterns
 
         protected string FilePath { get; }
 
+        protected PatternType Type { get; }
+
         public int HashLength { get; }
         public int ArrayLength => POW3_TABLE[HashLength];
-
-        public ulong Mask { get; }
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
 
         protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
 
-        private EvaledBoardSelector Selector { get; }
-
-        public Pattern(string filePath, PatternType type, int length, ulong mask)
+        public Pattern(string filePath, PatternType type, int length)
         {
             FilePath = filePath;
+            Type = type;
             HashLength = length;
-            Mask = mask;
-
-            Selector = type switch
-            {
-                PatternType.X_SYMETRIC => new EvaledBoardSelectorXSymmetric(),
-                PatternType.XY_SYMETRIC => new EvaledBoardSelectorXYSymmetric(),
-                PatternType.DIAGONAL => new EvaledBoardSelectorDiagonal(),
-                _ => throw new NotImplementedException(),
-            };
         }
 
         public virtual void Init()
@@ -149,7 +282,7 @@ namespace OthelloAI.Patterns
         {
             int stage = GetStage(board);
 
-            int hash = GetHash(board, Mask);
+            int hash = GetHash(board);
             int flipped = FlipStone(hash);
 
             StageBasedEvaluations[stage][hash] += add;
@@ -161,48 +294,57 @@ namespace OthelloAI.Patterns
             return POW3_TABLE[HashLength];
         }
 
-        public static int GetBinHash(in Board board, ulong mask)
+        public abstract int GetBinHash(in Board board);
+
+        public int GetHash(in Board board)
         {
-            return (int)(Bmi2.X64.ParallelBitExtract(board.bitB, mask) | (Bmi2.X64.ParallelBitExtract(board.bitW, mask) << 10));
+            return TERNARY_TABLE[GetBinHash(board)];
         }
 
-        public static int GetHash(in Board board, ulong mask) 
-        {
-            return TERNARY_TABLE[GetBinHash(board, mask)];
-        }
-
-        public virtual float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270, int stone)
+        public float Eval(int stone, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
             byte[] eval = StageBasedEvaluationsB[GetStage(org)];
-            return Selector.Eval(eval, Mask, org, tr, hor, rot90, rot270) * stone;
-        }
 
-        public Board SetBoard(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-            ulong mask = Mask;
+            int result = 0;
+            int h1, h2, h3, h4;
 
-            for(int i = 0; i < 64; i++)
+            switch (Type)
             {
-                if(((mask >> i) & 1) != 0)
-                {
-                    int id = hash % 3;
-                    switch (id)
-                    {
-                        case 1:
-                            b |= Board.Mask(i);
-                            break;
+                case PatternType.X_SYMETRIC:
+                    h1 = GetHash(org);
+                    h2 = GetHash(tr);
+                    h3 = GetHash(hor);
+                    h4 = GetHash(rot90);
+                    result = eval[h1] + eval[h2] + eval[h3] + eval[h4];
+                    break;
 
-                        case 2:
-                            w |= Board.Mask(i);
-                            break;
-                    }
-                    hash /= 3;
-                }
+                case PatternType.XY_SYMETRIC:
+                    h1 = GetHash(org);
+                    h2 = GetHash(tr);
+                    h3 = GetHash(hor);
+                    h4 = GetHash(rot270);
+                    result = eval[h1] + eval[h2] + eval[h3] + eval[h4];
+                    break;
+
+                case PatternType.DIAGONAL:
+                    h1 = GetHash(org);
+                    h2 = GetHash(hor);
+                    result = eval[h1] + eval[h2];
+                    break;
             }
-            return new Board(b, w);
+
+
+            /* int result = Type switch
+             {
+                 PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)],
+                 PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)],
+                 PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)],
+                 _ => throw new NotImplementedException()
+             };*/
+            return result * stone;
         }
+
+        public abstract Board SetBoard(int hash);
 
         public int FlipStone(int hash)
         {
@@ -242,7 +384,7 @@ namespace OthelloAI.Patterns
                 for (int i = 0; i < ArrayLength; i++)
                 {
                     StageBasedEvaluations[stage][i] = reader.ReadSingle();
-                    StageBasedEvaluationsB[stage][i] = (byte) (StageBasedEvaluations[stage][i] * 16 + 128);
+                    StageBasedEvaluationsB[stage][i] = (byte)Math.Clamp(StageBasedEvaluations[stage][i] * 32 + 128, byte.MinValue, byte.MaxValue);
                 }
             }
         }
@@ -262,14 +404,14 @@ namespace OthelloAI.Patterns
 
         public bool Test()
         {
-            return Enumerable.Range(0, GetArrayLength()).All(i => GetHash(SetBoard(i), Mask) == i);
+            return Enumerable.Range(0, GetArrayLength()).All(i => GetHash(SetBoard(i)) == i);
         }
 
         public void Info(int stage, float threshold)
         {
             for (int i = 0; i < GetArrayLength(); i++)
             {
-                if (StageBasedEvaluations[stage][i]  > threshold)
+                if (StageBasedEvaluations[stage][i] > threshold)
                 {
                     InfoHash(stage, i);
                 }

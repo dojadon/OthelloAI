@@ -76,7 +76,7 @@ namespace OthelloAI
                 var boards = new MirroredBoards(board);
                 MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
-                float e = result - Patterns.Sum(p => p.Eval(board, b1, b2, b3, b4, 1));
+                float e = result - Patterns.Sum(p => p.Eval(1, board, b1, b2, b3, b4));
                 Array.ForEach(Patterns, p => Array.ForEach(boards.Boards, b => p.UpdataEvaluation(b, e * alpha)));
 
                 if(board.stoneCount == 40)
