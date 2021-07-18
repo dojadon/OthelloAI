@@ -189,6 +189,10 @@ namespace OthelloAI
             return (obj is Board b) && (b.bitB == bitB) && (b.bitW == bitW);
         }
 
+        public ulong GetMoves() => GetMovesAvx2(bitB, bitW);
+
+        public ulong GetOpponentMoves() => GetMovesAvx2(bitW, bitB);
+
         public ulong GetMoves(int stone) => stone switch
         {
             BLACK => GetMovesAvx2(bitB, bitW),
@@ -271,6 +275,17 @@ namespace OthelloAI
             M = Sse2.Or(Avx2.ExtractVector128(MM, 0), Avx2.ExtractVector128(MM, 1));
             M = Sse2.Or(M, Sse2.UnpackHigh(M, M));
             return M.ToScalar() & ~(P | O); // mask with empties
+        }
+
+        public Board ColorFliped()
+        {
+            return new Board(bitW, bitB, stoneCount);
+        }
+
+        public Board Reversed(ulong move)
+        {
+            ulong reversed = ReverseAvx(move, bitB, bitW);
+            return new Board(bitW ^ reversed, bitB ^ (move | reversed), stoneCount + 1);
         }
 
         public Board Reversed(ulong move, int stone)
@@ -377,6 +392,8 @@ namespace OthelloAI
 
             return 0;
         }
+
+        public int GetStoneCount() => BitCount(bitB);
 
         public int GetStoneCount(int s) => s switch
         {

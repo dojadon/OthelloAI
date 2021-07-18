@@ -36,14 +36,14 @@ namespace OthelloAI
                 Console.WriteLine(p);
             }
 
-        //   PATTERN_EDGE2X.Info(30, 1F);
+          //  PATTERN_EDGE2X.Info(30, 1F);
 
-           //var builder = new PatternEvaluationBuilder(PATTERNS);
-          // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
-           //builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
+            //var builder = new PatternEvaluationBuilder(PATTERNS);
+            //builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log0.dat");
+            //builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
-            //StartClient();
-            StartGame();
+        StartClient();
+         //   StartGame();
         }
 
         static void StartClient()
@@ -51,10 +51,10 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerNegascout p = new PlayerNegascout(evaluator)
             {
-                SearchDepth = 9,
-                DepthDoMoveOrdering = 6,
+                SearchDepth = 10,
+                DepthDoMoveOrdering = 7,
                 ShallowSearchDepth = 0,
-                StoneCountDoFullSearch = 46
+                StoneCountDoFullSearch = 40
             };
 
             Client client = new Client(p);
@@ -83,7 +83,7 @@ namespace OthelloAI
                 SearchDepth = 9,
                 DepthDoMoveOrdering = 6,
                 ShallowSearchDepth = 0,
-                StoneCountDoFullSearch = 60
+                StoneCountDoFullSearch = 46
             };
 
             for (int i = 0; i < 1; i++)
@@ -97,14 +97,13 @@ namespace OthelloAI
                 Console.WriteLine(i);
             }
 
-            for(int i = 0; i < p.time.Length; i++)
-            {
-                if(p.count[i] > 0)
-                {
-                    Console.WriteLine(1000.0 * p.time[i] / p.count[i] / System.Diagnostics.Stopwatch.Frequency);
-                    Console.WriteLine();
-                }
-            }
+            var converted = p.times.Select(t => 1000.0 * t / System.Diagnostics.Stopwatch.Frequency);
+            Console.WriteLine($"Average : {converted.Average()}");
+            Console.WriteLine($"Min : {converted.Min()}");
+            Console.WriteLine($"Max : {converted.Max()}");
+            Console.WriteLine();
+            Console.WriteLine(string.Join("\r\n", converted));
+            Console.WriteLine();
         }
     }
 }

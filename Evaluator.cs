@@ -9,12 +9,12 @@ namespace OthelloAI
 {
     public abstract class Evaluator
     {
-        public abstract float Eval(Board board, int stone);
+        public abstract float Eval(Board board);
     }
 
     public class EvaluatorPatternBased : Evaluator
     {
-        public override float Eval(Board board, int stone)
+        public override float Eval(Board board)
         {
             /*
             float eval = 0;
@@ -27,16 +27,15 @@ namespace OthelloAI
 
             MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
-            return Program.PATTERN_EDGE2X.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_EDGE_BLOCK.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_CORNER_BLOCK.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_CORNER.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_LINE1.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_LINE2.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_LINE3.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_DIAGONAL8.Eval(stone, board, b1, b2, b3, b4)
-                    + Program.PATTERN_DIAGONAL7.Eval(stone, board, b1, b2, b3, b4);
-
+            return Program.PATTERN_EDGE2X.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_EDGE_BLOCK.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_CORNER_BLOCK.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_CORNER.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_LINE1.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_LINE2.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_LINE3.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_DIAGONAL8.Eval(board, b1, b2, b3, b4)
+                    + Program.PATTERN_DIAGONAL7.Eval(board, b1, b2, b3, b4);
         }
     }
 
@@ -52,9 +51,9 @@ namespace OthelloAI
             Randomness = randomness;
         }
 
-        public override float Eval(Board board, int stone)
+        public override float Eval(Board board)
         {
-            return Evaluator.Eval(board, stone) + (float)Rand.NextDouble() * Randomness;
+            return Evaluator.Eval(board) + (float)Rand.NextDouble() * Randomness;
         }
     }
 

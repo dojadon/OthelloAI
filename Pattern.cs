@@ -203,11 +203,11 @@ namespace OthelloAI.Patterns
             return TERNARY_TABLE[GetBinHash(board)];
         }
 
-        public float Eval(int stone, in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+        public float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
-            byte[] eval = StageBasedEvaluationsB[GetStage(org)];
+            float[] eval = StageBasedEvaluations[GetStage(org)];
 
-            int result;
+            float result;
             int h1, h2, h3, h4;
 
             switch (Type)
@@ -245,7 +245,7 @@ namespace OthelloAI.Patterns
                  PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)],
                  _ => throw new NotImplementedException()
              };*/
-            return result * stone;
+            return result;
         }
 
         public Board SetBoard(int hash)
@@ -283,16 +283,6 @@ namespace OthelloAI.Patterns
                 result += s * POW3_TABLE[i];
             }
             return result;
-        }
-
-        public static int Reverse(int value) => (int)Reverse((uint)value);
-
-        public static uint Reverse(uint value)
-        {
-            return (value & 0xFF) << 24 |
-                    ((value >> 8) & 0xFF) << 16 |
-                    ((value >> 16) & 0xFF) << 8 |
-                    ((value >> 24) & 0xFF);
         }
 
         public void Load()

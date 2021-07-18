@@ -20,9 +20,9 @@ namespace OthelloAI
             Evaluator = evaluator;
         }
 
-        protected float EvalFinishedGame(Board board, int stone)
+        protected float EvalFinishedGame(Board board)
         {
-            return board.GetStoneCount(stone) * 10000;
+            return board.GetStoneCount() * 10000;
         }
 
         protected int GetSearchDepth(Board board)
@@ -30,7 +30,7 @@ namespace OthelloAI
             if (board.stoneCount > StoneCountDoFullSearch)
             {
                 Console.WriteLine("完全読み開始");
-                return 64 - board.stoneCount;
+                return 64 - board.stoneCount + 10;
             }
             else
             {
@@ -54,18 +54,6 @@ namespace OthelloAI
         }
     }
 
-    readonly struct MoveEvaluation
-    {
-        public readonly ulong move;
-        public readonly float eval;
-
-        public MoveEvaluation(ulong move, float eval)
-        {
-            this.move = move;
-            this.eval = eval;
-        }
-    }
-
     public class PlayerNegascout : PlayerAlphaBetaBased
     {
         public int[] timeLimit;
@@ -74,25 +62,17 @@ namespace OthelloAI
         {
         }
 
-        public long[] count = new long[5];
-        public long[] time = new long[5];
+        public List<long> times = new List<long>();
 
-        public float Eval(Board board, int stone)
+        public float Eval(Board board)
         {
-            if (board.stoneCount >= 60)
-            {
-                return board.GetStoneCount(stone);
-            }
-            else
-            {
-                return Evaluator.Eval(board, stone);
-            }
+            return Evaluator.Eval(board);
         }
 
-        public float Negascout(Board board, int stone, IEnumerable<ulong> moves, int depth, float alpha, float beta, out ulong result)
+        public float Negascout(Board board, IEnumerable<ulong> moves, int depth, float alpha, float beta, out ulong result)
         {
             result = moves.First();
-            float max = -Search(board.Reversed(result, stone), -stone, depth - 1, -beta, -alpha, out _);
+            float max = -Search(board.Reversed(result), depth - 1, -beta, -alpha, out _);
 
             if (beta <= max)
                 return max;
@@ -101,8 +81,8 @@ namespace OthelloAI
 
             foreach (ulong move in moves.Skip(1))
             {
-                Board reversed = board.Reversed(move, stone);
-                float eval = -Search(reversed, -stone, depth - 1, -alpha - 1, -alpha, out _);
+                Board reversed = board.Reversed(move);
+                float eval = -Search(reversed, depth - 1, -alpha - 1, -alpha, out _);
 
                 if (beta <= eval)
                     return eval;
@@ -110,7 +90,7 @@ namespace OthelloAI
                 if (alpha < eval)
                 {
                     alpha = eval;
-                    eval = -Search(reversed, -stone, depth - 1, -beta, -alpha, out _);
+                    eval = -Search(reversed, depth - 1, -beta, -alpha, out _);
 
                     if (beta <= eval)
                         return eval;
@@ -127,13 +107,13 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negamax(Board board, int stone, IEnumerable<ulong> moves, int depth, float alpha, float beta, out ulong result)
+        public float Negamax(Board board, IEnumerable<ulong> moves, int depth, float alpha, float beta, out ulong result)
         {
             result = 0;
 
             foreach (ulong move in moves)
             {
-                float eval = -Search(board.Reversed(move, stone), -stone, depth - 1, -beta, -alpha, out _);
+                float eval = -Search(board.Reversed(move), depth - 1, -beta, -alpha, out _);
                 if (alpha < eval)
                 {
                     alpha = eval;
@@ -146,95 +126,39 @@ namespace OthelloAI
             return alpha;
         }
 
-        public float Search(Board board, int stone, int depth, float alpha, float beta, out ulong result)
+        public float Search(Board board, int depth, float alpha, float beta, out ulong result)
         {
             result = 0;
 
             if (ShouldSkipSearch(depth))
             {
-                return Eval(board, stone);
+                return Eval(board);
             }
 
-            ulong moves = board.GetMoves(stone);
+            ulong moves = board.GetMoves();
             if (moves == 0)
             {
-                if (board.GetMoves(-stone) == 0)
+                if (board.GetOpponentMoves() == 0)
                 {
-                    return EvalFinishedGame(board, stone);
+                    return EvalFinishedGame(board);
                 }
                 else
                 {
-                    return -Search(board, -stone, depth - 1, -beta, -alpha, out _);
+                    return -Search(board.ColorFliped(), depth - 1, -beta, -alpha, out _);
                 }
             }
 
             if (Board.BitCount(moves) == 1)
             {
                 result = moves;
-                return -Search(board.Reversed(moves, stone), -stone, depth - 1, -beta, -alpha, out _);
-            }
 
-            IEnumerable<ulong> movesEnumerable = new BitsEnumerable(moves);
-
-            if (ShouldDoMoveOrdering(depth))
-            {
-
-
-                movesEnumerable = movesEnumerable.OrderByDescending(m =>
+                if(board.stoneCount == 63)
                 {
-                    return -Search(board.Reversed(m, stone), -stone, GetShallowSearchDepth(depth), -beta, -alpha, out _);
-                });
-                return Negascout(board, stone, movesEnumerable, depth, alpha, beta, out result);
-            }
-            else
-            {
-                return Negamax(board, stone, new BitsEnumerable(moves), depth, alpha, beta, out result);
-            }
-        }
-
-        public override Move DecideMove(Board board, int stone)
-        {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            Search(board, stone, GetSearchDepth(board), -100000000, 10000000, out ulong result);
-            sw.Stop();
-            count[2]++;
-            time[2] += sw.ElapsedTicks;
-            return new Move(result);
-        }
-    }
-
-    public class PlayerNegamax : PlayerAlphaBetaBased
-    {
-        public int[] timeLimit;
-
-        public PlayerNegamax(Evaluator evaluator) : base(evaluator)
-        {
-        }
-
-        public long[] count = new long[5];
-        public long[] time = new long[5];
-
-        public float Negamax(Board board, int stone, int depth, float alpha, float beta, out ulong result)
-        {
-            ulong dummy = 0;
-            result = 0;
-
-            if (ShouldSkipSearch(depth))
-            {
-                return Evaluator.Eval(board, stone);
-            }
-
-            ulong moves = board.GetMoves(stone);
-
-            if (moves == 0)
-            {
-                if (board.GetMoves(-stone) == 0)
-                {
-                    return EvalFinishedGame(board, stone);
+                    return -EvalFinishedGame(board.Reversed(moves));
                 }
                 else
                 {
-                    return -Negamax(board, -stone, depth - 1, -beta, -alpha, out dummy);
+                    return -Search(board.Reversed(moves), depth - 1, -beta, -alpha, out _);
                 }
             }
 
@@ -242,34 +166,35 @@ namespace OthelloAI
 
             if (ShouldDoMoveOrdering(depth))
             {
-                movesEnumerable = movesEnumerable.OrderByDescending(m =>
+                /*movesEnumerable = movesEnumerable.OrderByDescending(m =>
                 {
-                    return -Negamax(board.Reversed(m, stone), -stone, GetShallowSearchDepth(depth), -beta, -alpha, out dummy);
+                    return -Search(board.Reversed(m), GetShallowSearchDepth(depth), -beta, -alpha, out _);
+                });*/
+                movesEnumerable = movesEnumerable.OrderBy(m =>
+                {
+                    return Board.BitCount(board.Reversed(m).GetMoves());
                 });
-            }
 
-            foreach (ulong move in movesEnumerable)
+                return Negascout(board, movesEnumerable, depth, alpha, beta, out result);
+            }
+            else
             {
-                float eval = -Negamax(board.Reversed(move, stone), -stone, depth - 1, -beta, -alpha, out dummy);
-                if (alpha < eval)
-                {
-                    alpha = eval;
-                    result = move;
-                }
-
-                if (alpha >= beta)
-                    return alpha;
+                return Negamax(board, movesEnumerable, depth, alpha, beta, out result);
             }
-            return alpha;
         }
 
         public override Move DecideMove(Board board, int stone)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            Negamax(board, stone, GetSearchDepth(board), -100000000, 10000000, out ulong result);
+
+            if(stone == -1)
+                board = board.ColorFliped();
+
+            Console.WriteLine(Search(board, GetSearchDepth(board), -100000000, 10000000, out ulong result));
             sw.Stop();
-            count[2]++;
-            time[2] += sw.ElapsedTicks;
+
+            times.Add(sw.ElapsedTicks);
+
             return new Move(result);
         }
     }
