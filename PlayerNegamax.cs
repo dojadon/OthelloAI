@@ -5,6 +5,22 @@ using System.Linq;
 
 namespace OthelloAI
 {
+    public readonly struct MoveInfo
+    {
+        public readonly ulong move;
+        public readonly int count;
+        public readonly ulong nextMoves;
+        public readonly Board reversed;
+
+        public MoveInfo(ulong move, ulong nextMoves, int count, Board reversed)
+        {
+            this.move = move;
+            this.nextMoves = nextMoves;
+            this.count = count;
+            this.reversed = reversed;
+        }
+    }
+
     public abstract class PlayerAlphaBetaBased : Player
     {
         public Evaluator Evaluator { get; set; }
@@ -22,7 +38,12 @@ namespace OthelloAI
 
         protected float EvalFinishedGame(Board board)
         {
-            return board.GetStoneCount() * 10000;
+            return board.GetStoneCountGap() * 10000;
+        }
+
+        protected float EvalFinishedGameWithLastMove(Board board)
+        {
+            return (board.GetStoneCountGap() + board.GetReversedCountOnLastMove() * 2 + 1) * 10000;
         }
 
         protected int GetSearchDepth(Board board)
@@ -74,6 +95,9 @@ namespace OthelloAI
             result = moves.First();
             float max = -Search(board.Reversed(result), depth - 1, -beta, -alpha, out _);
 
+            if (CurrentDepth == depth)
+                Console.WriteLine($"{new Move(result)} : {max}");
+
             if (beta <= max)
                 return max;
 
@@ -85,17 +109,33 @@ namespace OthelloAI
                 float eval = -Search(reversed, depth - 1, -alpha - 1, -alpha, out _);
 
                 if (beta <= eval)
+                {
+                    if (CurrentDepth == depth)
+                    {
+                        Console.WriteLine($"{new Move(move)} : Rejected");
+                    }
                     return eval;
+                }
 
                 if (alpha < eval)
                 {
                     alpha = eval;
                     eval = -Search(reversed, depth - 1, -beta, -alpha, out _);
 
+                    if (CurrentDepth == depth)
+                    {
+                        Console.WriteLine($"{new Move(move)} : {eval}");
+                    }
+
                     if (beta <= eval)
                         return eval;
 
                     alpha = Math.Max(alpha, eval);
+                }
+                else
+                {
+                    if (CurrentDepth == depth)
+                        Console.WriteLine($"{new Move(move)} : Rejected");
                 }
 
                 if (max < eval)
@@ -119,6 +159,9 @@ namespace OthelloAI
                     alpha = eval;
                     result = move;
                 }
+
+                if (CurrentDepth == depth)
+                    Console.WriteLine($"{new Move(move)} : {eval}");
 
                 if (alpha >= beta)
                     return alpha;
@@ -148,11 +191,12 @@ namespace OthelloAI
                 }
             }
 
-            if (Board.BitCount(moves) == 1)
+            int count = Board.BitCount(moves);
+            if (count == 1)
             {
                 result = moves;
 
-                if(board.stoneCount == 63)
+                if (board.stoneCount == 63)
                 {
                     return -EvalFinishedGame(board.Reversed(moves));
                 }
@@ -164,17 +208,12 @@ namespace OthelloAI
 
             IEnumerable<ulong> movesEnumerable = new BitsEnumerable(moves);
 
-            if (ShouldDoMoveOrdering(depth))
+            if (count > 3 && ShouldDoMoveOrdering(depth))
             {
-                /*movesEnumerable = movesEnumerable.OrderByDescending(m =>
-                {
-                    return -Search(board.Reversed(m), GetShallowSearchDepth(depth), -beta, -alpha, out _);
-                });*/
                 movesEnumerable = movesEnumerable.OrderBy(m =>
                 {
                     return Board.BitCount(board.Reversed(m).GetMoves());
                 });
-
                 return Negascout(board, movesEnumerable, depth, alpha, beta, out result);
             }
             else
@@ -183,11 +222,15 @@ namespace OthelloAI
             }
         }
 
+        int CurrentDepth { get; set; }
+
         public override Move DecideMove(Board board, int stone)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
-            if(stone == -1)
+            CurrentDepth = GetSearchDepth(board);
+
+            if (stone == -1)
                 board = board.ColorFliped();
 
             Console.WriteLine(Search(board, GetSearchDepth(board), -100000000, 10000000, out ulong result));

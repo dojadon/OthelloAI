@@ -121,7 +121,7 @@ namespace OthelloAI.Patterns
 
     public abstract class Pattern
     {
-        public static readonly unsafe int[] TERNARY_TABLE = new int[1 << 20];
+        public static readonly int[] TERNARY_TABLE = new int[1 << 20];
 
         public static void InitTable()
         {
@@ -203,49 +203,31 @@ namespace OthelloAI.Patterns
             return TERNARY_TABLE[GetBinHash(board)];
         }
 
-        public float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+        public float EvalForTraining(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
             float[] eval = StageBasedEvaluations[GetStage(org)];
 
-            float result;
-            int h1, h2, h3, h4;
-
-            switch (Type)
+            float result = Type switch
             {
-                case PatternType.X_SYMETRIC:
-                    h1 = GetHash(org);
-                    h2 = GetHash(tr);
-                    h3 = GetHash(hor);
-                    h4 = GetHash(rot90);
-                    result = eval[h1] + eval[h2] + eval[h3] + eval[h4];
-                    break;
-
-                case PatternType.XY_SYMETRIC:
-                    h1 = GetHash(org);
-                    h2 = GetHash(tr);
-                    h3 = GetHash(hor);
-                    h4 = GetHash(rot270);
-                    result = eval[h1] + eval[h2] + eval[h3] + eval[h4];
-                    break;
-
-                case PatternType.DIAGONAL:
-                    h1 = GetHash(org);
-                    h2 = GetHash(hor);
-                    result = eval[h1] + eval[h2];
-                    break;
-
-                default:
-                    throw new NotImplementedException();
-            }
-
-            /* int result = Type switch
-             {
-                 PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)],
-                 PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)],
-                 PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)],
-                 _ => throw new NotImplementedException()
-             };*/
+                PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)],
+                PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)],
+                PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)],
+                _ => throw new NotImplementedException()
+            };
             return result;
+        }
+
+        public float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+        {
+            byte[] eval = StageBasedEvaluationsB[GetStage(org)];
+
+            return Type switch
+            {
+                PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)],
+                PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)],
+                PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)],
+                _ => throw new NotImplementedException()
+            };
         }
 
         public Board SetBoard(int hash)

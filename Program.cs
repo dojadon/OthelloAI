@@ -36,14 +36,15 @@ namespace OthelloAI
                 Console.WriteLine(p);
             }
 
-          //  PATTERN_EDGE2X.Info(30, 1F);
+            // PATTERN_EDGE2X.Info(30, 1F);
 
-            //var builder = new PatternEvaluationBuilder(PATTERNS);
-            //builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log0.dat");
-            //builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
+            /*var builder = new PatternEvaluationBuilder(PATTERNS);
+           builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log5.dat");
+           builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log6.dat");*/
 
-        StartClient();
-         //   StartGame();
+            //   StartClient();
+            StartGame();
+           // StartManualGame();
         }
 
         static void StartClient()
@@ -51,10 +52,10 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerNegascout p = new PlayerNegascout(evaluator)
             {
-                SearchDepth = 10,
-                DepthDoMoveOrdering = 7,
+                SearchDepth = 11,
+                DepthDoMoveOrdering = 8,
                 ShallowSearchDepth = 0,
-                StoneCountDoFullSearch = 40
+                StoneCountDoFullSearch = 44
             };
 
             Client client = new Client(p);
@@ -83,7 +84,7 @@ namespace OthelloAI
                 SearchDepth = 9,
                 DepthDoMoveOrdering = 6,
                 ShallowSearchDepth = 0,
-                StoneCountDoFullSearch = 46
+                StoneCountDoFullSearch = 44
             };
 
             for (int i = 0; i < 1; i++)
@@ -104,6 +105,35 @@ namespace OthelloAI
             Console.WriteLine();
             Console.WriteLine(string.Join("\r\n", converted));
             Console.WriteLine();
+        }
+
+        static void StartManualGame()
+        {
+            Evaluator evaluator = new EvaluatorPatternBased();
+            Player p1 = new PlayerNegascout(evaluator)
+            {
+                SearchDepth = 9,
+                DepthDoMoveOrdering = 6,
+                ShallowSearchDepth = 0,
+                StoneCountDoFullSearch = 44
+            };
+
+            Player p2 = new PlayerManual();
+
+            Board board = new Board();
+
+            for (int i = 0; i < 1; i++)
+            {
+                board = new Board(Board.InitB, Board.InitW, 4);
+
+                while (Step(ref board, p1, 1) | Step(ref board, p2, -1))
+                {
+                }
+            }
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine($"B: {board.GetStoneCount(1)}");
+            Console.WriteLine($"W: {board.GetStoneCount(-1)}");
         }
     }
 }

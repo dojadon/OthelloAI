@@ -57,6 +57,7 @@ namespace OthelloAI
                 }
             }
             Board = new Board(b);
+            Board.print();
             OnChangedBoard?.Invoke(Board);
         }
 
@@ -86,7 +87,7 @@ namespace OthelloAI
                 {
                     string line = reader.ReadLine();
                     string[] tokens = line.Split();
-                    Console.WriteLine("RECV <- " + line);
+                  //  Console.WriteLine("RECV <- " + line);
 
                     switch (tokens[0])
                     {
