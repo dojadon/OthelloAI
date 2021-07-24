@@ -6,50 +6,19 @@ using System.Threading.Tasks;
 
 namespace OthelloAI
 {
-	public struct Move
+	public readonly struct Move
 	{
-        public int x, y;
-        public ulong move;
-
-		public Move(int x, int y)
-		{
-			this.x = x;
-			this.y = y;
-			this.move = Board.Mask(x, y);
-		}
-
-		public Move(int x)
-		{
-			this.x = x / 8;
-			this.y = x % 8;
-			this.move = Board.Mask(x);
-		}
-
-		public Move(ulong move)
-		{
-			this.move = move;
-            x = y = -1;
-
-            if (move == 0)
-			{
-                return;
-			}
-
-			for (int i = 0; i < 64; i++)
-			{
-				if (((move >> i) & 1) == 1)
-				{
-					x = i / 8;
-					y = i % 8;
-
-					break;
-				}
-			}
-		}
-
-        public override string ToString()
+		public readonly ulong move;
+		public readonly Board reversed;
+		public readonly ulong moves;
+		public readonly int count;
+		
+		public Move(Board board, ulong move)
         {
-            return $"{x}, {y}";
+			this.move = move;
+			reversed = board.Reversed(move);
+			moves = reversed.GetMoves();
+			count = Board.BitCount(moves);
         }
     }
 }

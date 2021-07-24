@@ -16,15 +16,6 @@ namespace OthelloAI
     {
         public override float Eval(Board board)
         {
-            /*
-            float eval = 0;
-            for (int i = 0; i < Patterns.Length; i++)
-            {
-                eval += Patterns[i].Eval(board) * Weight[i];
-            }
-            return eval;
-            */
-
             MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
             return Program.PATTERN_EDGE2X.Eval(board, b1, b2, b3, b4)

@@ -8,6 +8,9 @@ namespace OthelloAI
 {
     static class Program
     {
+        public static readonly Pattern PATTERN_EDGE = new PatternVerticalLine0("e_edge.dat", PatternType.X_SYMETRIC);
+        public static readonly Pattern PATTERN_CORNER_SMALL = new PatternBitMask("e_corner_small.dat", PatternType.XY_SYMETRIC, 8, 0b00000111_00000111_00000011UL);
+
         public static readonly Pattern PATTERN_EDGE2X = new PatternEdge2X("e_edge_x.dat", PatternType.X_SYMETRIC);
         public static readonly Pattern PATTERN_EDGE_BLOCK = new PatternBitMask("e_edge_block.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
         public static readonly Pattern PATTERN_CORNER_BLOCK = new PatternBitMask("e_corner_block.dat", PatternType.XY_SYMETRIC, 9, 0b00000111_00000111_00000111UL);
@@ -20,7 +23,7 @@ namespace OthelloAI
         public static readonly Pattern PATTERN_DIAGONAL6 = new PatternBitMask("e_diag6.dat", PatternType.XY_SYMETRIC, 6, 0x10204081020UL);
         public static readonly Pattern PATTERN_DIAGONAL5 = new PatternBitMask("e_diag5.dat", PatternType.XY_SYMETRIC, 5, 0x102040810UL);
 
-        public static readonly Pattern[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER,
+        public static readonly Pattern[] PATTERNS = { PATTERN_EDGE, PATTERN_CORNER_SMALL, PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER,
             PATTERN_LINE1, PATTERN_LINE2, PATTERN_LINE3, PATTERN_DIAGONAL8, PATTERN_DIAGONAL7, PATTERN_DIAGONAL6,
             PATTERN_DIAGONAL5 };
 
@@ -36,15 +39,14 @@ namespace OthelloAI
                 Console.WriteLine(p);
             }
 
-            // PATTERN_EDGE2X.Info(30, 1F);
 
-            /*var builder = new PatternEvaluationBuilder(PATTERNS);
-           builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log5.dat");
-           builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log6.dat");*/
+            //    var builder = new PatternEvaluationBuilder(new Pattern[] { PATTERN_EDGE, PATTERN_CORNER_SMALL });
+            //   builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
+            // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
-            //   StartClient();
-            StartGame();
-           // StartManualGame();
+            // StartClient();
+           StartGame();
+            // StartManualGame();
         }
 
         static void StartClient()
@@ -52,10 +54,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerNegascout p = new PlayerNegascout(evaluator)
             {
-                SearchDepth = 11,
-                DepthDoMoveOrdering = 8,
-                ShallowSearchDepth = 0,
-                StoneCountDoFullSearch = 44
+                SearchDepth = 8,
+                DepthDoMoveOrdering = 6,
+                StoneCountDoFullSearch = 46
             };
 
             Client client = new Client(p);
@@ -64,10 +65,10 @@ namespace OthelloAI
 
         static bool Step(ref Board board, Player player, int stone)
         {
-            Move move = player.DecideMove(board, stone);
-            if (move.move != 0)
+            (int x, int y, ulong move) = player.DecideMove(board, stone);
+            if (move != 0)
             {
-                board = board.Reversed(move.move, stone);
+                board = board.Reversed(move, stone);
                 board.print();
                 return true;
             }
@@ -83,8 +84,7 @@ namespace OthelloAI
             {
                 SearchDepth = 9,
                 DepthDoMoveOrdering = 6,
-                ShallowSearchDepth = 0,
-                StoneCountDoFullSearch = 44
+                StoneCountDoFullSearch = 40
             };
 
             for (int i = 0; i < 1; i++)
@@ -95,15 +95,16 @@ namespace OthelloAI
                 {
                 }
 
+                Console.WriteLine($"B: {board.GetStoneCount(1)}");
+                Console.WriteLine($"W: {board.GetStoneCount(-1)}");
                 Console.WriteLine(i);
             }
 
-            var converted = p.times.Select(t => 1000.0 * t / System.Diagnostics.Stopwatch.Frequency);
-            Console.WriteLine($"Average : {converted.Average()}");
-            Console.WriteLine($"Min : {converted.Min()}");
-            Console.WriteLine($"Max : {converted.Max()}");
+            Console.WriteLine($"Average : {p.times.Average()}");
+            Console.WriteLine($"Min : {p.times.Min()}");
+            Console.WriteLine($"Max : {p.times.Max()}");
             Console.WriteLine();
-            Console.WriteLine(string.Join("\r\n", converted));
+            Console.WriteLine(string.Join("\r\n", p.times));
             Console.WriteLine();
         }
 
@@ -114,7 +115,6 @@ namespace OthelloAI
             {
                 SearchDepth = 9,
                 DepthDoMoveOrdering = 6,
-                ShallowSearchDepth = 0,
                 StoneCountDoFullSearch = 44
             };
 

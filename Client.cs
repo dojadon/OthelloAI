@@ -35,8 +35,8 @@ namespace OthelloAI
         {
             if (Stone == int.Parse(tokens[1]))
             {
-                Move move = Player.DecideMove(Board, Stone);
-                return $"PUT {move.x} {move.y}";
+                (int x, int y, _) = Player.DecideMove(Board, Stone);
+                return $"PUT {x} {y}";
             }
             else
             {

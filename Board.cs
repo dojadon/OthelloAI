@@ -95,21 +95,6 @@ namespace OthelloAI
 
         public Board VerticalMirrored() => new Board(VerticalMirror(bitB), VerticalMirror(bitW), stoneCount);
 
-        /*public static Board VerticalMirror(ulong b, ulong w)
-        {
-            Vector128<ulong> v = Vector128.Create(b, w);
-            v = Sse2.Or(Sse2.And(Sse2.ShiftRightLogical(v, 1), Vector128.Create(0x5555555555555555UL)),
-                    Sse2.And(Sse2.ShiftLeftLogical(v, 1), Vector128.Create(0xAAAAAAAAAAAAAAAAUL)));
-
-            v = Sse2.Or(Sse2.And(Sse2.ShiftRightLogical(v, 2), Vector128.Create(0x3333333333333333UL)),
-                    Sse2.And(Sse2.ShiftLeftLogical(v, 2), Vector128.Create(0xCCCCCCCCCCCCCCCCUL)));
-
-            v = Sse2.Or(Sse2.And(Sse2.ShiftRightLogical(v, 4), Vector128.Create(0x0F0F0F0F0F0F0F0FUL)),
-                    Sse2.And(Sse2.ShiftLeftLogical(v, 4), Vector128.Create(0xF0F0F0F0F0F0F0F0UL)));
-
-            return new Board(Avx2.Extract(v, 0));
-        }*/
-
         public static ulong VerticalMirror(ulong b)
         {
             b = ((b >> 1) & 0x5555555555555555UL) | ((b << 1) & 0xAAAAAAAAAAAAAAAAUL);
@@ -177,6 +162,12 @@ namespace OthelloAI
             int result = (int)(bitB >> i) & 1;
             result += (int)((bitW >> i) & 1) * 2;
             return result;
+        }
+
+        public static (int, int) ToPos(ulong move)
+        {
+            int x = BitOperations.LeadingZeroCount(move);
+            return (x / 8, x % 8);
         }
 
         public override int GetHashCode()

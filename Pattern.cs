@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
@@ -78,9 +79,23 @@ namespace OthelloAI.Patterns
         }
     }
 
+    public class PatternVerticalLine0 : Pattern
+    {
+        public override int[] Positions { get; } = { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+        public PatternVerticalLine0(string filePath, PatternType type) : base(filePath, type, 8)
+        {
+        }
+
+        public override int GetBinHash(in Board board)
+        {
+            return (int)((board.bitB & 0xFF) | ((board.bitW & 0xFF) << 10));
+        }
+    }
+
     public class PatternVerticalLine1 : Pattern
     {
-        public override int[] Positions { get; } = { 8, 9, 10, 11, 12, 13, 14, 15};
+        public override int[] Positions { get; } = { 8, 9, 10, 11, 12, 13, 14, 15 };
 
         public PatternVerticalLine1(string filePath, PatternType type) : base(filePath, type, 8)
         {
@@ -170,8 +185,8 @@ namespace OthelloAI.Patterns
         {
             for (int i = 0; i < STAGES; i++)
             {
-                StageBasedEvaluations[i] = new float[GetArrayLength()];
-                StageBasedEvaluationsB[i] = new byte[GetArrayLength()];
+                StageBasedEvaluations[i] = new float[ArrayLength];
+                StageBasedEvaluationsB[i] = new byte[ArrayLength];
             }
         }
 
@@ -191,11 +206,6 @@ namespace OthelloAI.Patterns
             StageBasedEvaluations[stage][flipped] -= add;
         }
 
-        public int GetArrayLength()
-        {
-            return POW3_TABLE[HashLength];
-        }
-
         public abstract int GetBinHash(in Board board);
 
         public int GetHash(in Board board)
@@ -206,6 +216,12 @@ namespace OthelloAI.Patterns
         public float EvalForTraining(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
             float[] eval = StageBasedEvaluations[GetStage(org)];
+
+            int h1 = GetHash(org);
+            int h2 = GetHash(tr);
+            int h3 = GetHash(hor);
+            int h4 = GetHash(rot90);
+            int h5= GetHash(rot270);
 
             float result = Type switch
             {
@@ -301,18 +317,32 @@ namespace OthelloAI.Patterns
 
         public bool Test()
         {
-            return Enumerable.Range(0, GetArrayLength()).All(i => GetHash(SetBoard(i)) == i);
+            return Enumerable.Range(0, ArrayLength).All(i => GetHash(SetBoard(i)) == i);
         }
 
-        public void Info(int stage, float threshold)
+        public void PrintArray(int start, int end)
         {
-            for (int i = 0; i < GetArrayLength(); i++)
+            foreach((int i, double e) in Enumerable.Range(0, ArrayLength).Select(i => (i, Enumerable.Range(start, end - start).Average(j => StageBasedEvaluationsB[j][i]))))
             {
-                if (StageBasedEvaluations[stage][i] > threshold)
+                if(Math.Abs(e - 128) > 5)
+                    Console.Write("{" + i + ", " + (byte)e + "},");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine();
+        }
+
+        public void Info(int stage, int threshold)
+        {
+            for (int i = 0; i < ArrayLength; i++)
+            {
+                if (StageBasedEvaluationsB[stage][i] > threshold)
                 {
-                    InfoHash(stage, i);
+                    //InfoHash(stage, i);
                 }
             }
+            Console.WriteLine(Enumerable.Range(0, ArrayLength).Count(i => StageBasedEvaluationsB[stage][i] > threshold));
         }
 
         public void InfoHash(int stage, int hash)

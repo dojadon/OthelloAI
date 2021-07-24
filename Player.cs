@@ -8,16 +8,16 @@ namespace OthelloAI
 {
     public abstract class Player
     {
-        public abstract Move DecideMove(Board board, int stone);
+        public abstract (int x, int y, ulong move) DecideMove(Board board, int stone);
     }
 
     public class PlayerManual : Player
     {
-        public override Move DecideMove(Board board, int stone)
+        public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
             if(board.GetMoves(stone) == 0)
             {
-                return new Move(0UL);
+                return (-1, -1, 0);
             }
 
             string s = Console.ReadLine();
@@ -25,7 +25,7 @@ namespace OthelloAI
             int x = (int) char.GetNumericValue(s[0]);
             int y = (int) char.GetNumericValue(s[1]);
 
-            return new Move(x, y);
+            return (x, y, Board.Mask(x, y));
         }
     }
 }

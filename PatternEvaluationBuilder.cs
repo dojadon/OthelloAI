@@ -53,9 +53,12 @@ namespace OthelloAI
                 if (gameCount % 10000 == 0)
                 {
                     Array.ForEach(Patterns, p => p.Save());
+                    Console.WriteLine(string.Join(", ", Weight));
                 }
             }
         }
+
+        readonly float[] Weight = new float[60];
 
         public void Update(Board[] game)
         {
@@ -76,10 +79,13 @@ namespace OthelloAI
                 var boards = new MirroredBoards(board);
                 MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
-                float e = result - Patterns.Sum(p => p.EvalForTraining(board, b1, b2, b3, b4));
+                int stage = board.stoneCount - 5;
+                int move_gap = Board.BitCount(board.GetMoves()) - Board.BitCount(board.GetOpponentMoves());
+
+                float e = result - Patterns.Sum(p => p.EvalForTraining(board, b1, b2, b3, b4)) - move_gap;
                 Array.ForEach(Patterns, p => Array.ForEach(boards.Boards, b => p.UpdataEvaluation(b, e * alpha)));
 
-                if(board.stoneCount == 40)
+                if (board.stoneCount == 40)
                 {
                     //Console.WriteLine(e);
                 }
