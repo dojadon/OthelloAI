@@ -29,6 +29,11 @@ namespace OthelloAI
 
         static void Main()
         {
+            Console.WriteLine($"Support BMI2 x86 : {System.Runtime.Intrinsics.X86.Bmi2.IsSupported}");
+            Console.WriteLine($"Support BMI2 x64 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");
+            Console.WriteLine($"Support AVX2 : {System.Runtime.Intrinsics.X86.Avx2.IsSupported}");
+            Console.WriteLine($"Support AVX : {System.Runtime.Intrinsics.X86.Avx.IsSupported}");
+
             Pattern.InitTable();
 
             foreach (Pattern p in PATTERNS)
@@ -84,15 +89,18 @@ namespace OthelloAI
             {
                 SearchDepth = 9,
                 DepthDoMoveOrdering = 6,
-                StoneCountDoFullSearch = 40
+                StoneCountDoFullSearch = 42
             };
 
             for (int i = 0; i < 1; i++)
             {
                 board = new Board(Board.InitB, Board.InitW, 4);
 
+                board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
+
                 while (Step(ref board, p, 1) | Step(ref board, p, -1))
                 {
+                    GC.Collect();
                 }
 
                 Console.WriteLine($"B: {board.GetStoneCount(1)}");

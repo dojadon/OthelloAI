@@ -166,8 +166,8 @@ namespace OthelloAI
 
         public static (int, int) ToPos(ulong move)
         {
-            int x = BitOperations.LeadingZeroCount(move);
-            return (x / 8, x % 8);
+            int x = BitOperations.TrailingZeroCount(move);
+            return (x / 8, x & 7);
         }
 
         public override int GetHashCode()
@@ -275,12 +275,12 @@ namespace OthelloAI
 
         public int GetReversedCountOnLastMove()
         {
-            int count = ReverseUtil.GetReversedCountOnLastMove(bitB, bitW);
+            int count = ReverseUtil.CountOnLastMove(bitB, bitW);
             if(count > 0)
             {
-                return count;
+                return count * 2 + 1;
             }
-            return -ReverseUtil.GetReversedCountOnLastMove(bitW, bitB);
+            return ReverseUtil.CountOnLastMove(bitW, bitB) * -2 - 1;
         }
 
         public Board Reversed(ulong move)
