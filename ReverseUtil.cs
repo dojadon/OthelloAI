@@ -126,12 +126,12 @@ namespace OthelloAI
             int x = pos / 8;
             int y = pos & 7;
 
-            p &= MASK_TABLE[pos, 3];
+            o &= MASK_TABLE[pos, 3];
 
-            int count = REVERSED_TABLE[y, (byte)(p >> (pos & 0x38))];
-            count += REVERSED_TABLE[x, Bmi2.X64.ParallelBitExtract(p, MASK_TABLE[pos, 0])];
-            count += REVERSED_TABLE[x, Bmi2.X64.ParallelBitExtract(p, MASK_TABLE[pos, 1])];
-            count += REVERSED_TABLE[x, Bmi2.X64.ParallelBitExtract(p, MASK_TABLE[pos, 2])];
+            int count = REVERSED_TABLE[y, (byte)(o >> (pos & 0x38))];
+            count += REVERSED_TABLE[x, Bmi2.X64.ParallelBitExtract(o, MASK_TABLE[pos, 0])];
+            count += REVERSED_TABLE[x, Bmi2.X64.ParallelBitExtract(o, MASK_TABLE[pos, 1])];
+            count += REVERSED_TABLE[x, Bmi2.X64.ParallelBitExtract(o, MASK_TABLE[pos, 2])];
 
             return count;
         }

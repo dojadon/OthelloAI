@@ -29,8 +29,7 @@ namespace OthelloAI
 
         static void Main()
         {
-            Console.WriteLine($"Support BMI2 x86 : {System.Runtime.Intrinsics.X86.Bmi2.IsSupported}");
-            Console.WriteLine($"Support BMI2 x64 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");
+            Console.WriteLine($"Support BMI2 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");
             Console.WriteLine($"Support AVX2 : {System.Runtime.Intrinsics.X86.Avx2.IsSupported}");
             Console.WriteLine($"Support AVX : {System.Runtime.Intrinsics.X86.Avx.IsSupported}");
 
@@ -49,8 +48,9 @@ namespace OthelloAI
             //   builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
-            // StartClient();
-           StartGame();
+            //  MPCParamSolver.Test();
+            StartClient();
+            //StartGame();
             // StartManualGame();
         }
 
@@ -59,16 +59,16 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerNegascout p = new PlayerNegascout(evaluator)
             {
-                SearchDepth = 8,
-                DepthDoMoveOrdering = 6,
-                StoneCountDoFullSearch = 46
+                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, true)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 42, new CutoffParameters(true, true, false)),
             };
 
             Client client = new Client(p);
             client.Run("localhost", 25033, "Gen2");
         }
 
-        static bool Step(ref Board board, Player player, int stone)
+        public static bool Step(ref Board board, Player player, int stone)
         {
             (int x, int y, ulong move) = player.DecideMove(board, stone);
             if (move != 0)
@@ -87,9 +87,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerNegascout p = new PlayerNegascout(evaluator)
             {
-                SearchDepth = 9,
-                DepthDoMoveOrdering = 6,
-                StoneCountDoFullSearch = 42
+                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 9, stage: 16, new CutoffParameters(true, true, true)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 42, new CutoffParameters(true, true, false)),
             };
 
             for (int i = 0; i < 1; i++)
@@ -121,9 +121,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             Player p1 = new PlayerNegascout(evaluator)
             {
-                SearchDepth = 9,
-                DepthDoMoveOrdering = 6,
-                StoneCountDoFullSearch = 44
+                ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, true)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 42, new CutoffParameters(true, true, false)),
             };
 
             Player p2 = new PlayerManual();

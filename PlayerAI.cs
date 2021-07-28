@@ -5,15 +5,43 @@ using System.Linq;
 
 namespace OthelloAI
 {
-    public abstract class PlayerAlphaBetaBased : Player
+    public readonly struct CutoffParameters
     {
+        public readonly bool shouldTranspositionCut;
+        public readonly bool shouldStoreTranspositionTable;
+        public readonly bool shouldProbCut;
+
+        public CutoffParameters(bool transposition, bool storeTransposition, bool probcut)
+        {
+            shouldTranspositionCut = transposition;
+            shouldStoreTranspositionTable = storeTransposition;
+            shouldProbCut = probcut;
+        }
+    }
+
+    public class SearchParameters
+    {
+        public readonly int depth;
+        public readonly int stage;
+        public readonly CutoffParameters cutoff_param;
+
+        public SearchParameters(int depth, int stage, CutoffParameters cutoff_param)
+        {
+            this.depth = depth;
+            this.stage = stage;
+            this.cutoff_param = cutoff_param;
+        }
+    }
+
+    public class PlayerNegascout : Player
+    {
+        public SearchParameters ParamBeg { get; set; }
+        public SearchParameters ParamMid { get; set; }
+        public SearchParameters ParamEnd { get; set; }
+
         public Evaluator Evaluator { get; set; }
 
-        public int SearchDepth { get; set; }
-        public int DepthDoMoveOrdering { get; set; }
-        public int StoneCountDoFullSearch { get; set; }
-
-        public PlayerAlphaBetaBased(Evaluator evaluator)
+        public PlayerNegascout(Evaluator evaluator)
         {
             Evaluator = evaluator;
         }
@@ -28,25 +56,6 @@ namespace OthelloAI
             return (board.GetStoneCountGap() + board.GetReversedCountOnLastMove()) * 10000;
         }
 
-        protected int GetSearchDepth(Board board)
-        {
-            if (board.stoneCount > StoneCountDoFullSearch)
-            {
-                return 64 - board.stoneCount + 1;
-            }
-            else
-            {
-                return SearchDepth;
-            }
-        }
-    }
-
-    public class PlayerNegascout : PlayerAlphaBetaBased
-    {
-        public PlayerNegascout(Evaluator evaluator) : base(evaluator)
-        {
-        }
-
         public List<float> times = new List<float>();
 
         public float Eval(Board board)
@@ -54,212 +63,42 @@ namespace OthelloAI
             return Evaluator.Eval(board);
         }
 
-        public ulong NegascoutRootDefinite(Board board, int depth)
+        public ulong NegascoutRoot(Dictionary<Board, (float, float)> table, Board board, CutoffParameters param, int depth)
         {
             Move root = new Move(board);
 
-            if (root.count <= 1)
+            if (root.n_moves <= 1)
             {
                 return root.moves;
             }
 
-            Move[] array = CreateMoveArray(root.reversed, root.moves, root.count);
+            Move[] array = root.NextMoves();
 
             Array.Sort(array);
 
             Move result = array[0];
-            float max = -SearchDefinite(result, depth - 1, -1000000, 1000000);
+            float max = -Search(table, array[0], param, depth - 1, -1000000, 1000000);
             float alpha = max;
 
-            Console.WriteLine($"{Board.ToPos(result.move)} : {max}");
-
-            if (0 < max)
-                return result.move;
-
-            for (int i = 1; i < array.Length; i++)
-            {
-                Move move = array[i];
-                float eval = -SearchDefinite(move, depth - 1, -alpha - 1, -alpha);
-
-                if (0 < eval)
-                    return move.move;
-
-                if (alpha < eval)
-                {
-                    alpha = eval;
-                    eval = -SearchDefinite(move, depth - 1, -1000000, -alpha);
-
-                    if (0 < eval)
-                        return move.move;
-
-                    alpha = Math.Max(alpha, eval);
-
-                    Console.WriteLine($"{Board.ToPos(move.move)} : {eval}");
-                }
-                else
-                {
-                    Console.WriteLine($"{Board.ToPos(move.move)} : Rejected");
-                }
-
-                if (max < eval)
-                {
-                    max = eval;
-                    result = move;
-                }
-            }
-            return result.move;
-        }
-
-        public float NegascoutDefinite(Move[] moves, int depth, float alpha, float beta)
-        {
-            float max = -SearchDefinite(moves[0], depth - 1, -beta, -alpha);
-
-            if (beta <= max || 0 < max)
-                return max;
-
-            alpha = Math.Max(alpha, max);
-
-            for (int i = 0; i < moves.Length; i++)
-            {
-                Move move = moves[i];
-                float eval = -SearchDefinite(move, depth - 1, -alpha - 1, -alpha);
-
-                if (beta <= eval || 0 < max)
-                    return eval;
-
-                max = Math.Max(max, eval);
-               // alpha = Math.Max(alpha, max);
-            }
-            return max;
-        }
-
-        public float SearchDefinite(Move move, int depth, float alpha, float beta)
-        {
-            SearchedNodeCount++;
-
-            if (move.moves == 0)
-            {
-                ulong opponentMoves = move.reversed.GetOpponentMoves();
-                if (opponentMoves == 0)
-                {
-                    return EvalFinishedGame(move.reversed);
-                }
-                else
-                {
-                    return SearchDefinite(new Move(move.reversed.ColorFliped(), 0, opponentMoves, Board.BitCount(opponentMoves)), depth - 1, -beta, -alpha);
-                }
-            }
-            
-            if (move.count == 1)
-            {
-                if (move.reversed.stoneCount == 63)
-                {
-                    return -EvalLastMove(move.reversed);
-                }
-                else
-                {
-                    return -SearchDefinite(new Move(move.reversed, move.moves), depth - 1, -beta, -alpha);
-                }
-            }
-
-            if (move.count == 2)
-            {
-                ulong next1 = Board.NextMove(move.moves);
-                ulong next2 = Board.RemoveMove(move.moves, next1);
-
-                alpha = Math.Max(alpha, -SearchDefinite(new Move(move.reversed, next1), depth - 1, -beta, -alpha));
-
-                if (alpha >= beta)
-                    return alpha;
-
-                return Math.Max(alpha, -SearchDefinite(new Move(move.reversed, next2), depth - 1, -beta, -alpha));
-            }
-
-            Move[] array = CreateMoveArray(move.reversed, move.moves, move.count);
-
-            float lower = -1000000;
-            float upper = 1000000;
-
-            if (BorderTable.ContainsKey(move.reversed))
-            {
-                CollidedCount++;
-
-                (lower, upper) = BorderTable[move.reversed];
-
-                if (lower >= beta)
-                    return lower;
-
-                if (upper <= alpha || upper == lower)
-                    return upper;
-
-                alpha = Math.Max(alpha, lower);
-                beta = Math.Min(beta, upper);
-            }
-
-            float value;
-            if (depth >= 2)
-            {
-                Array.Sort(array);
-                value = NegascoutDefinite(array, depth, alpha, beta);
-            }
-            else
-            {
-                for (int i = 0; i < array.Length; i++)
-                {
-                    alpha = Math.Max(alpha, -SearchDefinite(array[i], depth - 1, -beta, -alpha));
-
-                    if (alpha >= beta || alpha > 0)
-                        break;
-                }
-                value =  alpha;
-            }
-
-            {
-                if (value <= alpha)
-                    BorderTable[move.reversed] = (lower, value);
-                else if (value >= beta)
-                    BorderTable[move.reversed] = (value, upper);
-                else
-                    BorderTable[move.reversed] = (value, value);
-            }
-
-            return value;
-        }
-
-        public ulong NegascoutRoot(Board board, int depth)
-        {
-            Move root = new Move(board);
-
-            if (root.count <= 1)
-            {
-                return root.moves;
-            }
-
-            Move[] array = CreateMoveArray(root.reversed, root.moves, root.count);
-
-            Array.Sort(array);
-
-            Move result = array[0];
-            float max = -Search(array[0], depth - 1, -1000000, 1000000);
-            float alpha = max;
-
-            Console.WriteLine($"{Board.ToPos(result.move)} : {max}");
+            if (PrintInfo)
+                Console.WriteLine($"{Board.ToPos(result.move)} : {max}");
 
             for (int i = 1; i < array.Length; i++)
             {
                 Move move = array[i];
 
-                float eval = -Search(move, depth - 1, -alpha - 1, -alpha);
+                float eval = -Search(table, move, param, depth - 1, -alpha - 1, -alpha);
 
                 if (alpha < eval)
                 {
                     alpha = eval;
-                    eval = -Search(move, depth - 1, -1000000, -alpha);
+                    eval = -Search(table, move, param, depth - 1, -1000000, -alpha);
                     alpha = Math.Max(alpha, eval);
 
-                    Console.WriteLine($"{Board.ToPos(move.move)} : {eval}");
+                    if (PrintInfo)
+                        Console.WriteLine($"{Board.ToPos(move.move)} : {eval}");
                 }
-                else
+                else if (PrintInfo)
                 {
                     Console.WriteLine($"{Board.ToPos(move.move)} : Rejected");
                 }
@@ -275,9 +114,9 @@ namespace OthelloAI
 
         Dictionary<Board, (float, float)> BorderTable { get; set; }
 
-        public float Negascout(Move[] moves, int depth, float alpha, float beta)
+        public float Negascout(Dictionary<Board, (float, float)> table, Move[] moves, CutoffParameters param, int depth, float alpha, float beta)
         {
-            float max = -Search(moves[0], depth - 1, -beta, -alpha);
+            float max = -Search(table, moves[0], param, depth - 1, -beta, -alpha);
 
             if (beta <= max)
                 return max;
@@ -287,7 +126,8 @@ namespace OthelloAI
             for (int i = 1; i < moves.Length; i++)
             {
                 Move move = moves[i];
-                float eval = -Search(move, depth - 1, -alpha - 1, -alpha);
+
+                float eval = -Search(table, move, param, depth - 1, -alpha - 1, -alpha);
 
                 if (beta <= eval)
                     return eval;
@@ -295,7 +135,7 @@ namespace OthelloAI
                 if (alpha < eval)
                 {
                     alpha = eval;
-                    eval = -Search(move, depth - 1, -beta, -alpha);
+                    eval = -Search(table, move, param, depth - 1, -beta, -alpha);
 
                     if (beta <= eval)
                         return eval;
@@ -307,11 +147,11 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negamax(Move[] moves, int depth, float alpha, float beta)
+        public float Negamax(Dictionary<Board, (float, float)> table, Move[] moves, CutoffParameters param, int depth, float alpha, float beta)
         {
             for (int i = 0; i < moves.Length; i++)
             {
-                alpha = Math.Max(alpha, -Search(moves[i], depth - 1, -beta, -alpha));
+                alpha = Math.Max(alpha, -Search(table, moves[i], param, depth - 1, -beta, -alpha));
 
                 if (alpha >= beta)
                     return alpha;
@@ -319,9 +159,81 @@ namespace OthelloAI
             return alpha;
         }
 
-        public float Search(Move move, int depth, float alpha, float beta)
+        public int[] MCPCount { get; } = new int[60];
+        public int[] SearchedNodeCount { get; } = new int[60];
+        public int[] TranspositionTableCount { get; } = new int[60];
+
+        public int CurrentIndex;
+
+        public bool PrintInfo { get; set; } = true;
+
+        public bool TryTranspositionCutoff(Dictionary<Board, (float, float)> table, Move move, ref float alpha, ref float beta, ref float lower, ref float upper, ref float value)
         {
-            SearchedNodeCount++;
+            if (!table.ContainsKey(move.reversed))
+            {
+                return false;
+            }
+            TranspositionTableCount[CurrentIndex]++;
+
+            (lower, upper) = table[move.reversed];
+
+            if (lower >= beta)
+            {
+                value = lower;
+                return true;
+            }
+
+            if (upper <= alpha || upper == lower)
+            {
+                value = upper;
+                return true;
+            }
+
+            alpha = Math.Max(alpha, lower);
+            beta = Math.Min(beta, upper);
+
+            return false;
+        }
+
+        public void StoreTranspositionTable(Dictionary<Board, (float, float)> table, Move move, float alpha, float beta, float lower, float upper, float value)
+        {
+            if (value <= alpha)
+                table[move.reversed] = (lower, value);
+            else if (value >= beta)
+                table[move.reversed] = (value, upper);
+            else
+                table[move.reversed] = (value, value);
+        }
+
+        public bool TryProbCutoff(Dictionary<Board, (float, float)> table, Move move, CutoffParameters param, int depth, float alpha, float beta, ref float value)
+        {
+            if (depth < 5 || depth > 8)
+                return false;
+
+            float sigma = (3 * move.reversed.stoneCount - 8) * 3.2F;
+            float offset = move.reversed.stoneCount * (depth % 2 == 0 ? -2 : 2);
+            float e = alpha - sigma - offset;
+            CutoffParameters mcpParam = new CutoffParameters(param.shouldTranspositionCut, false, true);
+
+            if (Search(table, move, mcpParam, depth - 3, e - 1, e) < e)
+            {
+                MCPCount[CurrentIndex]++;
+                value = alpha;
+                return true;
+            }
+            e = beta + sigma - offset;
+            if (Search(table, move, mcpParam, depth - 3, e, e + 1) > e)
+            {
+                MCPCount[CurrentIndex]++;
+                value = beta;
+                return true;
+            }
+            return false;
+        }
+
+        public float Search(Dictionary<Board, (float, float)> table, Move move, CutoffParameters param, int depth, float alpha, float beta)
+        {
+            SearchedNodeCount[CurrentIndex]++;
 
             if (depth <= 0)
             {
@@ -337,90 +249,57 @@ namespace OthelloAI
                 }
                 else
                 {
-                    return -Search(new Move(move.reversed.ColorFliped(), 0, opponentMoves, Board.BitCount(opponentMoves)), depth - 1, -beta, -alpha);
+                    Move next = new Move(move.reversed.ColorFliped(), 0, opponentMoves, Board.BitCount(opponentMoves));
+                    return -Search(table, next, param, depth, -beta, -alpha);
                 }
             }
 
-            if (move.count == 1)
-            {
-                /*  if (move.reversed.stoneCount == 62)
-                  {
-                      return EvalLastMove(move.reversed.Reversed(move.moves));
-                  }
-                  else*/
-                if (move.reversed.stoneCount == 63)
-                {
-                    return -EvalFinishedGame(move.reversed.Reversed(move.moves));
-                    return -EvalLastMove(move.reversed);
-                }
-                else
-                {
-                    return -Search(new Move(move.reversed, move.moves), depth - 1, -beta, -alpha);
-                }
-            }
+            float value = 0;
+
+            if (param.shouldProbCut && TryProbCutoff(table, move, param, depth, alpha, beta, ref value))
+                return value;
 
             float lower = -1000000;
             float upper = 1000000;
 
-            if (BorderTable.ContainsKey(move.reversed))
+            if (param.shouldTranspositionCut && TryTranspositionCutoff(table, move, ref alpha, ref beta, ref lower, ref upper, ref value))
+                return value;
+
+            if (move.n_moves == 1)
             {
-                CollidedCount++;
-
-                (lower, upper) = BorderTable[move.reversed];
-
-                if (lower >= beta)
-                    return lower;
-
-                if (upper <= alpha || upper == lower)
-                    return upper;
-
-                alpha = Math.Max(alpha, lower);
-                beta = Math.Min(beta, upper);
+                if (move.reversed.stoneCount == 63)
+                {
+                    //return EvalLastMove(move.reversed);
+                    return -EvalFinishedGame(move.reversed.Reversed(move.moves));
+                }
+                else
+                {
+                    return -Search(table, new Move(move.reversed, move.moves), param, depth - 1, -beta, -alpha);
+                }
             }
 
-            Move[] array = CreateMoveArray(move.reversed, move.moves, move.count);
+            Move[] array = move.NextMoves();
 
-            float value;
-            if (move.count > 3 && depth >= 3)
+            if (move.n_moves > 3 && depth >= 3 && move.reversed.stoneCount < 58)
             {
                 Array.Sort(array);
-                value = Negascout(array, depth, alpha, beta);
+                value = Negascout(table, array, param, depth, alpha, beta);
             }
             else
             {
-                value = Negamax(array, depth, alpha, beta);
+                value = Negamax(table, array, param, depth, alpha, beta);
             }
 
-            if (value <= alpha)
-                BorderTable[move.reversed] = (lower, value);
-            else if (value >= beta)
-                BorderTable[move.reversed] = (value, upper);
-            else
-                BorderTable[move.reversed] = (value, value);
+            if (param.shouldStoreTranspositionTable)
+                StoreTranspositionTable(table, move, alpha, beta, lower, upper, value);
 
             return value;
         }
 
-        long SearchedNodeCount;
-        long CollidedCount;
-
-        public Move[] CreateMoveArray(Board board, ulong moves, int count)
-        {
-            Move[] array = new Move[count];
-            for (int i = 0; i < array.Length; i++)
-            {
-                ulong move = Board.NextMove(moves);
-                moves = Board.RemoveMove(moves, move);
-                array[i] = new Move(board, move);
-            }
-            return array;
-        }
-
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
-            CollidedCount = 0;
-            SearchedNodeCount = 0;
-            BorderTable = new Dictionary<Board, (float, float)>();
+            CurrentIndex = board.stoneCount - 4;
+            var transpositionTable = new Dictionary<Board, (float, float)>();
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -428,22 +307,33 @@ namespace OthelloAI
                 board = board.ColorFliped();
 
             ulong result;
-            if (board.stoneCount > StoneCountDoFullSearch)
+            if(board.stoneCount < ParamMid.stage)
             {
-                Console.WriteLine("必勝読み開始");
-           //     result = NegascoutRoot(board, GetSearchDepth(board));
-                result = NegascoutRootDefinite(board, GetSearchDepth(board));
+                result = NegascoutRoot(transpositionTable, board, ParamBeg.cutoff_param, ParamBeg.depth);
+            }
+            else if (board.stoneCount < ParamEnd.stage)
+            {
+                result = NegascoutRoot(transpositionTable, board, ParamMid.cutoff_param, ParamMid.depth);
             }
             else
             {
-                result = NegascoutRoot(board, GetSearchDepth(board));
+                result = NegascoutRoot(transpositionTable, board, ParamEnd.cutoff_param, ParamEnd.depth);
             }
+
             sw.Stop();
 
-            float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
-            times.Add(time);
-            Console.WriteLine($"Taken Time : {time} ms");
-            Console.WriteLine($"Nodes : {CollidedCount}/{SearchedNodeCount}");
+            if (result != 0)
+            {
+                float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
+                times.Add(time);
+
+                if(PrintInfo)
+                {
+                    Console.WriteLine($"Taken Time : {time} ms");
+                    Console.WriteLine($"Nodes : {TranspositionTableCount[CurrentIndex]}/{SearchedNodeCount[CurrentIndex]}");
+                    Console.WriteLine($"MCP Count : {MCPCount[CurrentIndex]}");
+                }
+            }
 
             (int x, int y) = Board.ToPos(result);
 

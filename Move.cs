@@ -12,14 +12,14 @@ namespace OthelloAI
 		public readonly ulong move;
 		public readonly Board reversed;
 		public readonly ulong moves;
-		public readonly int count;
+		public readonly int n_moves;
 		
 		public Move(Board board, ulong move)
         {
 			this.move = move;
 			reversed = board.Reversed(move);
 			moves = reversed.GetMoves();
-			count = Board.BitCount(moves);
+			n_moves = Board.BitCount(moves);
         }
 
 		public Move(Board reversed)
@@ -27,7 +27,7 @@ namespace OthelloAI
 			move = 0;
 			this.reversed = reversed;
 			moves = reversed.GetMoves();
-			count = Board.BitCount(moves);
+			n_moves = Board.BitCount(moves);
 		}
 
 		public Move(Board reversed, ulong move, ulong moves, int count)
@@ -35,12 +35,26 @@ namespace OthelloAI
 			this.move = move;
 			this.reversed = reversed;
 			this.moves = moves;
-			this.count = count;
+			this.n_moves = count;
+		}
+
+		public Move[] NextMoves()
+		{
+			ulong moves_tmp = moves;
+
+			Move[] array = new Move[n_moves];
+			for (int i = 0; i < array.Length; i++)
+			{
+				ulong move = Board.NextMove(moves_tmp);
+				moves_tmp = Board.RemoveMove(moves_tmp, move);
+				array[i] = new Move(reversed, move);
+			}
+			return array;
 		}
 
 		public int CompareTo([AllowNull] Move other)
         {
-			return count - other.count;
+			return n_moves - other.n_moves;
         }
     }
 }

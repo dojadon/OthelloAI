@@ -239,9 +239,9 @@ namespace OthelloAI.Patterns
 
             return Type switch
             {
-                PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)],
-                PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)],
-                PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)],
+                PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)] - 512,
+                PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)] - 512,
+                PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)] - 256,
                 _ => throw new NotImplementedException()
             };
         }
