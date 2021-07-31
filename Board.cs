@@ -40,13 +40,13 @@ namespace OthelloAI
         public readonly ulong bitB;
         public readonly ulong bitW;
 
-        public readonly int stoneCount;
+        public readonly int n_stone;
 
         public Board(Board source)
         {
             bitB = source.bitB;
             bitW = source.bitW;
-            stoneCount = source.stoneCount;
+            n_stone = source.n_stone;
         }
 
         public Board(ulong b, ulong w) : this(b, w, BitCount(b | w))
@@ -57,12 +57,35 @@ namespace OthelloAI
         {
             bitB = b;
             bitW = w;
-            stoneCount = count;
+            n_stone = count;
+        }
+
+        public Board(int[] b)
+        {
+            n_stone = 0;
+            bitB = 0;
+            bitW = 0;
+
+            for (int x = 0; x < 64; x++)
+            {
+                switch (b[x])
+                {
+                    case BLACK:
+                        bitB |= Mask(x);
+                        n_stone++;
+                        break;
+
+                    case WHITE:
+                        bitW |= Mask(x);
+                        n_stone++;
+                        break;
+                }
+            }
         }
 
         public Board(int[,] b)
         {
-            stoneCount = 0;
+            n_stone = 0;
             bitB = 0;
             bitW = 0;
 
@@ -74,26 +97,26 @@ namespace OthelloAI
                     {
                         case BLACK:
                             bitB |= Mask(x, y);
-                            stoneCount++;
+                            n_stone++;
                             break;
 
                         case WHITE:
                             bitW |= Mask(x, y);
-                            stoneCount++;
+                            n_stone++;
                             break;
                     }
                 }
             }
         }
 
-        public Board HorizontalMirrored() => new Board(HorizontalMirror(bitB), HorizontalMirror(bitW), stoneCount);
+        public Board HorizontalMirrored() => new Board(HorizontalMirror(bitB), HorizontalMirror(bitW), n_stone);
 
         public static ulong HorizontalMirror(ulong x)
         {
             return BinaryPrimitives.ReverseEndianness(x);
         }
 
-        public Board VerticalMirrored() => new Board(VerticalMirror(bitB), VerticalMirror(bitW), stoneCount);
+        public Board VerticalMirrored() => new Board(VerticalMirror(bitB), VerticalMirror(bitW), n_stone);
 
         public static ulong VerticalMirror(ulong b)
         {
@@ -104,7 +127,7 @@ namespace OthelloAI
             return b;
         }
 
-        public Board Transposed() => new Board(Transpose(bitB), Transpose(bitW), stoneCount);
+        public Board Transposed() => new Board(Transpose(bitB), Transpose(bitW), n_stone);
 
         public static ulong TransposeAvx(ulong x)
         {
@@ -270,13 +293,13 @@ namespace OthelloAI
 
         public Board ColorFliped()
         {
-            return new Board(bitW, bitB, stoneCount);
+            return new Board(bitW, bitB, n_stone);
         }
 
         public int GetReversedCountOnLastMove()
         {
             int count = ReverseUtil.CountOnLastMove(bitB, bitW);
-            if(count > 0)
+            if (count > 0)
             {
                 return count * 2 + 1;
             }
@@ -286,7 +309,7 @@ namespace OthelloAI
         public Board Reversed(ulong move)
         {
             ulong reversed = ReverseUtil.ReverseAvx(move, bitB, bitW);
-            return new Board(bitW ^ reversed, bitB ^ (move | reversed), stoneCount + 1);
+            return new Board(bitW ^ reversed, bitB ^ (move | reversed), n_stone + 1);
         }
 
         public Board Reversed(ulong move, int stone)
@@ -297,11 +320,11 @@ namespace OthelloAI
             {
                 case BLACK:
                     reversed = ReverseUtil.ReverseAvx(move, bitB, bitW);
-                    return new Board(bitB ^ (move | reversed), bitW ^ reversed, stoneCount + 1);
+                    return new Board(bitB ^ (move | reversed), bitW ^ reversed, n_stone + 1);
 
                 case WHITE:
                     reversed = ReverseUtil.ReverseAvx(move, bitW, bitB);
-                    return new Board(bitB ^ reversed, bitW ^ (move | reversed), stoneCount + 1);
+                    return new Board(bitB ^ reversed, bitW ^ (move | reversed), n_stone + 1);
             }
             return this;
         }

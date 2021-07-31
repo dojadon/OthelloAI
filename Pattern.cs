@@ -39,7 +39,7 @@ namespace OthelloAI.Patterns
 
     public class PatternEdge2X : Pattern
     {
-        public override int[] Positions { get; } = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 14};
+        public override int[] Positions { get; } = { 0, 1, 2, 3, 4, 5, 6, 7, 9, 14 };
 
         public PatternEdge2X(string filePath, PatternType type) : base(filePath, type, 10)
         {
@@ -49,11 +49,21 @@ namespace OthelloAI.Patterns
         {
             return (int)((board.bitB & 0xFF) | ((board.bitB & 0x200) >> 1) | ((board.bitB & 0x4000) >> 5) | ((board.bitW & 0xFF) << 10) | ((board.bitW & 0x200) << 9) | ((board.bitW & 0x4000) << 5));
         }
+
+        public override int GetBinHash1(in Board board)
+        {
+            return (int)((board.bitB & 0xFF) | ((board.bitB & 0x200) >> 1) | ((board.bitB & 0x4000) >> 5));
+        }
+
+        public override int GetBinHash2(in Board board)
+        {
+            return (int)((board.bitW & 0xFF) | ((board.bitW & 0x200) >> 1) | ((board.bitW & 0x4000) >> 5));
+        }
     }
 
     public class PatternVerticalLine3 : Pattern
     {
-        public override int[] Positions { get; } = { 24, 25, 26, 27, 28, 29, 30, 31};
+        public override int[] Positions { get; } = { 24, 25, 26, 27, 28, 29, 30, 31 };
 
         public PatternVerticalLine3(string filePath, PatternType type) : base(filePath, type, 8)
         {
@@ -61,13 +71,23 @@ namespace OthelloAI.Patterns
 
         public override int GetBinHash(in Board board)
         {
-            return (int)(((board.bitB & 0xFF000000) >> 24) | ((board.bitW & 0xFF000000) >> 14));
+            return (int)(((board.bitB & 0xFF000000) >> 24) | ((board.bitW & 0xFF000000) >> 16));
+        }
+
+        public override int GetBinHash1(in Board board)
+        {
+            return (int)((board.bitB & 0xFF00) >> 24);
+        }
+
+        public override int GetBinHash2(in Board board)
+        {
+            return (int)((board.bitW & 0xFF00) >> 24);
         }
     }
 
     public class PatternVerticalLine2 : Pattern
     {
-        public override int[] Positions { get; } = { 16, 17, 18, 19, 20, 21, 22, 23};
+        public override int[] Positions { get; } = { 16, 17, 18, 19, 20, 21, 22, 23 };
 
         public PatternVerticalLine2(string filePath, PatternType type) : base(filePath, type, 8)
         {
@@ -75,21 +95,17 @@ namespace OthelloAI.Patterns
 
         public override int GetBinHash(in Board board)
         {
-            return (int)(((board.bitB & 0xFF0000) >> 16) | ((board.bitW & 0xFF0000) >> 6));
-        }
-    }
-
-    public class PatternVerticalLine0 : Pattern
-    {
-        public override int[] Positions { get; } = { 0, 1, 2, 3, 4, 5, 6, 7 };
-
-        public PatternVerticalLine0(string filePath, PatternType type) : base(filePath, type, 8)
-        {
+            return (int)(((board.bitB & 0xFF0000) >> 16) | ((board.bitW & 0xFF0000) >> 8));
         }
 
-        public override int GetBinHash(in Board board)
+        public override int GetBinHash1(in Board board)
         {
-            return (int)((board.bitB & 0xFF) | ((board.bitW & 0xFF) << 10));
+            return (int)((board.bitB & 0xFF00) >> 16);
+        }
+
+        public override int GetBinHash2(in Board board)
+        {
+            return (int)((board.bitW & 0xFF00) >> 16);
         }
     }
 
@@ -103,7 +119,41 @@ namespace OthelloAI.Patterns
 
         public override int GetBinHash(in Board board)
         {
-            return (int)(((board.bitB & 0xFF00) >> 8) | ((board.bitW & 0xFF00) << 2));
+            return (int)(((board.bitB & 0xFF00) >> 8) | (board.bitW & 0xFF00));
+        }
+
+        public override int GetBinHash1(in Board board)
+        {
+            return (int)((board.bitB & 0xFF00) >> 8);
+        }
+
+        public override int GetBinHash2(in Board board)
+        {
+            return (int)((board.bitW & 0xFF00) >> 8);
+        }
+    }
+
+    public class PatternVerticalLine0 : Pattern
+    {
+        public override int[] Positions { get; } = { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+        public PatternVerticalLine0(string filePath, PatternType type) : base(filePath, type, 8)
+        {
+        }
+
+        public override int GetBinHash(in Board board)
+        {
+            return (int)((board.bitB & 0xFF) | ((board.bitW & 0xFF) << 8));
+        }
+
+        public override int GetBinHash1(in Board board)
+        {
+            return (int)(board.bitB & 0xFF);
+        }
+
+        public override int GetBinHash2(in Board board)
+        {
+            return (int)(board.bitW & 0xFF);
         }
     }
 
@@ -130,34 +180,101 @@ namespace OthelloAI.Patterns
 
         public override int GetBinHash(in Board board)
         {
-            return (int)(Bmi2.X64.ParallelBitExtract(board.bitB, Mask) | (Bmi2.X64.ParallelBitExtract(board.bitW, Mask) << 10));
+            return (int)(Bmi2.X64.ParallelBitExtract(board.bitB, Mask) | (Bmi2.X64.ParallelBitExtract(board.bitW, Mask) << HashLength));
+        }
+
+        public override int GetBinHash1(in Board board)
+        {
+            return (int)Bmi2.X64.ParallelBitExtract(board.bitB, Mask);
+        }
+
+        public override int GetBinHash2(in Board board)
+        {
+            return (int)Bmi2.X64.ParallelBitExtract(board.bitW, Mask);
         }
     }
 
     public abstract class Pattern
     {
-        public static readonly int[] TERNARY_TABLE = new int[1 << 20];
+        public static readonly int[] POW3_TABLE = { 1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049 };
 
-        public static void InitTable()
+        public static readonly int[][] TERNARY_TABLES = Enumerable.Range(1, 10).Select(CreateTernaryTableHalf).ToArray();
+
+        public static (int, int) ConvertTerToBinPair(int value, int length)
         {
-            static int Convert(int b)
+            int b1= 0;
+            int b2= 0;
+            for (int i = 0; i < length; i++)
+            {
+                switch (value % 3)
+                {
+                    case 1:
+                        b1 |= 1 << i;
+                        break;
+
+                    case 2:
+                        b2 |= 1 << i;
+                        break;
+                }
+                value /= 3;
+            }
+            return (b1, b2);
+        }
+
+        public static int ConvertBinToTer(int value, int length)
+        {
+            int result = 0;
+
+            for (int i = 0; i < length; i++)
+            {
+                result += ((value >> i) & 1) * POW3_TABLE[i];
+            }
+            return result;
+        }
+
+        public static int[] CreateTernaryTable(int length)
+        {
+            int Convert(int b)
             {
                 int result = 0;
 
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < length; i++)
                 {
                     result += ((b >> i) & 1) * POW3_TABLE[i];
                 }
                 return result;
             }
 
-            for (int i = 0; i < TERNARY_TABLE.Length; i++)
+            int[] result = new int[1 << (length * 2)];
+
+            for (int i = 0; i < result.Length; i++)
             {
-                TERNARY_TABLE[i] = Convert(i) + Convert(i >> 10) * 2;
+                result[i] = Convert(i) + Convert(i >> length) * 2;
             }
+            return result;
         }
 
-        public static readonly int[] POW3_TABLE = { 1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049 };
+        public static int[] CreateTernaryTableHalf(int length)
+        {
+            int Convert(int b)
+            {
+                int result = 0;
+
+                for (int i = 0; i < length; i++)
+                {
+                    result += ((b >> i) & 1) * POW3_TABLE[i];
+                }
+                return result;
+            }
+
+            int[] result = new int[1 << length];
+
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] = Convert(i);
+            }
+            return result;
+        }
 
         public const int STAGES = 60;
 
@@ -168,17 +285,22 @@ namespace OthelloAI.Patterns
         public int HashLength { get; }
         public int ArrayLength => POW3_TABLE[HashLength];
 
+        int[] TernaryTable { get; }
+
         public abstract int[] Positions { get; }
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
 
         protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
 
+        protected byte[][] EvaluationsBin { get; } = new byte[STAGES][];
+
         public Pattern(string filePath, PatternType type, int length)
         {
             FilePath = filePath;
             Type = type;
             HashLength = length;
+            TernaryTable = TERNARY_TABLES[length - 1];
         }
 
         public virtual void Init()
@@ -187,12 +309,13 @@ namespace OthelloAI.Patterns
             {
                 StageBasedEvaluations[i] = new float[ArrayLength];
                 StageBasedEvaluationsB[i] = new byte[ArrayLength];
+                EvaluationsBin[i] = new byte[1 << (2 * HashLength)];
             }
         }
 
         protected int GetStage(Board board)
         {
-            return board.stoneCount - 5;
+            return board.n_stone - 5;
         }
 
         public void UpdataEvaluation(Board board, float add)
@@ -207,21 +330,29 @@ namespace OthelloAI.Patterns
         }
 
         public abstract int GetBinHash(in Board board);
+        public abstract int GetBinHash1(in Board board);
+        public abstract int GetBinHash2(in Board board);
 
         public int GetHash(in Board board)
         {
-            return TERNARY_TABLE[GetBinHash(board)];
+            return GetBinHash(board);
+
+            int hash1 = GetBinHash1(board);
+            int hash2 = GetBinHash2(board);
+
+            if (hash1 == 0 && hash2 == 0)
+                return 0;
+            /*else if (hash1 == 0)
+                return TernaryTableHalf[hash2] * 2;
+            else if (hash2 == 0)
+                return TernaryTableHalf[hash1];*/
+            else
+                return TernaryTable[hash1] + TernaryTable[hash2] * 2;
         }
 
         public float EvalForTraining(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
             float[] eval = StageBasedEvaluations[GetStage(org)];
-
-            int h1 = GetHash(org);
-            int h2 = GetHash(tr);
-            int h3 = GetHash(hor);
-            int h4 = GetHash(rot90);
-            int h5= GetHash(rot270);
 
             float result = Type switch
             {
@@ -235,7 +366,8 @@ namespace OthelloAI.Patterns
 
         public float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
-            byte[] eval = StageBasedEvaluationsB[GetStage(org)];
+           // byte[] eval = StageBasedEvaluationsB[GetStage(org)];
+            byte[] eval = EvaluationsBin[GetStage(org)];
 
             return Type switch
             {
@@ -296,8 +428,14 @@ namespace OthelloAI.Patterns
             {
                 for (int i = 0; i < ArrayLength; i++)
                 {
-                    StageBasedEvaluations[stage][i] = reader.ReadSingle();
-                    StageBasedEvaluationsB[stage][i] = (byte)Math.Clamp(StageBasedEvaluations[stage][i] * 32 + 128, byte.MinValue, byte.MaxValue);
+                    float e = reader.ReadSingle();
+
+                    StageBasedEvaluations[stage][i] = e;
+                    StageBasedEvaluationsB[stage][i] = (byte)Math.Clamp(e * 32 + 128, byte.MinValue, byte.MaxValue);
+
+                    (int b1, int b2) = ConvertTerToBinPair(i, HashLength);
+                    int hash = b1 | (b2 << HashLength);
+                    EvaluationsBin[stage][hash] = StageBasedEvaluationsB[stage][i];
                 }
             }
         }
@@ -322,9 +460,9 @@ namespace OthelloAI.Patterns
 
         public void PrintArray(int start, int end)
         {
-            foreach((int i, double e) in Enumerable.Range(0, ArrayLength).Select(i => (i, Enumerable.Range(start, end - start).Average(j => StageBasedEvaluationsB[j][i]))))
+            foreach ((int i, double e) in Enumerable.Range(0, ArrayLength).Select(i => (i, Enumerable.Range(start, end - start).Average(j => StageBasedEvaluationsB[j][i]))))
             {
-                if(Math.Abs(e - 128) > 5)
+                if (Math.Abs(e - 128) > 5)
                     Console.Write("{" + i + ", " + (byte)e + "},");
             }
 
@@ -335,14 +473,14 @@ namespace OthelloAI.Patterns
 
         public void Info(int stage, int threshold)
         {
-            for (int i = 0; i < ArrayLength; i++)
+            for (int i = 0; i < StageBasedEvaluations[stage].Length; i++)
             {
-                if (StageBasedEvaluationsB[stage][i] > threshold)
+                if (StageBasedEvaluations[stage][i] > threshold)
                 {
-                    //InfoHash(stage, i);
+                    InfoHash(stage, i);
                 }
             }
-            Console.WriteLine(Enumerable.Range(0, ArrayLength).Count(i => StageBasedEvaluationsB[stage][i] > threshold));
+            // Console.WriteLine(Enumerable.Range(0, ArrayLength).Count(i => StageBasedEvaluationsB[stage][i] > threshold));
         }
 
         public void InfoHash(int stage, int hash)

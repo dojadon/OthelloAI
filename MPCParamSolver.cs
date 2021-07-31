@@ -27,7 +27,7 @@ namespace OthelloAI
 
         public static void Test()
         {
-            PlayerNegascout player = new PlayerNegascout(new EvaluatorRandomize(new EvaluatorPatternBased(), 30))
+            PlayerAI player = new PlayerAI(new EvaluatorRandomize(new EvaluatorPatternBased(), 30))
             {
                 ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
                 ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, true)),
@@ -47,7 +47,7 @@ namespace OthelloAI
             {
                 Board board = new Board(Board.InitB, Board.InitW, 4);
 
-                while (board.stoneCount < 52 && (Step(list, ref board, player, 1) | Step(list, ref board, player, -1)))
+                while (board.n_stone < 52 && (Step(list, ref board, player, 1) | Step(list, ref board, player, -1)))
                 {
 
                 }
@@ -86,11 +86,11 @@ namespace OthelloAI
             return (a, ay - a * ax);
         }
 
-        PlayerNegascout Player { get; }
+        PlayerAI Player { get; }
         int Depth1 { get; }
         int Depth2 { get; }
 
-        public MPCParamSolver(PlayerNegascout player, int depth1, int depth2)
+        public MPCParamSolver(PlayerAI player, int depth1, int depth2)
         {
             Player = player;
             Depth1 = depth1;
@@ -104,8 +104,8 @@ namespace OthelloAI
         {
             foreach(Move m in new Move(board).NextMoves())
             {
-                X[board.stoneCount - 4].Add(Player.Search(new Dictionary<Board, (float, float)>(), m, new CutoffParameters(true, true, false), Depth1, -1000000, 1000000));
-                Y[board.stoneCount - 4].Add(Player.Search(new Dictionary<Board, (float, float)>(), m, new CutoffParameters(true, true, false), Depth2, -1000000, 1000000));
+                X[board.n_stone - 4].Add(Player.Solve(new Search(), m, new CutoffParameters(true, true, false), Depth1, -1000000, 1000000));
+                Y[board.n_stone - 4].Add(Player.Solve(new Search(), m, new CutoffParameters(true, true, false), Depth2, -1000000, 1000000));
             }
         }
 
