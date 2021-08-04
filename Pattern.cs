@@ -198,8 +198,6 @@ namespace OthelloAI.Patterns
     {
         public static readonly int[] POW3_TABLE = { 1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049 };
 
-        public static readonly int[][] TERNARY_TABLES = Enumerable.Range(1, 10).Select(CreateTernaryTableHalf).ToArray();
-
         public static (int, int) ConvertTerToBinPair(int value, int length)
         {
             int b1= 0;
@@ -245,28 +243,6 @@ namespace OthelloAI.Patterns
                 return result;
             }
 
-            int[] result = new int[1 << (length * 2)];
-
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] = Convert(i) + Convert(i >> length) * 2;
-            }
-            return result;
-        }
-
-        public static int[] CreateTernaryTableHalf(int length)
-        {
-            int Convert(int b)
-            {
-                int result = 0;
-
-                for (int i = 0; i < length; i++)
-                {
-                    result += ((b >> i) & 1) * POW3_TABLE[i];
-                }
-                return result;
-            }
-
             int[] result = new int[1 << length];
 
             for (int i = 0; i < result.Length; i++)
@@ -285,8 +261,6 @@ namespace OthelloAI.Patterns
         public int HashLength { get; }
         public int ArrayLength => POW3_TABLE[HashLength];
 
-        int[] TernaryTable { get; }
-
         public abstract int[] Positions { get; }
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
@@ -300,7 +274,6 @@ namespace OthelloAI.Patterns
             FilePath = filePath;
             Type = type;
             HashLength = length;
-            TernaryTable = TERNARY_TABLES[length - 1];
         }
 
         public virtual void Init()
@@ -336,18 +309,6 @@ namespace OthelloAI.Patterns
         public int GetHash(in Board board)
         {
             return GetBinHash(board);
-
-            int hash1 = GetBinHash1(board);
-            int hash2 = GetBinHash2(board);
-
-            if (hash1 == 0 && hash2 == 0)
-                return 0;
-            /*else if (hash1 == 0)
-                return TernaryTableHalf[hash2] * 2;
-            else if (hash2 == 0)
-                return TernaryTableHalf[hash1];*/
-            else
-                return TernaryTable[hash1] + TernaryTable[hash2] * 2;
         }
 
         public float EvalForTraining(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
@@ -366,14 +327,13 @@ namespace OthelloAI.Patterns
 
         public float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
-           // byte[] eval = StageBasedEvaluationsB[GetStage(org)];
             byte[] eval = EvaluationsBin[GetStage(org)];
 
             return Type switch
             {
-                PatternType.X_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot90)] - 512,
-                PatternType.XY_SYMETRIC => eval[GetHash(org)] + eval[GetHash(tr)] + eval[GetHash(hor)] + eval[GetHash(rot270)] - 512,
-                PatternType.DIAGONAL => eval[GetHash(org)] + eval[GetHash(hor)] - 256,
+                PatternType.X_SYMETRIC => eval[GetBinHash(org)] + eval[GetBinHash(tr)] + eval[GetBinHash(hor)] + eval[GetBinHash(rot90)] - 512,
+                PatternType.XY_SYMETRIC => eval[GetBinHash(org)] + eval[GetBinHash(tr)] + eval[GetBinHash(hor)] + eval[GetBinHash(rot270)] - 512,
+                PatternType.DIAGONAL => eval[GetBinHash(org)] + eval[GetBinHash(hor)] - 256,
                 _ => throw new NotImplementedException()
             };
         }
@@ -431,11 +391,10 @@ namespace OthelloAI.Patterns
                     float e = reader.ReadSingle();
 
                     StageBasedEvaluations[stage][i] = e;
-                    StageBasedEvaluationsB[stage][i] = (byte)Math.Clamp(e * 32 + 128, byte.MinValue, byte.MaxValue);
 
                     (int b1, int b2) = ConvertTerToBinPair(i, HashLength);
                     int hash = b1 | (b2 << HashLength);
-                    EvaluationsBin[stage][hash] = StageBasedEvaluationsB[stage][i];
+                    EvaluationsBin[stage][hash] = (byte)Math.Clamp(e * 32 + 128, byte.MinValue, byte.MaxValue);
                 }
             }
         }

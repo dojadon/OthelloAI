@@ -52,6 +52,13 @@ namespace OthelloAI
 			return array;
 		}
 
+		public Move[] OrderedNextMoves()
+        {
+			Move[] moves = NextMoves();
+			Array.Sort(moves);
+			return moves;
+        }
+
 		public int CompareTo([AllowNull] Move other)
         {
 			return n_moves - other.n_moves;

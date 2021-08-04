@@ -46,13 +46,13 @@ namespace OthelloAI
             //   builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
-            //  MPCParamSolver.Test();
-          // StartUpdataEvaluation();
-            //StartClient();
+            // MPCParamSolver.Test();
+            // StartUpdataEvaluation();
+            // StartClient();
             // TestFFO();
-             StartGame();
+            StartGame();
             // StartManualGame();
-          // UpdataEvaluationWithDatabase();
+            // UpdataEvaluationWithDatabase();
         }
 
         static void StartUpdataEvaluation()
@@ -120,9 +120,9 @@ namespace OthelloAI
         static void UpdataEvaluationWithDatabase()
         {
             var reader = new WthorRecordReader();
-            reader.OnLoadMove += (board, result) => UpdataEvaluation(board, result, 0.001F);
+            reader.OnLoadMove += (board, result) => UpdataEvaluation(board, result, 0.005F);
 
-            for (int k = 0; k < 1; k++)
+            for (int k = 0; k < 2; k++)
             {
                 for (int i = 2001; i <= 2015; i++)
                 {
@@ -218,15 +218,15 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 9, stage: 16, new CutoffParameters(true, true, true)),
-                ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 
             for (int i = 0; i < 1; i++)
             {
-                board = new Board(Board.InitB, Board.InitW, 4);
-                //board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
+                board = new Board(Board.InitB, Board.InitW);
+                board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
 
                 while (Step(ref board, p, 1, true) | Step(ref board, p, -1, true))
                 {
@@ -246,36 +246,14 @@ namespace OthelloAI
             Console.WriteLine();
         }
 
-        static void StartAutoGame()
-        {
-            Evaluator evaluator = new EvaluatorPatternBased();
-            PlayerAI p = new PlayerAI(evaluator)
-            {
-                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 9, stage: 16, new CutoffParameters(true, true, true)),
-                ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
-                PrintInfo = false,
-            };
-
-            for (int i = 0; i < 1000000; i++)
-            {
-                Board b = new Board(Board.InitB, Board.InitW, 4);
-
-                while (Step(ref b, p, 1, false) | Step(ref b, p, -1, false))
-                {
-
-                }
-            }
-        }
-
         static void StartManualGame()
         {
             Evaluator evaluator = new EvaluatorPatternBased();
             Player p1 = new PlayerAI(evaluator)
             {
                 ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, true)),
-                ParamEnd = new SearchParameters(depth: 64, stage: 42, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
             Player p2 = new PlayerManual();
@@ -286,7 +264,7 @@ namespace OthelloAI
             {
                 board = new Board(Board.InitB, Board.InitW, 4);
 
-                while (Step(ref board, p1, 1, false) | Step(ref board, p2, -1, false))
+                while (Step(ref board, p1, 1, true) | Step(ref board, p2, -1, true))
                 {
                 }
             }

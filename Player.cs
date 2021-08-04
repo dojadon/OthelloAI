@@ -15,17 +15,22 @@ namespace OthelloAI
     {
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
-            if(board.GetMoves(stone) == 0)
+            ulong moves = board.GetMoves(stone);
+
+            while (moves != 0)
             {
-                return (-1, -1, 0);
+                string s = Console.ReadLine();
+
+                int x = (int)char.GetNumericValue(s[0]);
+                int y = (int)char.GetNumericValue(s[1]);
+
+                ulong move = Board.Mask(x, y);
+
+                if ((move & moves) != 0)
+                    return (x, y, move);
             }
 
-            string s = Console.ReadLine();
-
-            int x = (int) char.GetNumericValue(s[0]);
-            int y = (int) char.GetNumericValue(s[1]);
-
-            return (x, y, Board.Mask(x, y));
+            return (-1, -1, 0);
         }
     }
 }
