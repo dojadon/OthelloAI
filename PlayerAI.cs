@@ -9,6 +9,52 @@ using System.Threading.Tasks;
 
 namespace OthelloAI
 {
+    class TranspositionTable
+    {
+        public IDictionary<Board, (float, float)> Dict { get; }
+
+        public (float, float) this[Board key]
+        {
+            get => Dict[key];
+            set => Dict[key] = value;
+        }
+
+        public TranspositionTable()
+        {
+            Dict = CreateDictionary();
+        }
+
+        public bool TryGetValue(Board key, out (float, float) border)
+        {
+            return Dict.TryGetValue(key, out border);
+        }
+
+        public void UpdateBorder(Board key, float lower, float upper)
+        {
+            if(TryGetValue(key, out (float l, float u) t))
+            {
+                this[key] = (Math.Max(lower, t.l), Math.Min(upper, t.u));
+            }
+            else
+            {
+                this[key] = (lower, upper);
+            }
+        }
+
+        protected virtual IDictionary<Board, (float, float)> CreateDictionary()
+        {
+            return new Dictionary<Board, (float, float)>();
+        }
+    }
+
+    class ConcurrentTranspositionTable : TranspositionTable
+    {
+        protected override IDictionary<Board, (float, float)> CreateDictionary()
+        {
+            return new ConcurrentDictionary<Board, (float, float)>();
+        }
+    }
+
     public class Search
     {
         public IDictionary<Board, (float, float)> Table { get; set; } = new Dictionary<Board, (float, float)>();
@@ -108,6 +154,8 @@ namespace OthelloAI
 
     public class PlayerAI : Player
     {
+        public const int INF = 1000000;
+
         public SearchParameters ParamBeg { get; set; }
         public SearchParameters ParamMid { get; set; }
         public SearchParameters ParamEnd { get; set; }
@@ -127,13 +175,13 @@ namespace OthelloAI
 
         protected float EvalFinishedGame(Board board)
         {
-            SearchedNodeCount[CurrentIndex]++;
+            //SearchedNodeCount[CurrentIndex]++;
             return board.GetStoneCountGap() * 10000;
         }
 
         protected float EvalLastMove(Board board)
         {
-            SearchedNodeCount[CurrentIndex]++;
+            //SearchedNodeCount[CurrentIndex]++;
             return (board.GetStoneCountGap() + board.GetReversedCountOnLastMove()) * 10000;
         }
 
@@ -141,6 +189,7 @@ namespace OthelloAI
 
         public float Eval(Board board)
         {
+            //SearchedNodeCount[CurrentIndex]++;
             return Evaluator.Eval(board);
         }
 
@@ -555,7 +604,7 @@ namespace OthelloAI
 
         int ordering_depth = 57;
 
-        public float Solve(Search search, Move move, CutoffParameters param, int depth, float alpha, float beta)
+        public virtual float Solve(Search search, Move move, CutoffParameters param, int depth, float alpha, float beta)
         {
             if (search.IsCanceled)
                 return -1000000;

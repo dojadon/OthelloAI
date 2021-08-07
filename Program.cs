@@ -216,7 +216,7 @@ namespace OthelloAI
             Board board;
 
             Evaluator evaluator = new EvaluatorPatternBased();
-            PlayerAI p = new PlayerAI(evaluator)
+            PlayerAI p = new PlayerAPHID(evaluator)
             {
                 ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
                 ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
