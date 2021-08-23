@@ -444,7 +444,7 @@ namespace OthelloAI.Patterns
 
         public void InfoHash(int stage, int hash)
         {
-            SetBoard(hash).print();
+            Console.WriteLine(SetBoard(hash));
             Console.WriteLine($"Stage : {stage}, Hash : {hash}");
             Console.WriteLine($"Eval : {StageBasedEvaluations[stage][hash]}");
             Console.WriteLine();

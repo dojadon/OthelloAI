@@ -57,7 +57,7 @@ namespace OthelloAI
                 }
             }
             Board = new Board(b);
-            Board.print();
+            Console.WriteLine(Board);
             OnChangedBoard?.Invoke(Board);
         }
 

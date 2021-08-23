@@ -154,7 +154,7 @@ namespace OthelloAI
             {
                 board = board.Reversed(move, stone);
                 if (print)
-                    board.print();
+                    Console.WriteLine(board);
                 return true;
             }
             return false;
@@ -190,8 +190,7 @@ namespace OthelloAI
                 (Board board, int color) = Parse(lines);
                 Console.WriteLine(lines[1]);
                 Console.WriteLine(color);
-
-                board.print();
+                Console.WriteLine(board);
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
@@ -216,7 +215,7 @@ namespace OthelloAI
             Board board;
 
             Evaluator evaluator = new EvaluatorPatternBased();
-            PlayerAI p = new PlayerAPHID(evaluator)
+            PlayerAI p = new PlayerAI(evaluator)
             {
                 ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
                 ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),

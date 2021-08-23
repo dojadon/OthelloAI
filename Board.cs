@@ -341,12 +341,12 @@ namespace OthelloAI
 
         public int GetStoneCountGap()
         {
-            return (BitCount(bitB) - BitCount(bitW));
+            return (n_stone - 2 * BitCount(bitB));
         }
 
         public int GetStoneCountGap(int s)
         {
-            return s * (BitCount(bitB) - BitCount(bitW));
+            return s * GetStoneCountGap();
         }
 
         public bool IsWon(int s)
@@ -364,37 +364,37 @@ namespace OthelloAI
             return moves ^ move;
         }
 
-        public void print()
+        public static bool operator ==(Board b1, Board b2) => (b1.bitB == b2.bitB) && (b1.bitW == b2.bitW);
+
+        public static bool operator !=(Board b1, Board b2) => (b1.bitB != b2.bitB) || (b1.bitW != b2.bitW);
+
+        public override string ToString()
         {
-            Console.WriteLine("    0   1   2   3   4   5   6   7");
-            Console.WriteLine("  +---+---+---+---+---+---+---+---+");
-            for (int y = 0; y < 8; y++)
+            Board b = this;
+            string Disc(int x, int y) => b.GetId(x, y) switch
             {
-                Console.Write(y + " |");
-                for (int x = 0; x < 8; x++)
-                {
-                    switch (GetId(x, y))
-                    {
-                        case 1:
-                            Console.Write(" X |");
-                            break;
+                0 => " ",
+                1 => "X",
+                2 => "O",
+                _ => "?"
+            };
 
-                        case 2:
-                            Console.Write(" O |");
-                            break;
-
-                        case 0:
-                            Console.Write("   |");
-                            break;
-
-                        default:
-                            Console.Write(" " + GetId(x, y) + " |");
-                            break;
-                    }
-                }
-                Console.WriteLine();
-                Console.WriteLine("  +---+---+---+---+---+---+---+---+");
+            string Line(int y)
+            {
+                return $"{y} | {Disc(0, y)} | {Disc(1, y)} | {Disc(2, y)} | {Disc(3, y)} | {Disc(4, y)} | {Disc(5, y)} | {Disc(6, y)} | {Disc(7, y)} |";
             }
+
+            return string.Join(Environment.NewLine,
+                $"    0   1   2   3   4   5   6   7",
+                $"  +---+---+---+---+---+---+---+---+", Line(0),
+                $"  +---+---+---+---+---+---+---+---+", Line(1),
+                $"  +---+---+---+---+---+---+---+---+", Line(2),
+                $"  +---+---+---+---+---+---+---+---+", Line(3),
+                $"  +---+---+---+---+---+---+---+---+", Line(4),
+                $"  +---+---+---+---+---+---+---+---+", Line(5),
+                $"  +---+---+---+---+---+---+---+---+", Line(6),
+                $"  +---+---+---+---+---+---+---+---+", Line(7),
+                $"  +---+---+---+---+---+---+---+---+");
         }
     }
 }
