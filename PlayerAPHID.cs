@@ -1,16 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace OthelloAI
 {
-    enum TaskStat
-    {
-        Waiting, Running, Finished
-    }
-
-    class WorkerTaskInfo
+    class WorkerTaskInfo : IComparable<WorkerTaskInfo>
     {
         public WorkerTaskInfo(float alpha, float beta)
         {
@@ -18,110 +14,46 @@ namespace OthelloAI
             Beta = beta;
         }
 
-        public int ThreadId { get; set; } = -1;
-        public TaskStat Stat { get; set; } = TaskStat.Waiting;
+        public Board Board { get; }
         public float Alpha { get; set; }
         public float Beta { get; set; }
-    }
 
-    class SearchAphidWorker : Search
-    {
-        public int Id { get; set; }
-        public Board Board { get; set; }
-        public ConcurrentStack<(Board, float, float)> Messages { get; } = new ConcurrentStack<(Board, float, float)>();
-
-        public float Alpha { get; set; } = -1000000;
-        public float Beta { get; set; } = 1000000;
-
-        public void AddMessage(Board key, float alpha, float beta)
+        int IComparable<WorkerTaskInfo>.CompareTo(WorkerTaskInfo other)
         {
-            Messages.Push((key, alpha, beta));
-        }
-
-        public void UpdateBorder()
-        {
-            while (Messages.TryPop(out (Board key, float alpha, float beta) t))
-            {
-                if (Board != t.key)
-                {
-                    //Console.WriteLine($"{Id} : [{t.alpha}, {t.beta}] Key doesn't match");
-                    continue;
-                }
-
-                //Console.WriteLine($"{t.key}\n{Id} : [{t.alpha}, {t.beta}]");
-
-                Alpha = Math.Max(Alpha, t.alpha);
-                Beta = Math.Min(Beta, t.beta);
-            }
-        }
-
-        public override bool TryCutoffOrUpdateBorder(Move move, CutoffParameters param, int depth, ref float alpha, ref float beta, ref float value)
-        {
-            if (depth <= 4)
-                return false;
-
-            UpdateBorder();
-
-            (float lower, float upper) = IsPlayer ? (Alpha, Beta) : (-Beta, -Alpha);
-
-            //Console.WriteLine($"{move.reversed}\n{IsPlayer}, {depth} : [{lower}, {upper}]");
-
-            if (lower >= beta)
-            {
-                value = lower;
-                return true;
-            }
-
-            if (upper <= alpha || upper == lower)
-            {
-                value = upper;
-                return true;
-            }
-
-            alpha = Math.Max(alpha, lower);
-            beta = Math.Min(beta, upper);
-            return false;
+            return (Beta - Alpha);
         }
     }
 
-    class TaskWorkers
+    class TaskWorkerManager
     {
         public PlayerAphid Player { get; }
         public CutoffParameters Param { get; }
         public int WorkerDepth { get; }
         public int NumThreads { get; }
         public ConcurrentDictionary<Board, WorkerTaskInfo> BorderTable { get; } = new ConcurrentDictionary<Board, WorkerTaskInfo>();
-        public ConcurrentDictionary<Board, float> CertainValueTable { get; } = new ConcurrentDictionary<Board, float>();
+        public ConcurrentDictionary<Board, (bool, float)> CertainValueTable { get; } = new ConcurrentDictionary<Board, (bool, float)>();
         public ConcurrentStack<Board> Keys { get; } = new ConcurrentStack<Board>();
 
-        public SearchAphidWorker[] Searches { get; }
+        public SortedSet<WorkerTaskInfo> workerTasks = new SortedSet<WorkerTaskInfo>();
 
         public bool RunningWorkers { get; private set; }
 
-        public TaskWorkers(PlayerAphid player, CutoffParameters param, int depth, int numThreads)
+        public TaskWorkerManager(PlayerAphid player, CutoffParameters param, int depth, int numThreads)
         {
             Player = player;
             Param = param;
             WorkerDepth = depth;
             NumThreads = numThreads;
-
-            Searches = new SearchAphidWorker[numThreads];
         }
 
         public void AddTask(Board key, float alpha, float beta)
         {
-            if (BorderTable.TryGetValue(key, out WorkerTaskInfo info) && info.Stat != TaskStat.Finished)
+            if (BorderTable.TryGetValue(key, out WorkerTaskInfo info))
             {
-                float a_tmp = Math.Max(info.Alpha, alpha);
-                float b_tmp = Math.Min(info.Beta, beta);
-
-                if (a_tmp != info.Alpha || b_tmp != info.Beta)
+                lock (info)
                 {
-                    info.Alpha = a_tmp;
-                    info.Beta = b_tmp;
-
-                    if (info.Stat == TaskStat.Running)
-                        Searches[info.ThreadId].AddMessage(key, info.Alpha, info.Beta);
+                    info.Alpha = Math.Max(info.Alpha, alpha);
+                    info.Beta = Math.Min(info.Beta, beta);
                 }
             }
             else
@@ -133,33 +65,35 @@ namespace OthelloAI
 
         public void Run(int id)
         {
-            var search = new SearchAphidWorker() { Id = id };
-            Searches[id] = search;
+            var tables = Enumerable.Range(0, WorkerDepth + 1).Select(i => new Dictionary<Board, (float, float)>()).ToArray();
 
             while (RunningWorkers)
             {
                 if (!Keys.TryPop(out Board b))
                     continue;
 
-                //Console.WriteLine($"{id} : Recieved");
+                SolveIteractiveDeepening(tables, BorderTable[b], new Move(b), Param, WorkerDepth);
+            }
+        }
 
-                search.Board = b;
-                search.Reset();
+        private void SolveIteractiveDeepening(Dictionary<Board, (float, float)>[] tables, WorkerTaskInfo info, Move move, CutoffParameters param, int depth)
+        {
+            int d = depth - 4;
+            Search search = new Search();
 
-                var info = BorderTable[b];
-                info.ThreadId = id;
-                info.Stat = TaskStat.Running;
+            while (true)
+            {
+                search.Table = tables[d];
+                float e = Player.Solve(search, move, param, d, info.Alpha, info.Beta);
 
-                float al = info.Alpha;
-                float be = info.Beta;
-                float e1 = Player.Solve(search, new Move(b), Param, WorkerDepth, al, be);
-                float e2 = Player.Solve(new Search(), new Move(b), Param, WorkerDepth, al, be);
-                Console.WriteLine($"{e1}, {e2}, [{info.Alpha}, {info.Beta}], [{al}, {be}]");
-                CertainValueTable[b] = e2;
+                if (d >= depth)
+                {
+                    CertainValueTable[move.reversed] = (d >= depth, e);
+                    break;
+                }
 
-                info.Stat = TaskStat.Finished;
-
-                //Console.WriteLine($"{id} : Finished");
+                d += 2;
+                search = new SearchIterativeDeepening(search.Table);
             }
         }
 
@@ -167,7 +101,7 @@ namespace OthelloAI
         {
             RunningWorkers = true;
 
-            for(int i = 0;i < NumThreads; i++)
+            foreach (int i in Enumerable.Range(0, NumThreads))
             {
                 Task.Run(() => Run(i));
             }
@@ -181,9 +115,9 @@ namespace OthelloAI
 
     class SearchAphid : Search
     {
-        public TaskWorkers Workers { get; }
+        public TaskWorkerManager Workers { get; }
 
-        public SearchAphid(TaskWorkers workers)
+        public SearchAphid(TaskWorkerManager workers)
         {
             Workers = workers;
         }
@@ -191,8 +125,8 @@ namespace OthelloAI
 
     class PlayerAphid : PlayerAI
     {
-        public int DepthMaser { get; } = 3;
-        public int DepthWorker { get; } = 7;
+        public int DepthMaser { get; } = 2;
+        public int DepthWorker { get; } = 9;
 
         public PlayerAphid(Evaluator evaluator) : base(evaluator)
         {
@@ -251,23 +185,22 @@ namespace OthelloAI
             if (root.n_moves <= 1)
                 return root.moves;
 
-            TaskWorkers workers = new TaskWorkers(this, param, DepthWorker, 15);
-            workers.RunWorkers();
+            TaskWorkerManager manager = new TaskWorkerManager(this, param, DepthWorker, 15);
+            SearchAphid search = new SearchAphid(manager);
+            manager.RunWorkers();
 
             Move[] moves = root.OrderedNextMoves();
 
-            SearchAphid search = new SearchAphid(workers);
-            ulong result = 0;
-            bool certain = false;
-
-            while (!certain)
+            while (true)
             {
-                (result, certain) = SolveAphidRoot(search, moves, depth);
-                // Console.WriteLine($"Move : {Board.ToPos(result)}");
-            }
-            workers.StopWorkers();
+                (ulong result, bool certain) = SolveAphidRoot(search, moves, depth);
 
-            return result;
+                if (certain)
+                {
+                    manager.StopWorkers();
+                    return result;
+                }
+            }
         }
 
         public (ulong move, bool certain) SolveAphidRoot(SearchAphid search, Move[] moves, int depth)
@@ -283,9 +216,6 @@ namespace OthelloAI
 
                 float eval = -SolveAphid(search, move, depth - 1, -INF, -a1, -INF, -a2, out bool isCertainNode);
                 certain &= isCertainNode;
-
-                // if (isCertainNode)
-                //Console.WriteLine($"{Board.ToPos(move.move)} : {eval}");
 
                 if (a1 < eval)
                 {
@@ -303,6 +233,8 @@ namespace OthelloAI
         {
             certain = true;
 
+            float max = -INF;
+
             foreach (Move move in moves)
             {
                 float eval = -SolveAphid(search, move, depth - 1, -b1, -a1, -b2, -a2, out bool isCertainNode);
@@ -312,19 +244,20 @@ namespace OthelloAI
                     return eval;
 
                 a1 = Math.Max(a1, eval);
+                max = Math.Max(max, eval);
 
                 if (isCertainNode)
                     a2 = Math.Max(a2, eval);
             }
-            return a1;
+            return max;
         }
 
         public float EvalMasterLeaf(SearchAphid search, Move move, float a2, float b2, out bool certain)
         {
-            if (search.Workers.CertainValueTable.TryGetValue(move.reversed, out float value))
+            if (search.Workers.CertainValueTable.TryGetValue(move.reversed, out (bool certain, float value) t))
             {
-                certain = true;
-                return value;
+                certain = t.certain;
+                return t.value;
             }
             else
             {

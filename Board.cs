@@ -341,7 +341,7 @@ namespace OthelloAI
 
         public int GetStoneCountGap()
         {
-            return (n_stone - 2 * BitCount(bitB));
+            return (-n_stone + 2 * BitCount(bitB));
         }
 
         public int GetStoneCountGap(int s)

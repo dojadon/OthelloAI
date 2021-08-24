@@ -50,7 +50,7 @@ namespace OthelloAI
             // StartUpdataEvaluation();
             // StartClient();
             // TestFFO();
-            StartGame();
+             StartGame();
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -136,10 +136,10 @@ namespace OthelloAI
         static void StartClient()
         {
             Evaluator evaluator = new EvaluatorPatternBased();
-            PlayerAI p = new PlayerAI(evaluator)
+            PlayerAI p = new PlayerAphid(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 12, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
@@ -215,7 +215,7 @@ namespace OthelloAI
             Board board;
 
             Evaluator evaluator = new EvaluatorPatternBased();
-            PlayerAI p = new PlayerAI(evaluator)
+            PlayerAI p = new PlayerAphid(evaluator)
             {
                 ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
                 ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
