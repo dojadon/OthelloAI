@@ -9,12 +9,12 @@ namespace OthelloAI
 {
     public abstract class Evaluator
     {
-        public abstract float Eval(Board board);
+        public abstract int Eval(Board board);
     }
 
     public class EvaluatorPatternBased : Evaluator
     {
-        public override float Eval(Board board)
+        public override int Eval(Board board)
         {
             MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
@@ -34,17 +34,17 @@ namespace OthelloAI
     {
         Random Rand { get; } = new Random(DateTime.Now.Millisecond);
         Evaluator Evaluator { get; }
-        float Randomness { get; }
+        int Randomness { get; }
 
-        public EvaluatorRandomize(Evaluator evaluator, float randomness)
+        public EvaluatorRandomize(Evaluator evaluator, int randomness)
         {
             Evaluator = evaluator;
             Randomness = randomness;
         }
 
-        public override float Eval(Board board)
+        public override int Eval(Board board)
         {
-            return Evaluator.Eval(board) + (float)Rand.NextDouble() * Randomness;
+            return Evaluator.Eval(board) + (Rand.Next(Randomness) - Randomness / 2);
         }
     }
 

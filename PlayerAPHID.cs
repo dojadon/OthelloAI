@@ -8,15 +8,15 @@ namespace OthelloAI
 {
     class WorkerTaskInfo : IComparable<WorkerTaskInfo>
     {
-        public WorkerTaskInfo(float alpha, float beta)
+        public WorkerTaskInfo(int alpha, int beta)
         {
             Alpha = alpha;
             Beta = beta;
         }
 
         public Board Board { get; }
-        public float Alpha { get; set; }
-        public float Beta { get; set; }
+        public int Alpha { get; set; }
+        public int Beta { get; set; }
 
         int IComparable<WorkerTaskInfo>.CompareTo(WorkerTaskInfo other)
         {
@@ -31,7 +31,7 @@ namespace OthelloAI
         public int WorkerDepth { get; }
         public int NumThreads { get; }
         public ConcurrentDictionary<Board, WorkerTaskInfo> BorderTable { get; } = new ConcurrentDictionary<Board, WorkerTaskInfo>();
-        public ConcurrentDictionary<Board, (bool, float)> CertainValueTable { get; } = new ConcurrentDictionary<Board, (bool, float)>();
+        public ConcurrentDictionary<Board, (bool, int)> CertainValueTable { get; } = new ConcurrentDictionary<Board, (bool, int)>();
         public ConcurrentStack<Board> Keys { get; } = new ConcurrentStack<Board>();
 
         public SortedSet<WorkerTaskInfo> workerTasks = new SortedSet<WorkerTaskInfo>();
@@ -46,7 +46,7 @@ namespace OthelloAI
             NumThreads = numThreads;
         }
 
-        public void AddTask(Board key, float alpha, float beta)
+        public void AddTask(Board key, int alpha, int beta)
         {
             if (BorderTable.TryGetValue(key, out WorkerTaskInfo info))
             {
@@ -65,7 +65,7 @@ namespace OthelloAI
 
         public void Run(int id)
         {
-            var tables = Enumerable.Range(0, WorkerDepth + 1).Select(i => new Dictionary<Board, (float, float)>()).ToArray();
+            var tables = Enumerable.Range(0, WorkerDepth + 1).Select(i => new Dictionary<Board, (int, int)>()).ToArray();
 
             while (RunningWorkers)
             {
@@ -76,7 +76,7 @@ namespace OthelloAI
             }
         }
 
-        private void SolveIteractiveDeepening(Dictionary<Board, (float, float)>[] tables, WorkerTaskInfo info, Move move, CutoffParameters param, int depth)
+        private void SolveIteractiveDeepening(Dictionary<Board, (int, int)>[] tables, WorkerTaskInfo info, Move move, CutoffParameters param, int depth)
         {
             int d = depth - 4;
             Search search = new Search();
@@ -84,7 +84,7 @@ namespace OthelloAI
             while (true)
             {
                 search.Table = tables[d];
-                float e = Player.Solve(search, move, param, d, info.Alpha, info.Beta);
+                int e = Player.Solve(search, move, param, d, info.Alpha, info.Beta);
 
                 if (d >= depth)
                 {
@@ -207,14 +207,14 @@ namespace OthelloAI
         {
             Move result = moves[0];
             bool certain = true;
-            float a1 = -INF;
-            float a2 = -INF;
+            int a1 = -INF;
+            int a2 = -INF;
 
             for (int i = 0; i < moves.Length; i++)
             {
                 Move move = moves[i];
 
-                float eval = -SolveAphid(search, move, depth - 1, -INF, -a1, -INF, -a2, out bool isCertainNode);
+                int eval = -SolveAphid(search, move, depth - 1, -INF, -a1, -INF, -a2, out bool isCertainNode);
                 certain &= isCertainNode;
 
                 if (a1 < eval)
@@ -229,15 +229,15 @@ namespace OthelloAI
             return (result.move, certain);
         }
 
-        public float NegascoutAphid(SearchAphid search, Move[] moves, int depth, float a1, float b1, float a2, float b2, out bool certain)
+        public int NegascoutAphid(SearchAphid search, Move[] moves, int depth, int a1, int b1, int a2, int b2, out bool certain)
         {
             certain = true;
 
-            float max = -INF;
+            int max = -INF;
 
             foreach (Move move in moves)
             {
-                float eval = -SolveAphid(search, move, depth - 1, -b1, -a1, -b2, -a2, out bool isCertainNode);
+                int eval = -SolveAphid(search, move, depth - 1, -b1, -a1, -b2, -a2, out bool isCertainNode);
                 certain &= isCertainNode;
 
                 if (b1 <= eval)
@@ -252,9 +252,9 @@ namespace OthelloAI
             return max;
         }
 
-        public float EvalMasterLeaf(SearchAphid search, Move move, float a2, float b2, out bool certain)
+        public int EvalMasterLeaf(SearchAphid search, Move move, int a2, int b2, out bool certain)
         {
-            if (search.Workers.CertainValueTable.TryGetValue(move.reversed, out (bool certain, float value) t))
+            if (search.Workers.CertainValueTable.TryGetValue(move.reversed, out (bool certain, int value) t))
             {
                 certain = t.certain;
                 return t.value;
@@ -267,7 +267,7 @@ namespace OthelloAI
             }
         }
 
-        public float SolveAphid(SearchAphid search, Move move, int depth, float a1, float b1, float a2, float b2, out bool certain)
+        public int SolveAphid(SearchAphid search, Move move, int depth, int a1, int b1, int a2, int b2, out bool certain)
         {
             if (depth <= 0)
                 return EvalMasterLeaf(search, move, a2, b2, out certain);

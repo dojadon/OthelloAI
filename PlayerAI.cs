@@ -11,7 +11,7 @@ namespace OthelloAI
 {
     public class Search
     {
-        public IDictionary<Board, (float, float)> Table { get; set; } = new Dictionary<Board, (float, float)>();
+        public IDictionary<Board, (int, int)> Table { get; set; } = new Dictionary<Board, (int, int)>();
 
         public virtual bool IsCanceled { get; set; }
 
@@ -46,11 +46,11 @@ namespace OthelloAI
 
     public class SearchIterativeDeepening : Search
     {
-        public IDictionary<Board, (float, float)> TablePrev { get; }
+        public IDictionary<Board, (int, int)> TablePrev { get; }
 
         public IComparer<Move> Comparer { get; set; }
 
-        public SearchIterativeDeepening(IDictionary<Board, (float, float)> prev)
+        public SearchIterativeDeepening(IDictionary<Board, (int, int)> prev)
         {
             TablePrev = prev;
             Comparer = new MoveComparer(prev);
@@ -70,16 +70,16 @@ namespace OthelloAI
         {
             const int INTERVAL = 200;
 
-            IDictionary<Board, (float, float)> Dict { get; }
+            IDictionary<Board, (int, int)> Dict { get; }
 
-            public MoveComparer(IDictionary<Board, (float, float)> dict)
+            public MoveComparer(IDictionary<Board, (int, int)> dict)
             {
                 Dict = dict;
             }
 
             public int Eval(Move move)
             {
-                if (Dict.TryGetValue(move.reversed, out (float min, float max) t))
+                if (Dict.TryGetValue(move.reversed, out (int min, int max) t))
                 {
                      if (-PlayerAI.INF < t.min && t.max < PlayerAI.INF)
                          return (int)(t.min + t.max) / 2;
@@ -158,13 +158,13 @@ namespace OthelloAI
             Evaluator = evaluator;
         }
 
-        protected float EvalFinishedGame(Board board)
+        protected int EvalFinishedGame(Board board)
         {
             //SearchedNodeCount[CurrentIndex]++;
             return board.GetStoneCountGap() * 10000;
         }
 
-        protected float EvalLastMove(Board board)
+        protected int EvalLastMove(Board board)
         {
             //SearchedNodeCount[CurrentIndex]++;
             return (board.GetStoneCountGap() + board.GetReversedCountOnLastMove()) * 10000;
@@ -172,7 +172,7 @@ namespace OthelloAI
 
         public List<float> times = new List<float>();
 
-        public float Eval(Board board)
+        public int Eval(Board board)
         {
             //SearchedNodeCount[CurrentIndex]++;
             return Evaluator.Eval(board);
@@ -248,7 +248,7 @@ namespace OthelloAI
             return move;
         }
 
-        public (ulong, float) SolveEndGame(Search search, Board board, CutoffParameters param)
+        public (ulong, int) SolveEndGame(Search search, Board board, CutoffParameters param)
         {
             Move root = new Move(board);
 
@@ -276,7 +276,7 @@ namespace OthelloAI
             return (array[0].move, -1);
         }
 
-        public float SolveEndGameParallel(Move[] array, CutoffParameters param)
+        public int SolveEndGameParallel(Move[] array, CutoffParameters param)
         {
             Array.Sort(array);
 
@@ -294,7 +294,7 @@ namespace OthelloAI
             return value;
         }
 
-        public (ulong, float) SolveRoot(Search search, Board board, CutoffParameters param, int depth)
+        public (ulong, int) SolveRoot(Search search, Board board, CutoffParameters param, int depth)
         {
             Move root = new Move(board);
 
@@ -307,8 +307,8 @@ namespace OthelloAI
             search.OrderMoves(array, depth);
 
             Move result = array[0];
-            float max = -Solve(search, array[0], param, depth - 1, -1000000, 1000000);
-            float alpha = max;
+            int max = -Solve(search, array[0], param, depth - 1, -1000000, 1000000);
+            int alpha = max;
 
             if (PrintInfo)
                 Console.WriteLine($"{Board.ToPos(result.move)} : {max}");
@@ -317,7 +317,7 @@ namespace OthelloAI
             {
                 Move move = array[i];
 
-                float eval = -Solve(search, move, param, depth - 1, -alpha - 1, -alpha);
+                int eval = -Solve(search, move, param, depth - 1, -alpha - 1, -alpha);
 
                 if (alpha < eval)
                 {
@@ -342,11 +342,11 @@ namespace OthelloAI
             return (result.move, max);
         }
 
-        public float Negascout(Search search, Board board, ulong moves, CutoffParameters param, int depth, float alpha, float beta)
+        public int Negascout(Search search, Board board, ulong moves, CutoffParameters param, int depth, int alpha, int beta)
         {
             ulong move = Board.NextMove(moves);
             moves = Board.RemoveMove(moves, move);
-            float max = -Solve(search, new Move(board, move), param, depth - 1, -beta, -alpha);
+            int max = -Solve(search, new Move(board, move), param, depth - 1, -beta, -alpha);
 
             if (beta <= max)
                 return max;
@@ -357,7 +357,7 @@ namespace OthelloAI
             {
                 moves = Board.RemoveMove(moves, move);
 
-                float eval = -Solve(search, new Move(board, move), param, depth - 1, -alpha - 1, -alpha);
+                int eval = -Solve(search, new Move(board, move), param, depth - 1, -alpha - 1, -alpha);
 
                 if (beta <= eval)
                     return eval;
@@ -377,9 +377,9 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negascout(Search search, Move[] moves, CutoffParameters param, int depth, float alpha, float beta)
+        public int Negascout(Search search, Move[] moves, CutoffParameters param, int depth, int alpha, int beta)
         {
-            float max = -Solve(search, moves[0], param, depth - 1, -beta, -alpha);
+            int max = -Solve(search, moves[0], param, depth - 1, -beta, -alpha);
 
             if (beta <= max)
                 return max;
@@ -388,7 +388,7 @@ namespace OthelloAI
 
             foreach (Move move in moves.AsSpan(1, moves.Length - 1))
             {
-                float eval = -Solve(search, move, param, depth - 1, -alpha - 1, -alpha);
+                int eval = -Solve(search, move, param, depth - 1, -alpha - 1, -alpha);
 
                 if (beta <= eval)
                     return eval;
@@ -408,13 +408,13 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negamax(Search search, Move[] moves, CutoffParameters param, int depth, float alpha, float beta)
+        public int Negamax(Search search, Move[] moves, CutoffParameters param, int depth, int alpha, int beta)
         {
-            float max = -1000000;
+            int max = -1000000;
 
             for (int i = 0; i < moves.Length; i++)
             {
-                float e = -Solve(search, moves[i], param, depth - 1, -beta, -alpha);
+                int e = -Solve(search, moves[i], param, depth - 1, -beta, -alpha);
                 max = Math.Max(max, e);
                 alpha = Math.Max(alpha, e);
 
@@ -424,15 +424,15 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negamax(Search search, Board board, ulong moves, CutoffParameters param, int depth, float alpha, float beta)
+        public int Negamax(Search search, Board board, ulong moves, CutoffParameters param, int depth, int alpha, int beta)
         {
-            float max = -1000000;
+            int max = -1000000;
             ulong move;
             while ((move = Board.NextMove(moves)) != 0)
             {
                 moves = Board.RemoveMove(moves, move);
 
-                float e = -Solve(search, new Move(board, move), param, depth - 1, -beta, -alpha);
+                int e = -Solve(search, new Move(board, move), param, depth - 1, -beta, -alpha);
                 max = Math.Max(max, e);
                 alpha = Math.Max(alpha, e);
 
@@ -444,7 +444,7 @@ namespace OthelloAI
 
         public bool PrintInfo { get; set; } = true;
 
-        public bool TryTranspositionCutoff(IDictionary<Board, (float, float)> table, Move move, CutoffParameters param, int depth, ref float alpha, ref float beta, out float lower, out float upper, ref float value)
+        public bool TryTranspositionCutoff(IDictionary<Board, (int, int)> table, Move move, CutoffParameters param, int depth, ref int alpha, ref int beta, out int lower, out int upper, ref int value)
         {
             if (depth <= transposition || move.reversed.n_stone > ordering_depth || !param.shouldTranspositionCut || !table.ContainsKey(move.reversed))
             {
@@ -473,7 +473,7 @@ namespace OthelloAI
             return false;
         }
 
-        public void StoreTranspositionTable(IDictionary<Board, (float, float)> table, Move move, float alpha, float beta, float lower, float upper, float value)
+        public void StoreTranspositionTable(IDictionary<Board, (int, int)> table, Move move, int alpha, int beta, int lower, int upper, int value)
         {
             if (value <= alpha)
                 table[move.reversed] = (lower, value);
@@ -483,14 +483,14 @@ namespace OthelloAI
                 table[move.reversed] = (value, value);
         }
 
-        public bool TryProbCutoff(Search search, Move move, CutoffParameters param, int depth, float alpha, float beta, ref float value)
+        public bool TryProbCutoff(Search search, Move move, CutoffParameters param, int depth, int alpha, int beta, ref int value)
         {
             if (!param.shouldProbCut || depth < 5 || depth > 8)
                 return false;
 
-            float sigma = (3 * move.reversed.n_stone - 8) * 3.2F;
-            float offset = move.reversed.n_stone * (depth % 2 == 0 ? -2 : 2);
-            float e = alpha - sigma - offset;
+            int sigma = (3 * move.reversed.n_stone - 8) * 3;
+            int offset = move.reversed.n_stone * (depth % 2 == 0 ? -2 : 2);
+            int e = alpha - sigma - offset;
             CutoffParameters mcpParam = new CutoffParameters(param.shouldTranspositionCut, false, true);
 
             if (Solve(search, move, mcpParam, depth - 3, e - 1, e) < e)
@@ -510,7 +510,7 @@ namespace OthelloAI
         int ordering_depth = 57;
         int transposition = 1;
 
-        public virtual float Solve(Search search, Move move, CutoffParameters param, int depth, float alpha, float beta)
+        public virtual int Solve(Search search, Move move, CutoffParameters param, int depth, int alpha, int beta)
         {
             SearchedNodeCount[CurrentIndex]++;
 
@@ -520,7 +520,7 @@ namespace OthelloAI
             if (depth <= 0)
                 return Eval(move.reversed);
 
-            float value = 0;
+            int value = 0;
 
             if (move.moves == 0)
             {
@@ -539,7 +539,7 @@ namespace OthelloAI
             /*if (search.TryCutoffOrUpdateBorder(move, param, depth, ref alpha, ref beta, ref value))
                 return value;*/
 
-            if (TryTranspositionCutoff(search.Table, move, param, depth, ref alpha, ref beta, out float lower, out float upper, ref value))
+            if (TryTranspositionCutoff(search.Table, move, param, depth, ref alpha, ref beta, out int lower, out int upper, ref value))
                 return value;
 
             if (TryProbCutoff(search, move, param, depth, alpha, beta, ref value))

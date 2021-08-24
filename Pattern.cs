@@ -325,7 +325,7 @@ namespace OthelloAI.Patterns
             return result;
         }
 
-        public float Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
+        public int Eval(in Board org, in Board tr, in Board hor, in Board rot90, in Board rot270)
         {
             byte[] eval = EvaluationsBin[GetStage(org)];
 
