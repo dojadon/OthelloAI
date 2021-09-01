@@ -14,7 +14,6 @@ namespace OthelloAI
             Beta = beta;
         }
 
-        public Board Board { get; }
         public int Alpha { get; set; }
         public int Beta { get; set; }
 
@@ -32,9 +31,7 @@ namespace OthelloAI
         public int NumThreads { get; }
         public ConcurrentDictionary<Board, WorkerTaskInfo> BorderTable { get; } = new ConcurrentDictionary<Board, WorkerTaskInfo>();
         public ConcurrentDictionary<Board, (bool, int)> CertainValueTable { get; } = new ConcurrentDictionary<Board, (bool, int)>();
-        public ConcurrentStack<Board> Keys { get; } = new ConcurrentStack<Board>();
-
-        public SortedSet<WorkerTaskInfo> workerTasks = new SortedSet<WorkerTaskInfo>();
+        public ConcurrentQueue<Board> Keys { get; } = new ConcurrentQueue<Board>();
 
         public bool RunningWorkers { get; private set; }
 
@@ -59,7 +56,7 @@ namespace OthelloAI
             else
             {
                 BorderTable[key] = new WorkerTaskInfo(alpha, beta);
-                Keys.Push(key);
+                Keys.Enqueue(key);
             }
         }
 
@@ -69,7 +66,7 @@ namespace OthelloAI
 
             while (RunningWorkers)
             {
-                if (!Keys.TryPop(out Board b))
+                if (!Keys.TryDequeue(out Board b))
                     continue;
 
                 SolveIteractiveDeepening(tables, BorderTable[b], new Move(b), Param, WorkerDepth);
@@ -92,8 +89,8 @@ namespace OthelloAI
                     break;
                 }
 
+                search = new SearchIterativeDeepening(search.Table, d);
                 d += 2;
-                search = new SearchIterativeDeepening(search.Table);
             }
         }
 
@@ -134,7 +131,6 @@ namespace OthelloAI
 
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
-            CurrentIndex = board.n_stone - 4;
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             if (stone == -1)
@@ -163,13 +159,12 @@ namespace OthelloAI
             if (result != 0)
             {
                 float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
-                times.Add(time);
+                Times.Add(time);
 
                 if (PrintInfo)
                 {
                     Console.WriteLine($"Taken Time : {time} ms");
-                    Console.WriteLine($"Nodes : {TranspositionTableCount[CurrentIndex]}/{SearchedNodeCount[CurrentIndex]}");
-                    Console.WriteLine($"MCP Count : {MCPCount[CurrentIndex]}");
+                    Console.WriteLine($"Nodes : {SearchedNodeCount}");
                 }
             }
 
@@ -200,6 +195,8 @@ namespace OthelloAI
                     manager.StopWorkers();
                     return result;
                 }
+
+                manager.Keys.Clear();
             }
         }
 

@@ -36,9 +36,8 @@ namespace OthelloAI
 
             foreach (Pattern p in PATTERNS)
             {
-                Console.WriteLine(p.Test());
                 p.Init();
-                p.Load();
+                //p.Load();
                 Console.WriteLine(p);
             }
 
@@ -46,11 +45,15 @@ namespace OthelloAI
             //   builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
+            var solver = MPCParamSolver.FromFile("data.dat");
+            var m = solver.SolveParameters(2, 4, 2, 16, 50);
+            Console.WriteLine(m.Test(5, 40, -100, 0));
+
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
             // StartClient();
             // TestFFO();
-             StartGame();
+            // StartGame();
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -149,7 +152,7 @@ namespace OthelloAI
 
         public static bool Step(ref Board board, Player player, int stone, bool print)
         {
-            (int x, int y, ulong move) = player.DecideMove(board, stone);
+            (_, _, ulong move) = player.DecideMove(board, stone);
             if (move != 0)
             {
                 board = board.Reversed(move, stone);
@@ -194,17 +197,16 @@ namespace OthelloAI
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                p.CurrentIndex = no;
                 p.SolveEndGame(new Search(), board, p.ParamEnd.cutoff_param);
                 sw.Stop();
                 float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
                 Console.WriteLine($"FFO Test No.{no}");
-                Console.WriteLine($"Empth Discs : {64 - board.n_stone}");
+                Console.WriteLine($"Discs : {64 - board.n_stone}");
                 Console.WriteLine($"Taken Time : {time} ms");
-                Console.WriteLine($"Nodes : {p.TranspositionTableCount[p.CurrentIndex]}/{p.SearchedNodeCount[p.CurrentIndex]}");
+                Console.WriteLine($"Nodes : {p.SearchedNodeCount}");
 
-                export += $"{no}, {64 - board.n_stone}, {time}, {p.SearchedNodeCount[p.CurrentIndex]}\r\n";
+                export += $"{no}, {64 - board.n_stone}, {time}, {p.SearchedNodeCount}\r\n";
             }
 
             File.WriteAllText($"FFO_Test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv", export);
@@ -215,7 +217,7 @@ namespace OthelloAI
             Board board;
 
             Evaluator evaluator = new EvaluatorPatternBased();
-            PlayerAI p = new PlayerAphid(evaluator)
+            PlayerAI p = new PlayerAI(evaluator)
             {
                 ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
                 ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
@@ -237,11 +239,11 @@ namespace OthelloAI
                 Console.WriteLine(i);
             }
 
-            Console.WriteLine($"Average : {p.times.Average()}");
-            Console.WriteLine($"Min : {p.times.Min()}");
-            Console.WriteLine($"Max : {p.times.Max()}");
+            Console.WriteLine($"Average : {p.Times.Average()}");
+            Console.WriteLine($"Min : {p.Times.Min()}");
+            Console.WriteLine($"Max : {p.Times.Max()}");
             Console.WriteLine();
-            Console.WriteLine(string.Join("\r\n", p.times));
+            Console.WriteLine(string.Join("\r\n", p.Times));
             Console.WriteLine();
         }
 

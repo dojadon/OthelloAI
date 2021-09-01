@@ -37,6 +37,8 @@ namespace OthelloAI
         public const long InitB = 0x0000000810000000L;
         public const long InitW = 0x0000001008000000L;
 
+        public static readonly Board Init = new Board(InitB, InitW);
+
         public readonly ulong bitB;
         public readonly ulong bitW;
 
@@ -335,13 +337,13 @@ namespace OthelloAI
         {
             BLACK => BitCount(bitB),
             WHITE => BitCount(bitW),
-            NONE => BitCount(~(bitB | bitW)),
+            NONE => 64 - n_stone,
             _ => -1,
         };
 
         public int GetStoneCountGap()
         {
-            return (-n_stone + 2 * BitCount(bitB));
+            return (2 * BitCount(bitB) - n_stone);
         }
 
         public int GetStoneCountGap(int s)
