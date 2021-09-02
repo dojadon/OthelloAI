@@ -521,14 +521,15 @@ namespace OthelloAI
             if (!param.shouldProbCut || depth < 5 || depth > 9)
                 return false;
 
-            static float CalcSigma(int x) => 0.0698F * x * x - 1.7746F * x + 73.621F;
-            static float CalcA(int x, int d) => -0.0003F * x * x + (0.0145F + (0.0235F - 0.0145F) * (d - 4) / 3.0F) * x;
+            int lower, upper;
+            (lower, upper) = Program.MCP_PARAM4.Test(depth - 4, move.reversed.n_stone, alpha, beta, 1.6F);
 
-            float sigma = CalcSigma(move.reversed.n_stone - 8);
-            int offset = 0;
-            int lower = (int)(alpha - sigma - offset);
-            int upper = (int)(beta + sigma - offset);
+            if(search.TryProbCutoff(this, move, param, depth, depth - 4, alpha, beta, lower, upper, ref value))
+            {
+                return true;
+            }
 
+            (lower, upper) = Program.MCP_PARAM2.Test(depth - 2, move.reversed.n_stone, alpha, beta, 1.6F);
             return search.TryProbCutoff(this, move, param, depth, depth - 2, alpha, beta, lower, upper, ref value);
         }
 

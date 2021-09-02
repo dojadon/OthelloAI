@@ -129,6 +129,8 @@ namespace OthelloAI
             }
         }
 
+        public static IEnumerable<float> Range(int start, int count) => Enumerable.Range(start, count).Select(i => (float)i);
+
         public static float F(Vector3 a, float x) => a.X * x * x + a.Y * x + a.Z;
 
         public static (float a, float b, float sigma) CalcSigma(List<float> x, List<float> y)
@@ -136,6 +138,17 @@ namespace OthelloAI
             Vector2 v = LinearRegression(x, y);
             float sigma = (float)Math.Sqrt(x.Zip(y, (x, y) => Math.Pow(y - v.X * x - v.Y, 2)).Sum() / y.Count);
             return (v.X, v.Y, sigma);
+        }
+
+        public Vector2[] CalcRegressionLineStageBased(int d1, int d2, int t1, int t2)
+        {
+            var result = new Vector2[t2 - t1];
+
+            for (int stage = t1; stage < t2; stage++)
+            {
+                result[stage - t1] = LinearRegression(Data[d1][stage], Data[d2][stage]);
+            }
+            return result;
         }
 
         public (float a, float b, float sigma)[] CalcSigmaStageBased(int d1, int d2, int t1, int t2)
@@ -150,21 +163,20 @@ namespace OthelloAI
                 var y = lists2[stage];
 
                 result[stage - t1] = CalcSigma(x, y);
-                Console.WriteLine($"{d1}, {d2}, {stage}: {result[stage - t1]}");
+                //Console.WriteLine($"{d1}, {d2}, {stage}: {result[stage - t1]}");
             }
             return result;
         }
 
         public Vector3[] CalcCoefficients(int d1, int d2, int t1, int t2)
         {
-            IEnumerable<float> t = Enumerable.Range(0, t2 - t1).Select(i => (float)i);
+            IEnumerable<float> t = Range(0, t2 - t1);
             (float a, float b, float sigma)[] array = CalcSigmaStageBased(d1, d2, t1, t2);
+            Vector2[] a = CalcRegressionLineStageBased(d1, d2, t1, t2);
 
-            Vector3 coefficientA = QuadraticRegression(t, array.Select(v => v.a));
-            Vector3 coefficientB = QuadraticRegression(t, array.Select(v => v.b));
+            Vector3 coefficientA = QuadraticRegression(t, a.Select(v => v.X));
+            Vector3 coefficientB = QuadraticRegression(t, a.Select(v => v.Y));
             Vector3 coefficientSigma = QuadraticRegression(t, array.Select(v => v.sigma));
-
-            Console.WriteLine($"Test: {d1}, {d2}, {F(coefficientSigma, 20)}");
 
             return new Vector3[] { coefficientA, coefficientB, coefficientSigma };
         }
@@ -187,25 +199,26 @@ namespace OthelloAI
         public class MCP
         {
             private readonly MPCParameters a_param, b_param, sigma_param;
-            private readonly int stage_start;
+            private readonly int stage_offset, depth_offset;
 
-            public MCP(MPCParameters a_param, MPCParameters b_param, MPCParameters sigma_param, int stage_start)
+            public MCP(MPCParameters a_param, MPCParameters b_param, MPCParameters sigma_param, int depth_offset, int stage_offset)
             {
                 this.a_param = a_param;
                 this.b_param = b_param;
                 this.sigma_param = sigma_param;
-                this.stage_start = stage_start;
+                this.depth_offset = depth_offset;
+                this.stage_offset = stage_offset;
             }
 
-            public (int lower, int upper) Test(int depth, int n_stone, float alpha, float beta)
+            public (int lower, int upper) Test(int depth, int n_stone, float alpha, float beta, float t)
             {
-                n_stone -= stage_start + 4;
-                depth -= 2;
-                float a = a_param.Calc(depth, n_stone);
-                float offset = b_param.Calc(depth, n_stone);
-                float sigma = sigma_param.Calc(depth, n_stone);
+                n_stone -= stage_offset + 4;
+                depth -= depth_offset;
+                float a = a_param.Calc(n_stone, depth);
+                float offset = b_param.Calc(n_stone, depth);
+                float sigma = sigma_param.Calc(n_stone, depth) * t;
 
-                Console.WriteLine($"{a}, {offset}, {sigma}");
+                //Console.WriteLine($"{a}, {offset}, {sigma}");
 
                 float lower = (alpha - sigma - offset) / a;
                 float upper = (beta + sigma - offset) / a;
@@ -214,11 +227,13 @@ namespace OthelloAI
             }
         }
 
-        public MCP SolveParameters(int start, int count, int diff, int stageStart, int stageEnd)
+        public MCP SolveParameters(int diff, int stageStart, int stageEnd)
         {
+            int count = Data.Length - diff;
+
             MPCParameters Test(IEnumerable<Vector3> arr)
             {
-                Vector2 te(Func<Vector3, float> map) => LinearRegression(Enumerable.Range(0, count).Select(i => (float)i), arr.Select(map));
+                Vector2 te(Func<Vector3, float> map) => LinearRegression(Range(0, count), arr.Select(map));
 
                 Vector2 a = te(v => v.X);
                 Vector2 b = te(v => v.Y);
@@ -231,14 +246,14 @@ namespace OthelloAI
 
             for (int i = 0; i < count; i++)
             {
-                coefficients[i] = CalcCoefficients(start + i, start + i + diff, stageStart, stageEnd);
+                coefficients[i] = CalcCoefficients(i, i + diff, stageStart, stageEnd);
             }
 
             MPCParameters a = Test(coefficients.Select(v => v[0]));
             MPCParameters b = Test(coefficients.Select(v => v[1]));
             MPCParameters sigma = Test(coefficients.Select(v => v[2]));
 
-            return new MCP(a, b, sigma, stageStart);
+            return new MCP(a, b, sigma, Depth1, stageStart);
         }
 
         public static MPCParamSolver FromFile(string path)
