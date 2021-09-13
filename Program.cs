@@ -48,15 +48,15 @@ namespace OthelloAI
             MCP_PARAM2 = solver.SolveParameters(2, 16, 50);
             MCP_PARAM4 = solver.SolveParameters(4, 16, 50);
 
-            //    var builder = new PatternEvaluationBuilder(new Pattern[] { PATTERN_EDGE, PATTERN_CORNER_SMALL });
-            //   builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
+            // var builder = new PatternEvaluationBuilder(new Pattern[] { PATTERN_EDGE, PATTERN_CORNER_SMALL });
+            // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-             StartClient();
+            // StartClient();
             // TestFFO();
-            // StartGame();
+             StartGame();
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -223,7 +223,7 @@ namespace OthelloAI
             PlayerAI p = new PlayerAI(evaluator)
             {
                 ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 12, stage: 10, new CutoffParameters(true, true, true)),
+                ParamMid = new SearchParameters(depth: 10, stage: 12, new CutoffParameters(true, true, true)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 

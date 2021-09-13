@@ -114,11 +114,11 @@ namespace OthelloAI
                 if (Dict.TryGetValue(move.reversed, out (int min, int max) t))
                 {
                     if (-PlayerAI.INF < t.min && t.max < PlayerAI.INF)
-                        return (int)(t.min + t.max) / 2;
+                        return (t.min + t.max) / 2;
                     else if (-PlayerAI.INF < t.min)
-                        return (int)t.min / 2 + INTERVAL;
+                        return t.min / 2 + INTERVAL;
                     else if (PlayerAI.INF > t.max)
-                        return (int)t.max / 2 - INTERVAL;
+                        return t.max / 2 - INTERVAL;
                 }
                 return PlayerAI.INF + move.n_moves;
             }
@@ -210,6 +210,10 @@ namespace OthelloAI
         {
             SearchedNodeCount = 0;
             MCPCount = 0;
+            for (int i = 0; i < ProbcutNode1.Length; i++)
+            {
+                ProbcutNode1[i] = ProbcutNode2[i] = ProbcutNode3[i] = 0;
+            }
 
             Search search = new Search();
 
@@ -250,6 +254,14 @@ namespace OthelloAI
                     Console.WriteLine($"Taken Time : {time} ms");
                     Console.WriteLine($"Nodes : {SearchedNodeCount}");
                     Console.WriteLine($"MCP Count : {MCPCount}");
+                    for(int i = 0; i < ProbcutNode1.Length; i++)
+                    {
+                        if (ProbcutNode1[i] == 0)
+                            continue;
+
+                        Console.WriteLine($"Depth {i}: False Posi {100F * ProbcutNode2[i] / ProbcutNode1[i]}%, {ProbcutNode2[i]}/{ProbcutNode1[i]}");
+                        Console.WriteLine($"Depth {i}: False Nega {100F * ProbcutNode3[i] / ProbcutNode1[i]}%, {ProbcutNode3[i]}/{ProbcutNode1[i]}");
+                    }
                 }
             }
 
@@ -516,21 +528,39 @@ namespace OthelloAI
                 table[move.reversed] = (value, value);
         }
 
+        public int[] ProbcutNode1 = new int[10];
+        public int[] ProbcutNode2 = new int[10];
+        public int[] ProbcutNode3 = new int[10];
+
         public bool TryProbCutoff(Search search, Move move, CutoffParameters param, int depth, int alpha, int beta, ref int value)
         {
-            if (!param.shouldProbCut || depth < 5 || depth > 9)
+            if (!param.shouldProbCut || depth < 5 || depth > 8)
                 return false;
 
+            ProbcutNode1[depth]++;
+
             int lower, upper;
-            (lower, upper) = Program.MCP_PARAM4.Test(depth - 4, move.reversed.n_stone, alpha, beta, 1.6F);
+            (lower, upper) = Program.MCP_PARAM4.Test(depth - 4, move.reversed.n_stone, alpha, beta, 2F);
 
-            if(search.TryProbCutoff(this, move, param, depth, depth - 4, alpha, beta, lower, upper, ref value))
+            int v = 0;
+            bool probcut = search.TryProbCutoff(this, move, param, depth, depth - 4, alpha, beta, lower, upper, ref v);
+            value = Solve(search, move, new CutoffParameters(true, false, false), depth, alpha, beta);
+            bool cut = value <= alpha || beta < value;
+
+            string msg = "True";
+            if(!cut && probcut)
             {
-                return true;
+                ProbcutNode2[depth]++;
+                msg = "False Posi";
             }
+            else if(cut && !probcut)
+            {
+                ProbcutNode3[depth]++;
+                msg = "False Nega";
+            }
+            Console.WriteLine($"Depth {depth}, {msg}, {value}, {v}, [{alpha}, {beta}], [{lower}, {upper}]");
 
-            (lower, upper) = Program.MCP_PARAM2.Test(depth - 2, move.reversed.n_stone, alpha, beta, 1.6F);
-            return search.TryProbCutoff(this, move, param, depth, depth - 2, alpha, beta, lower, upper, ref value);
+            return cut;
         }
 
         int ordering_depth = 57;
