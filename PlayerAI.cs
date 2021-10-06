@@ -37,16 +37,29 @@ namespace OthelloAI
 
         public virtual bool TryProbCutoff(PlayerAI player, Move move, CutoffParameters param, int depth, int depthShallow, int alpha, int beta, int lower, int upper, ref int value)
         {
-            CutoffParameters mcpParam = new CutoffParameters(param.shouldTranspositionCut, false, true);
-
-            if (player.Solve(this, move, mcpParam, depthShallow, lower - 1, lower) < lower)
+            if (player.Solve(this, move, param, depthShallow, lower - 1, lower) < lower)
             {
-                value = alpha;
+                value = alpha - 1;
                 return true;
             }
-            if (player.Solve(this, move, mcpParam, depthShallow, upper, upper + 1) > upper)
+            if (player.Solve(this, move, param, depthShallow, upper, upper + 1) > upper)
             {
-                value = beta;
+                value = beta + 1;
+                return true;
+            }
+            return false;
+        }
+
+        public virtual bool TryProbCutoff(PlayerAI player, Move move, CutoffParameters param, int depth, int depthShallow, int border, int lower, int upper, ref int value)
+        {
+            if (player.NullWindowSearch(this, move, param, depthShallow, lower) < lower)
+            {
+                value = border - 1;
+                return true;
+            }
+            if (player.NullWindowSearch(this, move, param, depthShallow, upper) > upper)
+            {
+                value = border + 1;
                 return true;
             }
             return false;
@@ -85,13 +98,13 @@ namespace OthelloAI
 
                 if (upperPrev < lower)
                 {
-                    value = alpha;
+                    value = alpha - 1;
                     return true;
                 }
 
                 if (lowerPrev > upper)
                 {
-                    value = beta;
+                    value = beta + 1;
                     return true;
                 }
             }
@@ -180,7 +193,6 @@ namespace OthelloAI
         public Evaluator Evaluator { get; set; }
 
         public List<float> Times { get; } = new List<float>();
-        public long MCPCount { get; set; }
         public long SearchedNodeCount { get; set; }
 
         public PlayerAI(Evaluator evaluator)
@@ -208,11 +220,11 @@ namespace OthelloAI
 
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
+            mpc = 0;
             SearchedNodeCount = 0;
-            MCPCount = 0;
             for (int i = 0; i < ProbcutNode1.Length; i++)
             {
-                ProbcutNode1[i] = ProbcutNode2[i] = ProbcutNode3[i] = 0;
+                ProbcutNode1[i] = ProbcutNode2[i] = ProbcutNode3[i] = ProbcutNode4[i] = ProbcutNode5[i] = 0;
             }
 
             Search search = new Search();
@@ -231,12 +243,12 @@ namespace OthelloAI
             else if (board.n_stone < ParamEnd.stage)
             {
                 result = SolveIterativeDeepening(board, ParamMid.cutoff_param, ParamMid.depth, 2, 3);
-               // (result, _) = SolveRoot(search, board, ParamMid.cutoff_param, ParamMid.depth);
+                // (result, _) = SolveRoot(search, board, ParamMid.cutoff_param, ParamMid.depth);
             }
-            else if (board.n_stone < ParamEnd.stage + 4)
+            /*else if (board.n_stone < ParamEnd.stage + 4)
             {
                 (result, _) = SolveEndGame(search, board, ParamEnd.cutoff_param);
-            }
+            }*/
             else
             {
                 (result, _) = SolveRoot(search, board, ParamEnd.cutoff_param, 64);
@@ -253,14 +265,22 @@ namespace OthelloAI
                 {
                     Console.WriteLine($"Taken Time : {time} ms");
                     Console.WriteLine($"Nodes : {SearchedNodeCount}");
-                    Console.WriteLine($"MCP Count : {MCPCount}");
-                    for(int i = 0; i < ProbcutNode1.Length; i++)
+                    Console.WriteLine($"MPC : {mpc}");
+
+                    for (int i = 0; i < ProbcutNode1.Length; i++)
                     {
                         if (ProbcutNode1[i] == 0)
                             continue;
 
+                        Console.WriteLine($"Depth {i}: True {100F * ProbcutNode2[i] / ProbcutNode1[i]}%, {ProbcutNode2[i]}/{ProbcutNode1[i]}");
+
+                        /*Console.WriteLine();
                         Console.WriteLine($"Depth {i}: False Posi {100F * ProbcutNode2[i] / ProbcutNode1[i]}%, {ProbcutNode2[i]}/{ProbcutNode1[i]}");
                         Console.WriteLine($"Depth {i}: False Nega {100F * ProbcutNode3[i] / ProbcutNode1[i]}%, {ProbcutNode3[i]}/{ProbcutNode1[i]}");
+                        Console.WriteLine($"Depth {i}: True Nega {100F * ProbcutNode4[i] / ProbcutNode1[i]}%, {ProbcutNode4[i]}/{ProbcutNode1[i]}");
+                        Console.WriteLine($"Depth {i}: True Posi {100F * ProbcutNode5[i] / ProbcutNode1[i]}%, {ProbcutNode5[i]}/{ProbcutNode1[i]}");
+                        foreach (var s in test[i])
+                            Console.WriteLine(s);*/
                     }
                 }
             }
@@ -303,7 +323,7 @@ namespace OthelloAI
             Move[] array = root.NextMoves();
             Array.Sort(array);
 
-            for (int i = 1; i < array.Length; i++)
+            for (int i = 0; i < array.Length; i++)
             {
                 Move move = array[i];
 
@@ -387,6 +407,35 @@ namespace OthelloAI
             return (result.move, max);
         }
 
+        public int NullWindowSearch(Search search, Move move, CutoffParameters param, int depth, int border)
+        {
+            int lower, upper;
+            lower = border - 800;
+            upper = border + 800;
+            //(lower, upper) = Program.MCP_PARAM2.Test(depth - 2, move.reversed.n_stone, border, border, 2F);
+
+            int v = 0;
+           /* if (move.reversed.n_stone > 16 && 4 < depth && depth < 9 && search.TryProbCutoff(this, move, param, depth, depth - 2, border, lower, upper, ref v))
+            {
+            }
+            else
+            {
+                v = -Solve(search, move, param, depth - 1, -border - 1, -border);
+            }
+            return v;*/
+
+            int value = -Solve(search, move, param, depth - 1, -border - 1, -border);
+
+            if (move.reversed.n_stone > 16 && 4 < depth  && depth < 9 && search.TryProbCutoff(this, move, param, depth, depth - 2, border, lower, upper, ref v))
+            {
+                ProbcutNode1[depth]++;
+
+                if (value < border == v < border)
+                    ProbcutNode2[depth]++;
+            }
+            return value;
+        }
+
         public int Negascout(Search search, Board board, ulong moves, CutoffParameters param, int depth, int alpha, int beta)
         {
             ulong move = Board.NextMove(moves);
@@ -401,8 +450,10 @@ namespace OthelloAI
             while ((move = Board.NextMove(moves)) != 0)
             {
                 moves = Board.RemoveMove(moves, move);
+                Move m = new Move(board, move);
 
-                int eval = -Solve(search, new Move(board, move), param, depth - 1, -alpha - 1, -alpha);
+                //int eval = -Solve(search, m, param, depth - 1, -alpha - 1, -alpha);
+                int eval = NullWindowSearch(search, m, param, depth, alpha);
 
                 if (beta <= eval)
                     return eval;
@@ -410,7 +461,7 @@ namespace OthelloAI
                 if (alpha < eval)
                 {
                     alpha = eval;
-                    eval = -Solve(search, new Move(board, move), param, depth - 1, -beta, -alpha);
+                    eval = -Solve(search, m, param, depth - 1, -beta, -alpha);
 
                     if (beta <= eval)
                         return eval;
@@ -433,7 +484,8 @@ namespace OthelloAI
 
             foreach (Move move in moves.AsSpan(1, moves.Length - 1))
             {
-                int eval = -Solve(search, move, param, depth - 1, -alpha - 1, -alpha);
+                //int eval = -Solve(search, move, param, depth - 1, -alpha - 1, -alpha);
+                int eval = NullWindowSearch(search, move, param, depth, alpha);
 
                 if (beta <= eval)
                     return eval;
@@ -531,40 +583,93 @@ namespace OthelloAI
         public int[] ProbcutNode1 = new int[10];
         public int[] ProbcutNode2 = new int[10];
         public int[] ProbcutNode3 = new int[10];
+        public int[] ProbcutNode4 = new int[10];
+        public int[] ProbcutNode5 = new int[10];
+
+        static string Visualize(float range, float alpha, float beta, float lower, float upper, float shallow, float value)
+        {
+            int length = 50;
+            float center = (lower + upper) / 2;
+
+            string[] array = new string[length];
+
+            bool add(float v, char c)
+            {
+                float t = (v + range) / range / 2;
+                int idx = (int)(length * (v + range) / range / 2);
+
+                if (idx < 0)
+                    idx = 0;
+
+                if (length <= idx)
+                    idx = length - 1;
+
+                array[idx] += c;
+
+                return true;
+            }
+
+            List<(float v, char c)> list = new List<(float, char)>() { (lower, '['), (alpha, '('), /*(shallow, '+'), */(value, '*'), (beta, ')'), (upper, ']') };
+            foreach (var (v, c) in list.OrderBy(t => t.v))
+            {
+                add(v, c);
+            }
+
+            return string.Join("_", array);
+        }
+
+        List<string>[] test = Enumerable.Range(0, 9).Select(i => new List<string>()).ToArray();
 
         public bool TryProbCutoff(Search search, Move move, CutoffParameters param, int depth, int alpha, int beta, ref int value)
         {
-            if (!param.shouldProbCut || depth < 5 || depth > 8)
+            if (Math.Abs(alpha - beta) <= 1 || !param.shouldProbCut || depth < 5 || depth > 8)
                 return false;
+
+            int lower, upper;
+            (lower, upper) = Program.MCP_PARAM2.Test(depth - 2, move.reversed.n_stone, alpha, beta, 1.5F);
+
+            return search.TryProbCutoff(this, move, param, depth, depth - 2, alpha, beta, lower, upper, ref value);
 
             ProbcutNode1[depth]++;
 
-            int lower, upper;
-            (lower, upper) = Program.MCP_PARAM4.Test(depth - 4, move.reversed.n_stone, alpha, beta, 2F);
-
             int v = 0;
-            bool probcut = search.TryProbCutoff(this, move, param, depth, depth - 4, alpha, beta, lower, upper, ref v);
+            bool probcut = search.TryProbCutoff(this, move, param, depth, depth - 2, alpha, beta, lower, upper, ref v);
             value = Solve(search, move, new CutoffParameters(true, false, false), depth, alpha, beta);
             bool cut = value <= alpha || beta < value;
 
-            string msg = "True";
-            if(!cut && probcut)
+            //if(Math.Abs(alpha - beta) <= 1)
             {
-                ProbcutNode2[depth]++;
-                msg = "False Posi";
+                string msg = Visualize(320, alpha, beta, lower, upper, v, value);
+
+                if (!cut && probcut)
+                {
+                    ProbcutNode2[depth]++;
+                    test[depth].Add("False Posi " + msg);
+                }
+                else if (cut && !probcut)
+                {
+                    ProbcutNode3[depth]++;
+                    test[depth].Add("False Nega " + msg);
+                }
+                else if (cut)
+                {
+                    ProbcutNode5[depth]++;
+                    test[depth].Add("True  Posi " + msg);
+                }
+                else
+                {
+                    ProbcutNode4[depth]++;
+                    test[depth].Add("True  Nega " + msg);
+                }
             }
-            else if(cut && !probcut)
-            {
-                ProbcutNode3[depth]++;
-                msg = "False Nega";
-            }
-            Console.WriteLine($"Depth {depth}, {msg}, {value}, {v}, [{alpha}, {beta}], [{lower}, {upper}]");
 
             return cut;
         }
 
         int ordering_depth = 57;
         int transposition = 1;
+
+        int mpc = 0;
 
         public virtual int Solve(Search search, Move move, CutoffParameters param, int depth, int alpha, int beta)
         {
@@ -590,17 +695,17 @@ namespace OthelloAI
                 }
             }
 
-            /*if (search.TryCutoffOrUpdateBorder(move, param, depth, ref alpha, ref beta, ref value))
-                return value;*/
+            if (move.reversed.n_stone == 63 && move.n_moves == 1)
+                return -EvalFinishedGame(move.reversed.Reversed(move.moves));
 
             if (TryTranspositionCutoff(search.Table, move, param, depth, ref alpha, ref beta, out int lower, out int upper, ref value))
                 return value;
 
-            if (TryProbCutoff(search, move, param, depth, alpha, beta, ref value))
+            /*if (TryProbCutoff(search, move, param, depth, alpha, beta, ref value))
+            {
+                mpc++;
                 return value;
-
-            if (move.reversed.n_stone == 63 && move.n_moves == 1)
-                return -EvalFinishedGame(move.reversed.Reversed(move.moves));
+            }*/
 
             if (depth >= 3 && move.reversed.n_stone < 60)
             {

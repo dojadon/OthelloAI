@@ -200,8 +200,8 @@ namespace OthelloAI.Patterns
 
         public static (int, int) ConvertTerToBinPair(int value, int length)
         {
-            int b1= 0;
-            int b2= 0;
+            int b1 = 0;
+            int b2 = 0;
             for (int i = 0; i < length; i++)
             {
                 switch (value % 3)
@@ -390,11 +390,15 @@ namespace OthelloAI.Patterns
                 {
                     float e = reader.ReadSingle();
 
+                    int count = 4;
                     StageBasedEvaluations[stage][i] = e;
+
+                    if (stage >= count)
+                        e = Enumerable.Range(0, count).Select(k => StageBasedEvaluations[stage - k][i]).Average();
 
                     (int b1, int b2) = ConvertTerToBinPair(i, HashLength);
                     int hash = b1 | (b2 << HashLength);
-                    EvaluationsBin[stage][hash] = (byte)Math.Clamp(e * 32 + 128, byte.MinValue, byte.MaxValue);
+                    EvaluationsBin[stage][hash] = (byte)Math.Clamp(e * 32 + 128, 0, 255);
                 }
             }
         }

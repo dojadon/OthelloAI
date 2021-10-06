@@ -42,21 +42,22 @@ namespace OthelloAI
                 p.Init();
                 p.Load();
                 Console.WriteLine(p);
+                Console.WriteLine(p.Test());
             }
 
             var solver = MPCParamSolver.FromFile("data.dat");
-            MCP_PARAM2 = solver.SolveParameters(2, 16, 50);
-            MCP_PARAM4 = solver.SolveParameters(4, 16, 50);
+            MCP_PARAM2 = solver.SolveParameters(2, 12, 50);
+            MCP_PARAM4 = solver.SolveParameters(4, 12, 50);
 
             // var builder = new PatternEvaluationBuilder(new Pattern[] { PATTERN_EDGE, PATTERN_CORNER_SMALL });
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
-            // MPCParamSolver.Test();
+             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-            // StartClient();
+           // StartClient();
             // TestFFO();
-             StartGame();
+             StartGame(); 
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -144,8 +145,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 12, stage: 10, new CutoffParameters(true, true, true)),
+                ParamBeg = new SearchParameters(depth: 13, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 13, stage: 10, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
@@ -222,8 +223,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 10, stage: 12, new CutoffParameters(true, true, true)),
+                ParamBeg = new SearchParameters(depth: 12, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 
@@ -255,8 +256,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             Player p1 = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, true)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
