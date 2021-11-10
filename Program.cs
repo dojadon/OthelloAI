@@ -53,11 +53,11 @@ namespace OthelloAI
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
 
-             // MPCParamSolver.Test();
+            // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-           // StartClient();
+             StartClient();
             // TestFFO();
-             StartGame(); 
+            // StartGame();
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -145,8 +145,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 13, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 13, stage: 10, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 10, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
@@ -231,7 +231,7 @@ namespace OthelloAI
             for (int i = 0; i < 1; i++)
             {
                 board = new Board(Board.InitB, Board.InitW);
-                board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
+                //board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
 
                 while (Step(ref board, p, 1, true) | Step(ref board, p, -1, true))
                 {

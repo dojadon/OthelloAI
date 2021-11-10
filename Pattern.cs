@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
+using System.Numerics;
+using System.Buffers.Binary;
 
 namespace OthelloAI.Patterns
 {
@@ -383,6 +385,7 @@ namespace OthelloAI.Patterns
             }
 
             using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
+            using var reader_sub = new BinaryReader(new FileStream("eval_old\\" +  FilePath, FileMode.Open));
 
             for (int stage = 0; stage < STAGES; stage++)
             {
@@ -390,7 +393,19 @@ namespace OthelloAI.Patterns
                 {
                     float e = reader.ReadSingle();
 
-                    int count = 4;
+                    //if(e == 0)
+                    {
+                        int win = BinaryPrimitives.ReverseEndianness(reader_sub.ReadInt32());
+                        int game = BinaryPrimitives.ReverseEndianness(reader_sub.ReadInt32());
+
+                        if(game != 0)
+                        {
+                            e = (float)win / game;
+                            //Console.WriteLine(e);
+                        }
+                    }
+
+                    int count = 10000;
                     StageBasedEvaluations[stage][i] = e;
 
                     if (stage >= count)
