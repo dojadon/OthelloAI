@@ -9,10 +9,8 @@ namespace OthelloAI
 {
     static class Program
     {
-        public static readonly Pattern PATTERN_EDGE = new PatternVerticalLine0("e_edge.dat", PatternType.X_SYMETRIC);
-        public static readonly Pattern PATTERN_CORNER_SMALL = new PatternBitMask("e_corner_small.dat", PatternType.XY_SYMETRIC, 8, 0b00000111_00000111_00000011UL);
-
-        public static readonly Pattern PATTERN_EDGE2X = new PatternEdge2X("e_edge_x.dat", PatternType.X_SYMETRIC);
+        // public static readonly Pattern PATTERN_EDGE2X = new PatternEdge2X("e_edge_x.dat", PatternType.X_SYMETRIC);
+        public static readonly Pattern PATTERN_EDGE2X = new PatternBitMask("e_edge_x.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
         public static readonly Pattern PATTERN_EDGE_BLOCK = new PatternBitMask("e_edge_block.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
         public static readonly Pattern PATTERN_CORNER_BLOCK = new PatternBitMask("e_corner_block.dat", PatternType.XY_SYMETRIC, 9, 0b00000111_00000111_00000111UL);
         public static readonly Pattern PATTERN_CORNER = new PatternBitMask("e_corner.dat", PatternType.XY_SYMETRIC, 10, 0b10000000_10000000_10000000_00000011_00011111UL);
@@ -55,9 +53,9 @@ namespace OthelloAI
 
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-             StartClient();
+           //  StartClient();
             // TestFFO();
-            // StartGame();
+            StartGame();
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -115,12 +113,11 @@ namespace OthelloAI
         static void UpdataEvaluation(Board board, int result, float alpha)
         {
             var boards = new MirroredBoards(board);
-            MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
             int stage = board.n_stone - 5;
             int move_gap = Board.BitCount(board.GetMoves()) - Board.BitCount(board.GetOpponentMoves());
 
-            float e = result - PATTERNS.Sum(p => p.EvalForTraining(board, b1, b2, b3, b4)) - move_gap;
+            float e = result - PATTERNS.Sum(p => p.EvalForTraining(board)) - move_gap;
             Array.ForEach(PATTERNS, p => Array.ForEach(boards.Boards, b => p.UpdataEvaluation(b, e * alpha)));
         }
 

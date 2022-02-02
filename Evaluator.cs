@@ -16,17 +16,15 @@ namespace OthelloAI
     {
         public override int Eval(Board board)
         {
-            MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
-
-            return Program.PATTERN_EDGE2X.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_EDGE_BLOCK.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_CORNER_BLOCK.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_CORNER.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_LINE1.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_LINE2.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_LINE3.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_DIAGONAL8.Eval(board, b1, b2, b3, b4)
-                    + Program.PATTERN_DIAGONAL7.Eval(board, b1, b2, b3, b4);
+            return Program.PATTERN_EDGE2X.Eval(board)
+                    + Program.PATTERN_EDGE_BLOCK.Eval(board)
+                    + Program.PATTERN_CORNER_BLOCK.Eval(board)
+                    + Program.PATTERN_CORNER.Eval(board)
+                    + Program.PATTERN_LINE1.Eval(board)
+                    + Program.PATTERN_LINE2.Eval(board)
+                    + Program.PATTERN_LINE3.Eval(board)
+                    + Program.PATTERN_DIAGONAL8.Eval(board)
+                    + Program.PATTERN_DIAGONAL7.Eval(board);
         }
     }
 

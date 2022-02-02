@@ -68,12 +68,11 @@ namespace OthelloAI
             foreach(var board in game)
             {
                 var boards = new MirroredBoards(board);
-                MirroredNeededBoards.Create(board, out Board b1, out Board b2, out Board b3, out Board b4);
 
                 int stage = board.n_stone - 5;
                 int move_gap = Board.BitCount(board.GetMoves()) - Board.BitCount(board.GetOpponentMoves());
 
-                float e = result - Patterns.Sum(p => p.EvalForTraining(board, b1, b2, b3, b4)) - move_gap;
+                float e = result - Patterns.Sum(p => p.EvalForTraining(board)) - move_gap;
                 Array.ForEach(Patterns, p => Array.ForEach(boards.Boards, b => p.UpdataEvaluation(b, e * alpha)));
 
                 if (board.n_stone == 40)
