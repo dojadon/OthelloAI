@@ -16,15 +16,22 @@ namespace OthelloAI
     {
         public override int Eval(Board board)
         {
-            return Program.PATTERN_EDGE2X.Eval(board)
-                    + Program.PATTERN_EDGE_BLOCK.Eval(board)
-                    + Program.PATTERN_CORNER_BLOCK.Eval(board)
-                    + Program.PATTERN_CORNER.Eval(board)
-                    + Program.PATTERN_LINE1.Eval(board)
-                    + Program.PATTERN_LINE2.Eval(board)
-                    + Program.PATTERN_LINE3.Eval(board)
-                    + Program.PATTERN_DIAGONAL8.Eval(board)
-                    + Program.PATTERN_DIAGONAL7.Eval(board);
+            return EvalByPEXTHashing(board);
+        }
+
+        protected int EvalByPEXTHashing(Board board)
+        {
+            var boards = new Boards(board);
+
+            return Program.PATTERN_EDGE2X.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_EDGE_BLOCK.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_CORNER_BLOCK.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_CORNER.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_LINE1.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_LINE2.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_LINE3.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_DIAGONAL8.EvalByPEXTHashing(boards)
+                    + Program.PATTERN_DIAGONAL7.EvalByPEXTHashing(boards);
         }
     }
 

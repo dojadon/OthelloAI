@@ -9,18 +9,31 @@ namespace OthelloAI
 {
     static class Program
     {
-        // public static readonly Pattern PATTERN_EDGE2X = new PatternEdge2X("e_edge_x.dat", PatternType.X_SYMETRIC);
-        public static readonly Pattern PATTERN_EDGE2X = new PatternBitMask("e_edge_x.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
-        public static readonly Pattern PATTERN_EDGE_BLOCK = new PatternBitMask("e_edge_block.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
-        public static readonly Pattern PATTERN_CORNER_BLOCK = new PatternBitMask("e_corner_block.dat", PatternType.XY_SYMETRIC, 9, 0b00000111_00000111_00000111UL);
-        public static readonly Pattern PATTERN_CORNER = new PatternBitMask("e_corner.dat", PatternType.XY_SYMETRIC, 10, 0b10000000_10000000_10000000_00000011_00011111UL);
-        public static readonly Pattern PATTERN_LINE1 = new PatternVerticalLine1("e_line1.dat", PatternType.X_SYMETRIC);
-        public static readonly Pattern PATTERN_LINE2 = new PatternVerticalLine2("e_line2.dat", PatternType.X_SYMETRIC);
-        public static readonly Pattern PATTERN_LINE3 = new PatternVerticalLine3("e_line3.dat", PatternType.X_SYMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL8 = new PatternBitMask("e_diag8.dat", PatternType.DIAGONAL, 8, 0x8040201008040201UL);
-        public static readonly Pattern PATTERN_DIAGONAL7 = new PatternBitMask("e_diag7.dat", PatternType.XY_SYMETRIC, 7, 0x1020408102040UL);
-        public static readonly Pattern PATTERN_DIAGONAL6 = new PatternBitMask("e_diag6.dat", PatternType.XY_SYMETRIC, 6, 0x10204081020UL);
-        public static readonly Pattern PATTERN_DIAGONAL5 = new PatternBitMask("e_diag5.dat", PatternType.XY_SYMETRIC, 5, 0x102040810UL);
+        //public static readonly Pattern PATTERN_EDGE2X = new PatternBitMask("e_edge_x.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
+        //public static readonly Pattern PATTERN_EDGE_BLOCK = new PatternBitMask("e_edge_block.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
+        //public static readonly Pattern PATTERN_CORNER_BLOCK = new PatternBitMask("e_corner_block.dat", PatternType.XY_SYMETRIC, 9, 0b00000111_00000111_00000111UL);
+        //public static readonly Pattern PATTERN_CORNER = new PatternBitMask("e_corner.dat", PatternType.XY_SYMETRIC, 10, 0b10000000_10000000_10000000_00000011_00011111UL);
+        //public static readonly Pattern PATTERN_LINE1 = new PatternVerticalLine1("e_line1.dat", PatternType.X_SYMETRIC);
+        //public static readonly Pattern PATTERN_LINE2 = new PatternVerticalLine2("e_line2.dat", PatternType.X_SYMETRIC);
+        //public static readonly Pattern PATTERN_LINE3 = new PatternVerticalLine3("e_line3.dat", PatternType.X_SYMETRIC);
+        //public static readonly Pattern PATTERN_DIAGONAL8 = new PatternBitMask("e_diag8.dat", PatternType.DIAGONAL, 8, 0x8040201008040201UL);
+        //public static readonly Pattern PATTERN_DIAGONAL7 = new PatternBitMask("e_diag7.dat", PatternType.XY_SYMETRIC, 7, 0x1020408102040UL);
+        //public static readonly Pattern PATTERN_DIAGONAL6 = new PatternBitMask("e_diag6.dat", PatternType.XY_SYMETRIC, 6, 0x10204081020UL);
+        //public static readonly Pattern PATTERN_DIAGONAL5 = new PatternBitMask("e_diag5.dat", PatternType.XY_SYMETRIC, 5, 0x102040810UL);
+
+        public static NAry NAry => NAry.TER;
+
+        public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_EDGE_BLOCK = new Pattern("e_edge_block.dat", new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_CORNER_BLOCK = new Pattern("e_corner_block.dat", new BoardHasherMask(0b00000111_00000111_00000111UL), PatternType.XY_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_CORNER = new Pattern("e_corner.dat", new BoardHasherMask(0b10000000_10000000_10000000_00000011_00011111UL), PatternType.XY_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_LINE1 = new Pattern("e_line1.dat", new BoardHasherLine1(1), PatternType.X_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_LINE2 = new Pattern("e_line2.dat", new BoardHasherLine1(2), PatternType.X_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_LINE3 = new Pattern("e_line3.dat", new BoardHasherLine1(3), PatternType.X_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_DIAGONAL8 = new Pattern("e_diag8.dat", new BoardHasherMask(0x8040201008040201UL), PatternType.DIAGONAL, NAry);
+        public static readonly Pattern PATTERN_DIAGONAL7 = new Pattern("e_diag7.dat", new BoardHasherMask(0x1020408102040UL), PatternType.XY_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_DIAGONAL6 = new Pattern("e_diag6.dat", new BoardHasherMask(0x10204081020UL), PatternType.XY_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_DIAGONAL5 = new Pattern("e_diag5.dat", new BoardHasherMask(0x102040810UL), PatternType.XY_SYMETRIC, NAry);
 
         public static readonly Pattern[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER,
             PATTERN_LINE1, PATTERN_LINE2, PATTERN_LINE3, PATTERN_DIAGONAL8, PATTERN_DIAGONAL7, PATTERN_DIAGONAL6,
@@ -37,15 +50,16 @@ namespace OthelloAI
 
             foreach (Pattern p in PATTERNS)
             {
-                p.Init();
                 p.Load();
                 Console.WriteLine(p);
                 Console.WriteLine(p.Test());
             }
 
-            var solver = MPCParamSolver.FromFile("data.dat");
-            MCP_PARAM2 = solver.SolveParameters(2, 12, 50);
-            MCP_PARAM4 = solver.SolveParameters(4, 12, 50);
+            PATTERN_EDGE2X.Info(32, 0);
+
+            //var solver = MPCParamSolver.FromFile("data.dat");
+            //MCP_PARAM2 = solver.SolveParameters(2, 12, 50);
+            //MCP_PARAM4 = solver.SolveParameters(4, 12, 50);
 
             // var builder = new PatternEvaluationBuilder(new Pattern[] { PATTERN_EDGE, PATTERN_CORNER_SMALL });
             // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
@@ -53,9 +67,9 @@ namespace OthelloAI
 
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-           //  StartClient();
+            //  StartClient();
             // TestFFO();
-            StartGame();
+            // StartGame();
             // StartManualGame();
             // UpdataEvaluationWithDatabase();
         }
@@ -112,13 +126,10 @@ namespace OthelloAI
 
         static void UpdataEvaluation(Board board, int result, float alpha)
         {
-            var boards = new MirroredBoards(board);
+            var boards = new Boards(board);
 
-            int stage = board.n_stone - 5;
-            int move_gap = Board.BitCount(board.GetMoves()) - Board.BitCount(board.GetOpponentMoves());
-
-            float e = result - PATTERNS.Sum(p => p.EvalForTraining(board)) - move_gap;
-            Array.ForEach(PATTERNS, p => Array.ForEach(boards.Boards, b => p.UpdataEvaluation(b, e * alpha)));
+            float e = result - PATTERNS.Sum(p => p.EvalTrainingByPEXTHashing(boards));
+            Array.ForEach(PATTERNS, p => p.UpdataEvaluation(boards, e * alpha));
         }
 
         static void UpdataEvaluationWithDatabase()
