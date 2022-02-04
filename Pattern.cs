@@ -112,7 +112,7 @@ namespace OthelloAI.Patterns
             int stage = GetStage(board);
 
             int hash = Hasher.HashByPEXT(board, NAry);
-            int flipped = FlipStone(hash);
+            int flipped = FlipHash(hash);
 
             StageBasedGameCount[stage][hash] += weight;
             StageBasedGameCount[stage][flipped] += weight;
@@ -153,7 +153,7 @@ namespace OthelloAI.Patterns
             int stage = GetStage(board);
 
             int hash = Hasher.HashByPEXT(board, NAry);
-            int flipped = FlipStone(hash);
+            int flipped = FlipHash(hash);
 
             StageBasedEvaluations[stage][hash] += add;
             StageBasedEvaluations[stage][flipped] -= add;
@@ -191,29 +191,7 @@ namespace OthelloAI.Patterns
 
         protected Board FromHash(int hash) => Hasher.FromHash(hash, NAry);
 
-        public int FlipStone(int hash)
-        {
-            switch (NAry)
-            {
-                case NAry.BIN:
-                    return (hash >> Hasher.HashLength) | ((hash & ((1 << Hasher.HashLength) - 1)) << Hasher.HashLength);
-
-                case NAry.TER:
-                    int result = 0;
-
-                    for (int i = 0; i < Hasher.HashLength; i++)
-                    {
-                        int s = hash % 3;
-                        hash /= 3;
-                        s = s == 0 ? 0 : (s == 1 ? 2 : 1);
-                        result += s * BinTerUtil.POW3_TABLE[i];
-                    }
-                    return result;
-
-                default:
-                    throw new NotImplementedException();
-            }
-        }
+        public int FlipHash(int hash) => Hasher.FlipHash(hash, NAry);
 
         public void Load2()
         {

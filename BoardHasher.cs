@@ -53,6 +53,29 @@ namespace OthelloAI
             }
         }
 
+        public int FlipHash(int hash, NAry nary) => nary switch
+        {
+            NAry.BIN => FlipBinHash(hash),
+            NAry.TER => FlipTerHash(hash),
+            _ => throw new NotImplementedException()
+        };
+
+        public int FlipBinHash(int hash) => (hash >> HashLength) | ((hash & ((1 << HashLength) - 1)) << HashLength);
+
+        public int FlipTerHash(int hash)
+        {
+            int result = 0;
+
+            for (int i = 0; i < HashLength; i++)
+            {
+                int s = hash % 3;
+                hash /= 3;
+                s = s == 0 ? 0 : (s == 1 ? 2 : 1);
+                result += s * BinTerUtil.POW3_TABLE[i];
+            }
+            return result;
+        }
+
         public Board FromHash(int hash, NAry nary) => nary switch
         {
             NAry.BIN => FromBinHash(hash),

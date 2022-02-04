@@ -9,18 +9,6 @@ namespace OthelloAI
 {
     static class Program
     {
-        //public static readonly Pattern PATTERN_EDGE2X = new PatternBitMask("e_edge_x.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
-        //public static readonly Pattern PATTERN_EDGE_BLOCK = new PatternBitMask("e_edge_block.dat", PatternType.X_SYMETRIC, 10, 0b00111100_10111101UL);
-        //public static readonly Pattern PATTERN_CORNER_BLOCK = new PatternBitMask("e_corner_block.dat", PatternType.XY_SYMETRIC, 9, 0b00000111_00000111_00000111UL);
-        //public static readonly Pattern PATTERN_CORNER = new PatternBitMask("e_corner.dat", PatternType.XY_SYMETRIC, 10, 0b10000000_10000000_10000000_00000011_00011111UL);
-        //public static readonly Pattern PATTERN_LINE1 = new PatternVerticalLine1("e_line1.dat", PatternType.X_SYMETRIC);
-        //public static readonly Pattern PATTERN_LINE2 = new PatternVerticalLine2("e_line2.dat", PatternType.X_SYMETRIC);
-        //public static readonly Pattern PATTERN_LINE3 = new PatternVerticalLine3("e_line3.dat", PatternType.X_SYMETRIC);
-        //public static readonly Pattern PATTERN_DIAGONAL8 = new PatternBitMask("e_diag8.dat", PatternType.DIAGONAL, 8, 0x8040201008040201UL);
-        //public static readonly Pattern PATTERN_DIAGONAL7 = new PatternBitMask("e_diag7.dat", PatternType.XY_SYMETRIC, 7, 0x1020408102040UL);
-        //public static readonly Pattern PATTERN_DIAGONAL6 = new PatternBitMask("e_diag6.dat", PatternType.XY_SYMETRIC, 6, 0x10204081020UL);
-        //public static readonly Pattern PATTERN_DIAGONAL5 = new PatternBitMask("e_diag5.dat", PatternType.XY_SYMETRIC, 5, 0x102040810UL);
-
         public static NAry NAry => NAry.BIN;
 
         public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", new BoardHasherMask(0b01000010_11111111UL), PatternType.X_SYMETRIC, NAry);
@@ -63,7 +51,7 @@ namespace OthelloAI
 
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-            // StartClient();
+            StartClient();
             // TestFFO();
             // StartGame();
             // StartManualGame();
@@ -149,8 +137,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 11, stage: 10, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 10, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 10, stage: 10, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
