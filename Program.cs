@@ -21,12 +21,12 @@ namespace OthelloAI
         //public static readonly Pattern PATTERN_DIAGONAL6 = new PatternBitMask("e_diag6.dat", PatternType.XY_SYMETRIC, 6, 0x10204081020UL);
         //public static readonly Pattern PATTERN_DIAGONAL5 = new PatternBitMask("e_diag5.dat", PatternType.XY_SYMETRIC, 5, 0x102040810UL);
 
-        public static NAry NAry => NAry.TER;
+        public static NAry NAry => NAry.BIN;
 
-        public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", new BoardHasherMask(0b01000010_11111111UL), PatternType.X_SYMETRIC, NAry);
         public static readonly Pattern PATTERN_EDGE_BLOCK = new Pattern("e_edge_block.dat", new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMETRIC, NAry);
         public static readonly Pattern PATTERN_CORNER_BLOCK = new Pattern("e_corner_block.dat", new BoardHasherMask(0b00000111_00000111_00000111UL), PatternType.XY_SYMETRIC, NAry);
-        public static readonly Pattern PATTERN_CORNER = new Pattern("e_corner.dat", new BoardHasherMask(0b10000000_10000000_10000000_00000011_00011111UL), PatternType.XY_SYMETRIC, NAry);
+        public static readonly Pattern PATTERN_CORNER = new Pattern("e_corner.dat", new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), PatternType.XY_SYMETRIC, NAry);
         public static readonly Pattern PATTERN_LINE1 = new Pattern("e_line1.dat", new BoardHasherLine1(1), PatternType.X_SYMETRIC, NAry);
         public static readonly Pattern PATTERN_LINE2 = new Pattern("e_line2.dat", new BoardHasherLine1(2), PatternType.X_SYMETRIC, NAry);
         public static readonly Pattern PATTERN_LINE3 = new Pattern("e_line3.dat", new BoardHasherLine1(3), PatternType.X_SYMETRIC, NAry);
@@ -50,28 +50,25 @@ namespace OthelloAI
 
             foreach (Pattern p in PATTERNS)
             {
-                p.Load();
+                p.Load2();
                 Console.WriteLine(p);
                 Console.WriteLine(p.Test());
             }
 
-            PATTERN_EDGE2X.Info(32, 0);
+            // PATTERN_EDGE2X.Info(32, 0.9F);
 
             //var solver = MPCParamSolver.FromFile("data.dat");
             //MCP_PARAM2 = solver.SolveParameters(2, 12, 50);
             //MCP_PARAM4 = solver.SolveParameters(4, 12, 50);
 
-            // var builder = new PatternEvaluationBuilder(new Pattern[] { PATTERN_EDGE, PATTERN_CORNER_SMALL });
-            // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log1.dat");
-            // builder.Load(@"C:\Users\zyand\eclipse-workspace\tus\Report7\log\log2.dat");
-
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
-            //  StartClient();
+            // StartClient();
             // TestFFO();
             // StartGame();
             // StartManualGame();
-            // UpdataEvaluationWithDatabase();
+            // UpdataEvaluationWithWthorDatabase();
+            //UpdataEvaluationWithMyDatabase();
         }
 
         static void StartUpdataEvaluation()
@@ -109,7 +106,7 @@ namespace OthelloAI
                 int result = board.GetStoneCountGap();
                 foreach (var b in boards)
                 {
-                    UpdataEvaluation(b, result, 0.001F);
+                    // UpdataEvaluation(b, result, 0.001F);
                 }
 
                 //if(i % 10 == 0)
@@ -124,26 +121,25 @@ namespace OthelloAI
             }
         }
 
-        static void UpdataEvaluation(Board board, int result, float alpha)
+        static void UpdataEvaluationWithMyDatabase()
         {
-            var boards = new Boards(board);
-
-            float e = result - PATTERNS.Sum(p => p.EvalTrainingByPEXTHashing(boards));
-            Array.ForEach(PATTERNS, p => p.UpdataEvaluation(boards, e * alpha));
+            for (int i = 0; i <= 8; i++)
+            {
+                Console.WriteLine($"log{i}.dat");
+                PatternTrainer.Train(PATTERNS, 0.005F, new MyRecordReader(@$"F:\Users\zyand\eclipse-workspace\tus\Report7\log\log{i}.dat"));
+                Array.ForEach(PATTERNS, p => p.Save2());
+            }
         }
 
-        static void UpdataEvaluationWithDatabase()
+        static void UpdataEvaluationWithWthorDatabase()
         {
-            var reader = new WthorRecordReader();
-            reader.OnLoadMove += (board, result) => UpdataEvaluation(board, result, 0.005F);
-
             for (int k = 0; k < 2; k++)
             {
                 for (int i = 2001; i <= 2015; i++)
                 {
                     Console.WriteLine($"{k} : WTH/WTH_{i}.wtb");
-                    reader.Load($"WTH/WTH_{i}.wtb");
-                    Array.ForEach(PATTERNS, p => p.Save());
+                    PatternTrainer.Train(PATTERNS, 0.005F, new WthorRecordReader($"WTH/WTH_{i}.wtb"));
+                    Array.ForEach(PATTERNS, p => p.Save2());
                 }
             }
         }
@@ -231,8 +227,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 12, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 12, stage: 16, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 
