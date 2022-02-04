@@ -20,6 +20,15 @@ namespace OthelloAI
             _ => throw new NotImplementedException(),
         };
 
+        public int HashByPEXT(in Board b)
+        {
+#if BIN_HASH
+            return HashByPEXT(b.bitB) | (HashByPEXT(b.bitW) << HashLength);
+#else
+            return BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitB), HashLength) + 2 * BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitW), HashLength);
+#endif
+        }
+
         public abstract int HashByPEXT(ulong b);
 
         public int HashByScanning(Board board, int number)
@@ -53,6 +62,34 @@ namespace OthelloAI
             }
         }
 
+        public int ConvertStateToHash(int i)
+        {
+#if BIN_HASH
+            (int b1, int b2) = BinTerUtil.ConvertTerToBinPair(i, HashLength);
+            return b1 | (b2 << HashLength);
+#else
+            return i;
+#endif
+        }
+
+        public int FlipHash(int hash)
+        {
+#if BIN_HASH
+            return (hash >> HashLength) | ((hash & ((1 << HashLength) - 1)) << HashLength);
+#else
+            int result = 0;
+
+            for (int i = 0; i < HashLength; i++)
+            {
+                int s = hash % 3;
+                hash /= 3;
+                s = s == 0 ? 0 : (s == 1 ? 2 : 1);
+                result += s * BinTerUtil.POW3_TABLE[i];
+            }
+            return result;
+#endif
+        }
+
         public int FlipHash(int hash, NAry nary) => nary switch
         {
             NAry.BIN => FlipBinHash(hash),
@@ -82,6 +119,15 @@ namespace OthelloAI
             NAry.TER => FromTerHash(hash),
             _ => throw new NotImplementedException()
         };
+
+        public Board FromHash(int hash)
+        {
+#if BIN_HASH
+            return FromBinHash(hash);
+#else
+            return FromTerHash(hash);
+#endif
+        }
 
         public Board FromTerHash(int hash)
         {

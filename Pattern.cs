@@ -40,7 +40,7 @@ namespace OthelloAI.Patterns
         protected string FilePath { get; }
 
         protected PatternType Type { get; }
-        protected NAry NAry { get; }
+        //protected NAry NAry { get; }
         public BoardHasher Hasher { get; }
 
         public int ArrayLength { get; }
@@ -52,21 +52,19 @@ namespace OthelloAI.Patterns
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
         protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
 
-        public Pattern(string filePath, BoardHasher hasher, PatternType type, NAry nary)
+        public Pattern(string filePath, BoardHasher hasher, PatternType type)
         {
             FilePath = filePath;
             Hasher = hasher;
             Type = type;
-            NAry = nary;
 
             NumOfStates = (int)Math.Pow(3, Hasher.HashLength);
 
-            ArrayLength = NAry switch
-            {
-                NAry.BIN => (int)Math.Pow(2, 2 * Hasher.HashLength),
-                NAry.TER => NumOfStates,
-                _ => throw new NotImplementedException()
-            };
+#if BIN_HASH
+            ArrayLength = (int)Math.Pow(2, 2 * Hasher.HashLength);
+#else
+            ArrayLength = NumOfStates;
+#endif
 
             for (int i = 0; i < STAGES; i++)
             {
@@ -111,7 +109,7 @@ namespace OthelloAI.Patterns
         {
             int stage = GetStage(board);
 
-            int hash = Hasher.HashByPEXT(board, NAry);
+            int hash = Hasher.HashByPEXT(board);
             int flipped = FlipHash(hash);
 
             StageBasedGameCount[stage][hash] += weight;
@@ -152,7 +150,7 @@ namespace OthelloAI.Patterns
         {
             int stage = GetStage(board);
 
-            int hash = Hasher.HashByPEXT(board, NAry);
+            int hash = Hasher.HashByPEXT(board);
             int flipped = FlipHash(hash);
 
             StageBasedEvaluations[stage][hash] += add;
@@ -162,7 +160,7 @@ namespace OthelloAI.Patterns
         public int EvalByPEXTHashing(Boards b)
         {
             byte[] e = StageBasedEvaluationsB[GetStage(b.Original)];
-            byte _Eval(in Board borad) => e[Hasher.HashByPEXT(borad, NAry)];
+            byte _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
 
             return Type switch
             {
@@ -176,7 +174,7 @@ namespace OthelloAI.Patterns
         public float EvalTrainingByPEXTHashing(Boards b)
         {
             float[] e = StageBasedEvaluations[GetStage(b.Original)];
-            float _Eval(in Board borad) => e[Hasher.HashByPEXT(borad, NAry)];
+            float _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
 
             return Type switch
             {
@@ -187,11 +185,11 @@ namespace OthelloAI.Patterns
             };
         }
 
-        protected int ConvertStateToHash(int i) => Hasher.ConvertStateToHash(i, NAry);
+        protected int ConvertStateToHash(int i) => Hasher.ConvertStateToHash(i);
 
-        protected Board FromHash(int hash) => Hasher.FromHash(hash, NAry);
+        protected Board FromHash(int hash) => Hasher.FromHash(hash);
 
-        public int FlipHash(int hash) => Hasher.FlipHash(hash, NAry);
+        public int FlipHash(int hash) => Hasher.FlipHash(hash);
 
         public void Load2()
         {
@@ -275,10 +273,10 @@ namespace OthelloAI.Patterns
             {
                 int hash = ConvertStateToHash(i);
 
-                if (Hasher.HashByPEXT(FromHash(hash), NAry) != hash)
+                if (Hasher.HashByPEXT(FromHash(hash)) != hash)
                 {
                     Console.WriteLine(FromHash(hash));
-                    Console.WriteLine($"{hash}, {Hasher.HashByPEXT(FromHash(hash), NAry)}");
+                    Console.WriteLine($"{hash}, {Hasher.HashByPEXT(FromHash(hash))}");
                     Console.WriteLine($"{hash}, {(hash >> Hasher.HashLength)}, {(hash & ((1 << Hasher.HashLength) - 1)) << Hasher.HashLength}");
                     return false;
                 }
