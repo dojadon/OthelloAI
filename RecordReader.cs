@@ -5,7 +5,7 @@ using System.Text;
 
 namespace OthelloAI
 {
-    abstract class RecordReader
+    public abstract class RecordReader
     {
         public delegate void OnLoadMoveEventhandler(Board board, int result);
 

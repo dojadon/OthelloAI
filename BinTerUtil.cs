@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace OthelloAI
 {
     static class BinTerUtil
     {
-        public static readonly int[] POW3_TABLE = { 1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049 };
+        public static readonly int[] POW3_TABLE = Enumerable.Range(0, 19).Select(i => (int)Math.Pow(3, i)).ToArray();
 
         public static (int, int) ConvertTerToBinPair(int value, int length)
         {

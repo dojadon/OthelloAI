@@ -1,30 +1,44 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Numerics;
-using System.Runtime.Intrinsics.X86;
-using System.Runtime.Intrinsics;
 using System.Buffers.Binary;
+using System.Collections;
+using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI
 {
-    public class MirroredBoards
+    public class RotatedAndMirroredBoards : IEnumerable<Board>
     {
-        public Board[] Boards = new Board[8];
+        public readonly Board rot0, rot90, rot180, rot270, inv_rot0, inv_rot90, inv_rot180, inv_rot270;
 
-        public MirroredBoards(Board org)
+        public RotatedAndMirroredBoards(Board board)
         {
-            Boards[0] = org;
-            Boards[1] = org.HorizontalMirrored();
-            Boards[2] = org.VerticalMirrored();
-            Boards[3] = Boards[1].VerticalMirrored();
+            rot0 = board;
+            inv_rot0 = board.HorizontalMirrored();
+            inv_rot90 = board.Transposed();
+            inv_rot180 = board.VerticalMirrored();
+            rot90 = inv_rot0.Transposed();
+            rot180 = inv_rot180.HorizontalMirrored();
+            rot270 = inv_rot90.HorizontalMirrored();
+            inv_rot270 = rot270.VerticalMirrored();
+        }
 
-            Boards[4] = org.Transposed();
-            Boards[5] = Boards[4].HorizontalMirrored();
-            Boards[6] = Boards[4].VerticalMirrored();
-            Boards[7] = Boards[5].VerticalMirrored();
+        public IEnumerator<Board> GetEnumerator()
+        {
+            yield return rot0;
+            yield return rot90;
+            yield return rot180;
+            yield return rot270;
+            yield return inv_rot0;
+            yield return inv_rot90;
+            yield return inv_rot180;
+            yield return inv_rot270;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
     }
 
@@ -150,6 +164,25 @@ namespace OthelloAI
             t = k1 & (x ^ (x << 9));
             x ^= t ^ (t >> 9);
             return x;
+        }
+
+        public IEnumerable<Board> RotatedAndMirrored()
+        {
+            yield return this;
+
+            var inv = HorizontalMirrored();
+            yield return inv;
+            yield return inv.Transposed();
+
+            var inv_rot90 = Transposed();
+            var rot270 = inv_rot90.HorizontalMirrored();
+            yield return inv_rot90;
+            yield return rot270;
+            yield return rot270.VerticalMirrored();
+
+            var inv_rot180 = VerticalMirrored();
+            yield return inv_rot180;
+            yield return inv_rot180.HorizontalMirrored();
         }
 
         public static int BitCount(ulong v)

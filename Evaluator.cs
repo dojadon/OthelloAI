@@ -14,6 +14,13 @@ namespace OthelloAI
 
     public class EvaluatorPatternBased : Evaluator
     {
+        public Pattern[] Patterns { get; }
+
+        public EvaluatorPatternBased(Pattern[] patterns)
+        {
+            Patterns = patterns;
+        }
+
         public override int Eval(Board board)
         {
             return EvalByPEXTHashing(board);
@@ -21,7 +28,21 @@ namespace OthelloAI
 
         protected int EvalByPEXTHashing(Board board)
         {
-            var boards = new Boards(board);
+            var boards = new RotatedAndMirroredBoards(board);
+            return Patterns.Sum(p => p.EvalByPEXTHashing(boards));
+        }
+    }
+
+    public class EvaluatorPatternBased_Release : Evaluator
+    {
+        public override int Eval(Board board)
+        {
+            return EvalByPEXTHashing(board);
+        }
+
+        protected int EvalByPEXTHashing(Board board)
+        {
+            var boards = new RotatedAndMirroredBoards(board);
 
             return Program.PATTERN_EDGE2X.EvalByPEXTHashing(boards)
                     + Program.PATTERN_EDGE_BLOCK.EvalByPEXTHashing(boards)
@@ -32,6 +53,27 @@ namespace OthelloAI
                     + Program.PATTERN_LINE3.EvalByPEXTHashing(boards)
                     + Program.PATTERN_DIAGONAL8.EvalByPEXTHashing(boards)
                     + Program.PATTERN_DIAGONAL7.EvalByPEXTHashing(boards);
+        }
+    }
+
+    public class EvaluatorRandomChoice : Evaluator
+    {
+        Random Rand { get; } = new Random(DateTime.Now.Millisecond);
+        Evaluator[] Evaluators { get; }
+
+        public EvaluatorRandomChoice(Evaluator[] evaluators)
+        {
+            Evaluators = evaluators;
+        }
+
+        Evaluator Choice()
+        {
+            return Evaluators[Rand.Next(Evaluators.Length)];
+        }
+
+        public override int Eval(Board board)
+        {
+            return Choice().Eval(board);
         }
     }
 

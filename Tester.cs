@@ -6,14 +6,12 @@ namespace OthelloAI
 {
     class Tester
     {
-        static readonly Random Random = new Random();
-
-        public static Board CreateRnadomGame(int num_moves)
+        public static Board CreateRnadomGame(Random rand, int num_moves)
         {
-            static Board Step(Board b)
+            Board Step(Board b)
             {
                 Move[] moves = new Move(b).NextMoves();
-                Move move = moves[Random.Next(moves.Length)];
+                Move move = moves[rand.Next(moves.Length)];
                 return move.reversed;
             }
 
@@ -25,11 +23,6 @@ namespace OthelloAI
             }
 
             return board;
-        }
-
-        public static void TestInRandomGames(PlayerAI player)
-        {
-
         }
     }
 }

@@ -13,13 +13,6 @@ namespace OthelloAI
         public int HashBinByPEXT(in Board b) => HashByPEXT(b.bitB) | (HashByPEXT(b.bitW) << HashLength);
         public int HashTerByPEXT(in Board b) => BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitB), HashLength) + 2 * BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitW), HashLength);
 
-        public int HashByPEXT(in Board b, NAry ary) => ary switch
-        {
-            NAry.BIN => HashBinByPEXT(b),
-            NAry.TER => HashTerByPEXT(b),
-            _ => throw new NotImplementedException(),
-        };
-
         public int HashByPEXT(in Board b)
         {
 #if BIN_HASH
@@ -31,35 +24,19 @@ namespace OthelloAI
 
         public abstract int HashByPEXT(ulong b);
 
-        public int HashByScanning(Board board, int number)
+        public int HashByScanning(Board board)
         {
-            throw new NotImplementedException();
-
             int hash = 0;
 
-            foreach (int pos in Positions)
+            for(int i = 0; i < Positions.Length; i++)
             {
+                int pos = Positions[Positions.Length - 1 - i];
+
                 hash *= 3;
                 hash += (int)((board.bitB >> pos) & 1);
-                hash += (int)((board.bitB >> pos) & 1) * 2;
+                hash += (int)((board.bitW >> pos) & 1) * 2;
             }
             return hash;
-        }
-
-        public int ConvertStateToHash(int i, NAry nary)
-        {
-            switch (nary)
-            {
-                case NAry.BIN:
-                    (int b1, int b2) = BinTerUtil.ConvertTerToBinPair(i, HashLength);
-                    return b1 | (b2 << HashLength);
-
-                case NAry.TER:
-                    return i;
-
-                default:
-                    throw new NotImplementedException();
-            }
         }
 
         public int ConvertStateToHash(int i)
@@ -90,13 +67,6 @@ namespace OthelloAI
 #endif
         }
 
-        public int FlipHash(int hash, NAry nary) => nary switch
-        {
-            NAry.BIN => FlipBinHash(hash),
-            NAry.TER => FlipTerHash(hash),
-            _ => throw new NotImplementedException()
-        };
-
         public int FlipBinHash(int hash) => (hash >> HashLength) | ((hash & ((1 << HashLength) - 1)) << HashLength);
 
         public int FlipTerHash(int hash)
@@ -113,13 +83,6 @@ namespace OthelloAI
             return result;
         }
 
-        public Board FromHash(int hash, NAry nary) => nary switch
-        {
-            NAry.BIN => FromBinHash(hash),
-            NAry.TER => FromTerHash(hash),
-            _ => throw new NotImplementedException()
-        };
-
         public Board FromHash(int hash)
         {
 #if BIN_HASH
@@ -127,29 +90,6 @@ namespace OthelloAI
 #else
             return FromTerHash(hash);
 #endif
-        }
-
-        public Board FromTerHash(int hash)
-        {
-            ulong b = 0;
-            ulong w = 0;
-
-            for (int i = 0; i < HashLength; i++)
-            {
-                int id = hash % 3;
-                switch (id)
-                {
-                    case 1:
-                        b |= Board.Mask(Positions[i]);
-                        break;
-
-                    case 2:
-                        w |= Board.Mask(Positions[i]);
-                        break;
-                }
-                hash /= 3;
-            }
-            return new Board(b, w);
         }
 
         public Board FromBinHash(int hash)
@@ -172,6 +112,29 @@ namespace OthelloAI
                 }
 
                 hash >>= 1;
+            }
+            return new Board(b, w);
+        }
+
+        public Board FromTerHash(int hash)
+        {
+            ulong b = 0;
+            ulong w = 0;
+
+            for (int i = 0; i < HashLength; i++)
+            {
+                int id = hash % 3;
+                switch (id)
+                {
+                    case 1:
+                        b |= Board.Mask(Positions[i]);
+                        break;
+
+                    case 2:
+                        w |= Board.Mask(Positions[i]);
+                        break;
+                }
+                hash /= 3;
             }
             return new Board(b, w);
         }

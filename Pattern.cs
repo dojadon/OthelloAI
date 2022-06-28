@@ -1,35 +1,97 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 
 namespace OthelloAI.Patterns
 {
     public enum PatternType
     {
-        X_SYMETRIC,
-        XY_SYMETRIC,
+        X_SYMMETRIC,
+        XY_SYMMETRIC,
         DIAGONAL,
+        ASYMMETRIC
     }
 
-    public enum NAry
+    public class RegionForTraining
     {
-        BIN, TER
-    }
+        protected string FilePath { get; }
 
-    public class Boards
-    {
-        public Board Original { get; }
-        public Board Transposed { get; }
-        public Board HorizontalMirrored { get; }
-        public Board Rotated90 { get; }
-        public Board Rotated270 { get; }
+        protected PatternType Type { get; }
+        public BoardHasher Hasher { get; }
 
-        public Boards(Board source)
+        protected int[] GameCount { get; }
+        protected int[] WinCount { get; }
+
+        public int ArrayLength { get; }
+        public int NumOfStates { get; }
+
+        public RegionForTraining(string filePath, BoardHasher hasher, PatternType type)
         {
-            Original = source;
-            Transposed = source.Transposed();
-            HorizontalMirrored = source.HorizontalMirrored();
-            Rotated270 = HorizontalMirrored.Transposed();
-            Rotated90 = Transposed.HorizontalMirrored();
+            FilePath = filePath;
+            Hasher = hasher;
+            Type = type;
+
+            NumOfStates = (int)Math.Pow(3, Hasher.HashLength);
+
+            GameCount = new int[NumOfStates];
+            WinCount = new int[NumOfStates];
+        }
+
+        public void UpdateWinCountWithRotatingAndFliping(Board board, int win, int game)
+        {
+            var inv = board.HorizontalMirrored();
+            var inv_rot90 = board.Transposed();
+            var inv_rot180 = board.VerticalMirrored();
+            var rot90 = inv.Transposed();
+            var rot180 = inv_rot180.HorizontalMirrored();
+            var rot270 = inv_rot90.HorizontalMirrored();
+            var inv_rot270 = rot270.VerticalMirrored();
+
+            UpdateWinCount(board, win, game);
+            UpdateWinCount(rot90, win, game);
+            UpdateWinCount(rot180, win, game);
+            UpdateWinCount(rot270, win, game);
+            UpdateWinCount(inv, win, game);
+            UpdateWinCount(inv_rot90, win, game);
+            UpdateWinCount(inv_rot180, win, game);
+            UpdateWinCount(inv_rot270, win, game);
+        }
+
+        public void UpdateWinCount(Board board, int win, int game)
+        {
+            int hash = Hasher.HashByScanning(board);
+            int flipped = Hasher.FlipHash(hash);
+
+            GameCount[hash] += game;
+            GameCount[flipped] += game;
+
+            WinCount[hash] += win;
+            WinCount[flipped] += game - win;
+        }
+
+        public void Load()
+        {
+            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
+
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                int win = reader.ReadInt32();
+                int game = reader.ReadInt32();
+
+                WinCount[i] = win;
+                GameCount[i] = game;
+            }
+        }
+
+        public void Save()
+        {
+            using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
+
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                writer.Write(WinCount[i]);
+                writer.Write(GameCount[i]);
+            }
         }
     }
 
@@ -40,14 +102,10 @@ namespace OthelloAI.Patterns
         protected string FilePath { get; }
 
         protected PatternType Type { get; }
-        //protected NAry NAry { get; }
         public BoardHasher Hasher { get; }
 
         public int ArrayLength { get; }
         public int NumOfStates { get; }
-
-        protected int[][] StageBasedGameCount { get; } = new int[STAGES][];
-        protected int[][] StageBasedWinCount { get; } = new int[STAGES][];
 
         protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
         protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
@@ -68,8 +126,6 @@ namespace OthelloAI.Patterns
 
             for (int i = 0; i < STAGES; i++)
             {
-                StageBasedGameCount[i] = new int[ArrayLength];
-                StageBasedWinCount[i] = new int[ArrayLength];
                 StageBasedEvaluations[i] = new float[ArrayLength];
                 StageBasedEvaluationsB[i] = new byte[ArrayLength];
             }
@@ -80,146 +136,19 @@ namespace OthelloAI.Patterns
             return board.n_stone - 5;
         }
 
-        public void UpdateWinCount(Boards boards, bool win, int weight)
-        {
-            switch (Type)
-            {
-                case PatternType.X_SYMETRIC:
-                    UpdateWinCount(boards.Original, win, weight);
-                    UpdateWinCount(boards.HorizontalMirrored, win, weight);
-                    UpdateWinCount(boards.Transposed, win, weight);
-                    UpdateWinCount(boards.Rotated90, win, weight);
-                    break;
-
-                case PatternType.XY_SYMETRIC:
-                    UpdateWinCount(boards.Original, win, weight);
-                    UpdateWinCount(boards.HorizontalMirrored, win, weight);
-                    UpdateWinCount(boards.Transposed, win, weight);
-                    UpdateWinCount(boards.Rotated270, win, weight);
-                    break;
-
-                case PatternType.DIAGONAL:
-                    UpdateWinCount(boards.Original, win, weight);
-                    UpdateWinCount(boards.HorizontalMirrored, win, weight);
-                    break;
-            }
-        }
-
-        public void UpdateWinCount(Board board, bool win, int weight)
-        {
-            int stage = GetStage(board);
-
-            int hash = Hasher.HashByPEXT(board);
-            int flipped = FlipHash(hash);
-
-            StageBasedGameCount[stage][hash] += weight;
-            StageBasedGameCount[stage][flipped] += weight;
-
-            if (win)
-                StageBasedWinCount[stage][hash] += weight;
-            else
-                StageBasedWinCount[stage][flipped] += weight;
-        }
-
-        public void UpdataEvaluation(Boards boards, float add)
-        {
-            switch (Type)
-            {
-                case PatternType.X_SYMETRIC:
-                    UpdataEvaluation(boards.Original, add);
-                    UpdataEvaluation(boards.HorizontalMirrored, add);
-                    UpdataEvaluation(boards.Transposed, add);
-                    UpdataEvaluation(boards.Rotated270, add);
-                    break;
-
-                case PatternType.XY_SYMETRIC:
-                    UpdataEvaluation(boards.Original, add);
-                    UpdataEvaluation(boards.HorizontalMirrored, add);
-                    UpdataEvaluation(boards.Transposed, add);
-                    UpdataEvaluation(boards.Rotated90, add);
-                    break;
-
-                case PatternType.DIAGONAL:
-                    UpdataEvaluation(boards.Original, add);
-                    UpdataEvaluation(boards.HorizontalMirrored, add);
-                    break;
-            }
-        }
-
         public void UpdataEvaluation(Board board, float add)
         {
             int stage = GetStage(board);
 
             int hash = Hasher.HashByPEXT(board);
-            int flipped = FlipHash(hash);
+            int flipped = Hasher.FlipHash(hash);
 
             StageBasedEvaluations[stage][hash] += add;
             StageBasedEvaluations[stage][flipped] -= add;
         }
 
-        public int EvalByPEXTHashing(Boards b)
+        public void ApplyTrainedEvaluation()
         {
-            byte[] e = StageBasedEvaluationsB[GetStage(b.Original)];
-            byte _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
-
-            return Type switch
-            {
-                PatternType.X_SYMETRIC => _Eval(b.Original) + _Eval(b.HorizontalMirrored) + _Eval(b.Transposed) + _Eval(b.Rotated90) - 128 * 4,
-                PatternType.XY_SYMETRIC => _Eval(b.Original) + _Eval(b.HorizontalMirrored) + _Eval(b.Transposed) + _Eval(b.Rotated270) - 128 * 4,
-                PatternType.DIAGONAL => _Eval(b.Original) + _Eval(b.HorizontalMirrored) - 128 * 2,
-                _ => throw new NotImplementedException(),
-            };
-        }
-
-        public float EvalTrainingByPEXTHashing(Boards b)
-        {
-            float[] e = StageBasedEvaluations[GetStage(b.Original)];
-            float _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
-
-            return Type switch
-            {
-                PatternType.X_SYMETRIC => _Eval(b.Original) + _Eval(b.HorizontalMirrored) + _Eval(b.Transposed) + _Eval(b.Rotated90),
-                PatternType.XY_SYMETRIC => _Eval(b.Original) + _Eval(b.HorizontalMirrored) + _Eval(b.Transposed) + _Eval(b.Rotated270),
-                PatternType.DIAGONAL => _Eval(b.Original) + _Eval(b.HorizontalMirrored),
-                _ => throw new NotImplementedException(),
-            };
-        }
-
-        protected int ConvertStateToHash(int i) => Hasher.ConvertStateToHash(i);
-
-        protected Board FromHash(int hash) => Hasher.FromHash(hash);
-
-        public int FlipHash(int hash) => Hasher.FlipHash(hash);
-
-        public void Load2()
-        {
-            using var reader = new BinaryReader(new FileStream("e2\\" + FilePath, FileMode.Open));
-
-            static byte ConvertToInt8(float e)
-            {
-                return (byte)Math.Clamp(128 + (e - 0.5F) * 255, 0, 255);
-            }
-
-            for (int stage = 0; stage < STAGES; stage++)
-            {
-                for (int i = 0; i < NumOfStates; i++)
-                {
-                    int game = reader.ReadInt32();
-                    int win = reader.ReadInt32();
-
-                    float e = game > 10 ? (float)win / game : 0.5F;
-
-                    int index = ConvertStateToHash(i);
-                    StageBasedEvaluations[stage][index] = e;
-                    StageBasedEvaluationsB[stage][index] = ConvertToInt8(e);
-                }
-            }
-        }
-
-        public void Load()
-        {
-            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
-
             static byte ConvertToInt8(float e)
             {
                 return (byte)Math.Clamp(e * 32 + 128, 0, 255);
@@ -229,28 +158,58 @@ namespace OthelloAI.Patterns
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
-                    float e = reader.ReadSingle();
-
-                    int index = ConvertStateToHash(i);
-                    StageBasedEvaluations[stage][index] = e;
-                    StageBasedEvaluationsB[stage][index] = ConvertToInt8(e);
+                    int index = Hasher.ConvertStateToHash(i);
+                    StageBasedEvaluationsB[stage][index] = ConvertToInt8(StageBasedEvaluations[stage][index]);
                 }
             }
         }
 
-        public void Save2()
+        public int EvalByPEXTHashing(RotatedAndMirroredBoards b)
         {
-            using var writer = new BinaryWriter(new FileStream("e2\\" + FilePath, FileMode.Create));
+            byte[] e = StageBasedEvaluationsB[GetStage(b.rot0)];
+            byte _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
+
+            return Type switch
+            {
+                PatternType.X_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot270) - 128 * 4,
+                PatternType.XY_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot90) - 128 * 4,
+                PatternType.DIAGONAL => _Eval(b.rot0) + _Eval(b.inv_rot0) - 128 * 2,
+                PatternType.ASYMMETRIC => b.Sum(bi => _Eval(bi)),
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        public float EvalTrainingByPEXTHashing(RotatedAndMirroredBoards b)
+        {
+            float[] e = StageBasedEvaluations[GetStage(b.rot0)];
+            float _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
+
+            return Type switch
+            {
+                PatternType.X_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot270),
+                PatternType.XY_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot90),
+                PatternType.DIAGONAL => _Eval(b.rot0) + _Eval(b.inv_rot0),
+                PatternType.ASYMMETRIC => b.Sum(bi => _Eval(bi)),
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        public void Load()
+        {
+            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
 
             for (int stage = 0; stage < STAGES; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
-                    int index = ConvertStateToHash(i);
-                    writer.Write(StageBasedGameCount[stage][index]);
-                    writer.Write(StageBasedWinCount[stage][index]);
+                    float e = reader.ReadSingle();
+
+                    int index = Hasher.ConvertStateToHash(i);
+                    StageBasedEvaluations[stage][index] = e;
                 }
             }
+
+            ApplyTrainedEvaluation();
         }
 
         public void Save()
@@ -261,7 +220,7 @@ namespace OthelloAI.Patterns
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
-                    int index = ConvertStateToHash(i);
+                    int index = Hasher.ConvertStateToHash(i);
                     writer.Write(StageBasedEvaluations[stage][index]);
                 }
             }
@@ -271,12 +230,12 @@ namespace OthelloAI.Patterns
         {
             for (int i = 0; i < NumOfStates; i++)
             {
-                int hash = ConvertStateToHash(i);
+                int hash = Hasher.ConvertStateToHash(i);
 
-                if (Hasher.HashByPEXT(FromHash(hash)) != hash)
+                if (Hasher.HashByPEXT(Hasher.FromHash(hash)) != hash)
                 {
-                    Console.WriteLine(FromHash(hash));
-                    Console.WriteLine($"{hash}, {Hasher.HashByPEXT(FromHash(hash))}");
+                    Console.WriteLine(Hasher.FromHash(hash));
+                    Console.WriteLine($"{hash}, {Hasher.HashByPEXT(Hasher.FromHash(hash))}");
                     Console.WriteLine($"{hash}, {(hash >> Hasher.HashLength)}, {(hash & ((1 << Hasher.HashLength) - 1)) << Hasher.HashLength}");
                     return false;
                 }
@@ -284,25 +243,11 @@ namespace OthelloAI.Patterns
             return true;
         }
 
-        public void TestRotation()
-        {
-            var br = new Board(0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101UL,
-                    0b01010101_10101010_01010101_10101010_01010101_10101010_01010101_10101010UL);
-            var b = Hasher.FromTerHash(Hasher.HashTerByPEXT(br));
-            var bs = new Boards(b);
-
-            Console.WriteLine(bs.Original);
-            Console.WriteLine(bs.HorizontalMirrored);
-            Console.WriteLine(bs.Transposed);
-            Console.WriteLine(bs.Rotated90);
-            Console.WriteLine(bs.Rotated270);
-        }
-
         public void Info(int stage, float threshold)
         {
             for (int i = 0; i < NumOfStates; i++)
             {
-                int index = ConvertStateToHash(i);
+                int index = Hasher.ConvertStateToHash(i);
 
                 if (StageBasedEvaluations[stage][index] > threshold)
                     InfoHash(stage, index);
@@ -311,7 +256,7 @@ namespace OthelloAI.Patterns
 
         public void InfoHash(int stage, int hash)
         {
-            Console.WriteLine(FromHash(hash));
+            Console.WriteLine(Hasher.FromHash(hash));
             Console.WriteLine($"Stage : {stage}, Hash : {hash}");
             Console.WriteLine($"Eval : {StageBasedEvaluations[stage][hash]}");
             Console.WriteLine();

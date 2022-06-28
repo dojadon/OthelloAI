@@ -20,19 +20,43 @@ namespace OthelloAI
             return moves;
         }
 
-        public virtual bool TryCutoffOrUpdateBorder(Move move, CutoffParameters param, int depth, ref float alpha, ref float beta, ref float value)
-        {
-            return false;
-        }
-
-        public void StoreTranspositionTable(IDictionary<Board, (int, int)> table, Move move, int alpha, int beta, int lower, int upper, int value)
+        public void StoreTranspositionTable(Move move, int alpha, int beta, int lower, int upper, int value)
         {
             if (value <= alpha)
-                table[move.reversed] = (lower, value);
+                Table[move.reversed] = (lower, value);
             else if (value >= beta)
-                table[move.reversed] = (value, upper);
+                Table[move.reversed] = (value, upper);
             else
-                table[move.reversed] = (value, value);
+                Table[move.reversed] = (value, value);
+        }
+
+        public bool TryTranspositionCutoff(Move move, CutoffParameters param, int depth, ref int alpha, ref int beta, out int lower, out int upper, ref int value)
+        {
+            if (depth <= PlayerAI.transposition || move.reversed.n_stone > PlayerAI.ordering_depth || !param.shouldTranspositionCut || !Table.ContainsKey(move.reversed))
+            {
+                lower = -1000000;
+                upper = 1000000;
+                return false;
+            }
+
+            (lower, upper) = Table[move.reversed];
+
+            if (lower >= beta)
+            {
+                value = lower;
+                return true;
+            }
+
+            if (upper <= alpha || upper == lower)
+            {
+                value = upper;
+                return true;
+            }
+
+            alpha = Math.Max(alpha, lower);
+            beta = Math.Min(beta, upper);
+
+            return false;
         }
 
         public virtual bool TryProbCutoff(PlayerAI player, Move move, CutoffParameters param, int depth, int depthShallow, int alpha, int beta, int lower, int upper, ref int value)
@@ -572,51 +596,12 @@ namespace OthelloAI
 
         public bool PrintInfo { get; set; } = true;
 
-        public bool TryTranspositionCutoff(IDictionary<Board, (int, int)> table, Move move, CutoffParameters param, int depth, ref int alpha, ref int beta, out int lower, out int upper, ref int value)
-        {
-            if (depth <= transposition || move.reversed.n_stone > ordering_depth || !param.shouldTranspositionCut || !table.ContainsKey(move.reversed))
-            {
-                lower = -1000000;
-                upper = 1000000;
-                return false;
-            }
-
-            (lower, upper) = table[move.reversed];
-
-            if (lower >= beta)
-            {
-                value = lower;
-                return true;
-            }
-
-            if (upper <= alpha || upper == lower)
-            {
-                value = upper;
-                return true;
-            }
-
-            alpha = Math.Max(alpha, lower);
-            beta = Math.Min(beta, upper);
-
-            return false;
-        }
-
-        public void StoreTranspositionTable(IDictionary<Board, (int, int)> table, Move move, int alpha, int beta, int lower, int upper, int value)
-        {
-            if (value <= alpha)
-                table[move.reversed] = (lower, value);
-            else if (value >= beta)
-                table[move.reversed] = (value, upper);
-            else
-                table[move.reversed] = (value, value);
-        }
-
         public int[] ProbcutNode1 = new int[12];
         public int[] ProbcutNode2 = new int[12];
 
 
-        int ordering_depth = 57;
-        int transposition = 1;
+        public static int ordering_depth = 57;
+        public static int transposition = 1;
 
         public virtual int Solve(Search search, Move move, CutoffParameters param, int depth, int alpha, int beta)
         {
@@ -645,7 +630,7 @@ namespace OthelloAI
             if (move.reversed.n_stone == 63 && move.n_moves == 1)
                 return -EvalFinishedGame(move.reversed.Reversed(move.moves));
 
-            if (TryTranspositionCutoff(search.Table, move, param, depth, ref alpha, ref beta, out int lower, out int upper, ref value))
+            if (search.TryTranspositionCutoff(move, param, depth, ref alpha, ref beta, out int lower, out int upper, ref value))
                 return value;
 
             if (depth >= 3 && move.reversed.n_stone < 60)
@@ -661,7 +646,7 @@ namespace OthelloAI
             }
 
             if (depth > transposition && move.reversed.n_stone <= ordering_depth && param.shouldStoreTranspositionTable)
-                StoreTranspositionTable(search.Table, move, alpha, beta, lower, upper, value);
+                search.StoreTranspositionTable(move, alpha, beta, lower, upper, value);
 
             return value;
         }

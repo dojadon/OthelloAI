@@ -35,7 +35,7 @@ namespace OthelloAI
 
         public static void Test()
         {
-            PlayerAI player = new PlayerAI(new EvaluatorPatternBased())
+            PlayerAI player = new PlayerAI(new EvaluatorPatternBased_Release())
             {
                 ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
                 ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
@@ -47,7 +47,7 @@ namespace OthelloAI
 
             for (int i = 0; i < 500; i++)
             {
-                Board board = Tester.CreateRnadomGame(5);
+                Board board = Tester.CreateRnadomGame(null, 5);
 
                 while (Step(solver, ref board, player, 1) | Step(solver, ref board, player, -1))
                 {
