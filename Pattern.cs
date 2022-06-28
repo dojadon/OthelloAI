@@ -194,10 +194,8 @@ namespace OthelloAI.Patterns
             };
         }
 
-        public void Load()
+        public void Read(BinaryReader reader)
         {
-            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
-
             for (int stage = 0; stage < STAGES; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
@@ -212,10 +210,14 @@ namespace OthelloAI.Patterns
             ApplyTrainedEvaluation();
         }
 
-        public void Save()
+        public void Load()
         {
-            using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
+            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
+            Read(reader);
+        }
 
+        public void Write(BinaryWriter writer)
+        {
             for (int stage = 0; stage < STAGES; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
@@ -224,6 +226,12 @@ namespace OthelloAI.Patterns
                     writer.Write(StageBasedEvaluations[stage][index]);
                 }
             }
+        }
+
+        public void Save()
+        {
+            using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
+            Write(writer);
         }
 
         public bool Test()

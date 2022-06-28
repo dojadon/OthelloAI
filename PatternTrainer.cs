@@ -6,9 +6,43 @@ using System.Threading;
 
 namespace OthelloAI
 {
+    public class TrainingData : List<TrainingDataElement>
+    {
+        public TrainingData()
+        {
+        }
+
+        public TrainingData(List<TrainingDataElement> data)
+        {
+            AddRange(data);
+        }
+
+        public void Add(Board b, int result)
+        {
+            Add(new TrainingDataElement(b, result));
+        }
+
+        public void Add(IEnumerable<Board> boards, int result)
+        {
+            AddRange(boards.Select(b => new TrainingDataElement(b, result)));
+        }
+    }
+
+    public struct TrainingDataElement
+    {
+        public readonly Board board;
+        public readonly int result;
+
+        public TrainingDataElement(Board board, int result)
+        {
+            this.board = board;
+            this.result = result;
+        }
+    }
+
     public class TrainerUtil
     {
-        public static (List<Board>, int)[] PlayForTrainingParallel(int n_game, Player player)
+        public static TrainingData PlayForTrainingParallel(int n_game, Player player)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -26,7 +60,7 @@ namespace OthelloAI
 
             var data = Enumerable.Range(0, 16).AsParallel().SelectMany(i =>
             {
-                var results = new List<(List<Board>, int)>();
+                var results = new TrainingData();
                 var rand = new Random();
 
                 while (count < n_game)
@@ -37,7 +71,7 @@ namespace OthelloAI
                     while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
                     {
                     }
-                    results.Add((boards, board.GetStoneCountGap()));
+                    results.Add(boards, board.GetStoneCountGap());
 
                     Interlocked.Increment(ref count);
                 }
@@ -45,7 +79,7 @@ namespace OthelloAI
                 return results;
             });
 
-            return data.ToArray();
+            return new TrainingData(data.ToList());
         }
     }
 
