@@ -17,6 +17,11 @@ namespace OthelloAI
             var lookup = source.ToLookup(selector);
             return lookup[lookup.Max(a => a.Key)];
         }
+
+        public static IEnumerable<T> TakeLast<T>(this IEnumerable<T> source, int N)
+        {
+            return source.Skip(Math.Max(0, source.Count() - N));
+        }
     }
 
     public static class RandomUtil

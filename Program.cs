@@ -3,35 +3,42 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Threading;
-using OthelloAI.GA;
 
 namespace OthelloAI
 {
     static class Program
     {
-        public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", new BoardHasherMask(0b01000010_11111111UL), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_EDGE_BLOCK = new Pattern("e_edge_block.dat", new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_CORNER_BLOCK = new Pattern("e_corner_block.dat", new BoardHasherMask(0b00000111_00000111_00000111UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_CORNER = new Pattern("e_corner.dat", new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_LINE1 = new Pattern("e_line1.dat", new BoardHasherLine1(1), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_LINE2 = new Pattern("e_line2.dat", new BoardHasherLine1(2), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_LINE3 = new Pattern("e_line3.dat", new BoardHasherLine1(3), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL8 = new Pattern("e_diag8.dat", new BoardHasherMask(0x8040201008040201UL), PatternType.DIAGONAL);
-        public static readonly Pattern PATTERN_DIAGONAL7 = new Pattern("e_diag7.dat", new BoardHasherMask(0x1020408102040UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL6 = new Pattern("e_diag6.dat", new BoardHasherMask(0x10204081020UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL5 = new Pattern("e_diag5.dat", new BoardHasherMask(0x102040810UL), PatternType.XY_SYMMETRIC);
+        public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", 60, new BoardHasherMask(0b01000010_11111111UL), PatternType.X_SYMMETRIC);
+        public static readonly Pattern PATTERN_EDGE_BLOCK = new Pattern("e_edge_block.dat", 60, new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMMETRIC);
+        public static readonly Pattern PATTERN_CORNER_BLOCK = new Pattern("e_corner_block.dat", 60, new BoardHasherMask(0b00000111_00000111_00000111UL), PatternType.XY_SYMMETRIC);
+        public static readonly Pattern PATTERN_CORNER = new Pattern("e_corner.dat", 60, new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), PatternType.XY_SYMMETRIC);
+        public static readonly Pattern PATTERN_LINE1 = new Pattern("e_line1.dat", 60, new BoardHasherLine1(1), PatternType.X_SYMMETRIC);
+        public static readonly Pattern PATTERN_LINE2 = new Pattern("e_line2.dat", 60, new BoardHasherLine1(2), PatternType.X_SYMMETRIC);
+        public static readonly Pattern PATTERN_LINE3 = new Pattern("e_line3.dat", 60, new BoardHasherLine1(3), PatternType.X_SYMMETRIC);
+        public static readonly Pattern PATTERN_DIAGONAL8 = new Pattern("e_diag8.dat", 60, new BoardHasherMask(0x8040201008040201UL), PatternType.DIAGONAL);
+        public static readonly Pattern PATTERN_DIAGONAL7 = new Pattern("e_diag7.dat", 60, new BoardHasherMask(0x1020408102040UL), PatternType.XY_SYMMETRIC);
+        public static readonly Pattern PATTERN_DIAGONAL6 = new Pattern("e_diag6.dat", 60, new BoardHasherMask(0x10204081020UL), PatternType.XY_SYMMETRIC);
+        public static readonly Pattern PATTERN_DIAGONAL5 = new Pattern("e_diag5.dat", 60, new BoardHasherMask(0x102040810UL), PatternType.XY_SYMMETRIC);
 
         public static readonly Pattern[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER,
             PATTERN_LINE1, PATTERN_LINE2, PATTERN_LINE3, PATTERN_DIAGONAL8, PATTERN_DIAGONAL7, PATTERN_DIAGONAL6,
             PATTERN_DIAGONAL5 };
 
-        public static MPCParamSolver.MCP MCP_PARAM2;
-        public static MPCParamSolver.MCP MCP_PARAM4;
-
         static void Main()
         {
+            var evaluator = new EvaluatorPatternBased(PATTERNS);
+            PlayerAI player = new PlayerAI(evaluator)
+            {
+                ParamBeg = new SearchParameters(depth: 5, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 5, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                PrintInfo = false,
+            };
+
+            PatternTrainer.Train(PATTERNS, 0.01F, player);
+            return;
+
             GA.GA.Run();
             return;
 
@@ -67,31 +74,58 @@ namespace OthelloAI
             // StartManualGame();
             // UpdataEvaluationWithWthorDatabase();
             // UpdataEvaluationWithMyDatabase();
-
-            // UpdataEvaluations();
         }
 
-        static void UpdataEvaluations()
+        static void Test()
         {
-            var hasher = new BoardHasherMask(0b111_11111111_11111111UL);
-            RegionForTraining region = new RegionForTraining("e_all2.dat", hasher, PatternType.ASYMMETRIC);
+            Pattern[] p1 = { new Pattern("p11.dat", 10, new BoardHasherMask(0b10100101_11110000UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p12.dat", 10, new BoardHasherMask(0b1000001_1010001_10000011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p13.dat", 10, new BoardHasherMask(0b100000_10101000_00111100UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p14.dat", 10, new BoardHasherMask(0b10000000_11101111UL), PatternType.ASYMMETRIC),
+            };
 
-            //region.Load();
-            //return;
+            Pattern[] p2 = { new Pattern("p21.dat", 10, new BoardHasherMask(0b11111111UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p22.dat", 10, new BoardHasherMask(0b11000000_11100000_11100000UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p23.dat", 10, new BoardHasherMask(0b10000000_11100000_11110000UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p24.dat", 10, new BoardHasherMask(0x8040201008040201UL), PatternType.ASYMMETRIC),
+            };
 
-            //for (int i = 2001; i <= 2015; i++)
-            //{
-            //    Console.WriteLine($"WTH/WTH_{i}.wtb");
-            //    RegionTrainer.Train(region, new WthorRecordReader($"WTH/WTH_{i}.wtb"));
-            //}
+            PatternTrainer[] trainers = { new PatternTrainer(p1, 0.01F), new PatternTrainer(p2, 0.01F) };
+            Evaluator[] evaluators = { new EvaluatorPatternBased(p1), new EvaluatorPatternBased(p2) };
 
-            for (int i = 0; i <= 8; i++)
+            var evaluator = new EvaluatorRandomChoice(evaluators);
+
+            PlayerAI player = new PlayerAI(evaluator)
             {
-                Console.WriteLine($"log{i}.dat");
-                RegionTrainer.Train(region, new MyRecordReader(@$"F:\Users\zyand\eclipse-workspace\tus\Report7\log\log{i}.dat"));
-            }
+                ParamBeg = new SearchParameters(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                PrintInfo = false,
+            };
 
-            region.Save();
+            List<float>[] scores = { new List<float>(), new List<float>() };
+
+            for (int i = 0; i < 10000; i++)
+            {
+                var data = TrainerUtil.PlayForTrainingParallel(10, player);
+
+                foreach (var (trainer, s) in trainers.Zip(scores))
+                {
+                    s.Add(data.Select(t => trainer.Update(t.board, t.result)).Select(f => f * f).Average());
+                    Console.Write(s.TakeLast(100).Average() + ", ");
+                }
+
+                Console.WriteLine();
+
+                if (i % 100 == 0)
+                {
+                    foreach (var p in p1)
+                        p.Save();
+
+                    foreach (var p in p2)
+                        p.Save();
+                }
+            }
         }
 
         static void Train()
@@ -99,7 +133,7 @@ namespace OthelloAI
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var trainer = new PatternTrainer(PATTERNS, 0.01F);
 
-            for(int i = 0; i < 200; i++)
+            for (int i = 0; i < 200; i++)
             {
                 sw.Restart();
 
@@ -107,7 +141,7 @@ namespace OthelloAI
                 float e = data.SelectMany(t => t.Item1.Select(b => trainer.Update(b, t.Item2))).Select(f => f * f).Average();
 
                 sw.Stop();
-                float time = (float) sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
+                float time = (float)sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
                 string s_time = string.Format("{0:F}", time);
                 Console.WriteLine($"{i}, {s_time}, {e}");
@@ -137,15 +171,16 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 4, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 4, stage: 16, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 6, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 6, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
             };
 
             int count = 0;
 
-            var data =  Enumerable.Range(0, 16).AsParallel().SelectMany(i => {
+            var data = Enumerable.Range(0, 16).AsParallel().SelectMany(i =>
+            {
                 var results = new List<(List<Board>, int)>();
                 var rand = new Random();
 

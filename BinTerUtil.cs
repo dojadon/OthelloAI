@@ -9,20 +9,20 @@ namespace OthelloAI
     {
         public static readonly int[] POW3_TABLE = Enumerable.Range(0, 19).Select(i => (int)Math.Pow(3, i)).ToArray();
 
-        public static (int, int) ConvertTerToBinPair(int value, int length)
+        public static (uint, uint) ConvertTerToBinPair(int value, int length)
         {
-            int b1 = 0;
-            int b2 = 0;
+            uint b1 = 0;
+            uint b2 = 0;
             for (int i = 0; i < length; i++)
             {
                 switch (value % 3)
                 {
                     case 1:
-                        b1 |= 1 << i;
+                        b1 |= 1U << i;
                         break;
 
                     case 2:
-                        b2 |= 1 << i;
+                        b2 |= 1U << i;
                         break;
                 }
                 value /= 3;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -12,92 +13,9 @@ namespace OthelloAI.Patterns
         ASYMMETRIC
     }
 
-    public class RegionForTraining
-    {
-        protected string FilePath { get; }
-
-        protected PatternType Type { get; }
-        public BoardHasher Hasher { get; }
-
-        protected int[] GameCount { get; }
-        protected int[] WinCount { get; }
-
-        public int ArrayLength { get; }
-        public int NumOfStates { get; }
-
-        public RegionForTraining(string filePath, BoardHasher hasher, PatternType type)
-        {
-            FilePath = filePath;
-            Hasher = hasher;
-            Type = type;
-
-            NumOfStates = (int)Math.Pow(3, Hasher.HashLength);
-
-            GameCount = new int[NumOfStates];
-            WinCount = new int[NumOfStates];
-        }
-
-        public void UpdateWinCountWithRotatingAndFliping(Board board, int win, int game)
-        {
-            var inv = board.HorizontalMirrored();
-            var inv_rot90 = board.Transposed();
-            var inv_rot180 = board.VerticalMirrored();
-            var rot90 = inv.Transposed();
-            var rot180 = inv_rot180.HorizontalMirrored();
-            var rot270 = inv_rot90.HorizontalMirrored();
-            var inv_rot270 = rot270.VerticalMirrored();
-
-            UpdateWinCount(board, win, game);
-            UpdateWinCount(rot90, win, game);
-            UpdateWinCount(rot180, win, game);
-            UpdateWinCount(rot270, win, game);
-            UpdateWinCount(inv, win, game);
-            UpdateWinCount(inv_rot90, win, game);
-            UpdateWinCount(inv_rot180, win, game);
-            UpdateWinCount(inv_rot270, win, game);
-        }
-
-        public void UpdateWinCount(Board board, int win, int game)
-        {
-            int hash = Hasher.HashByScanning(board);
-            int flipped = Hasher.FlipHash(hash);
-
-            GameCount[hash] += game;
-            GameCount[flipped] += game;
-
-            WinCount[hash] += win;
-            WinCount[flipped] += game - win;
-        }
-
-        public void Load()
-        {
-            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
-
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                int win = reader.ReadInt32();
-                int game = reader.ReadInt32();
-
-                WinCount[i] = win;
-                GameCount[i] = game;
-            }
-        }
-
-        public void Save()
-        {
-            using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
-
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                writer.Write(WinCount[i]);
-                writer.Write(GameCount[i]);
-            }
-        }
-    }
-
     public class Pattern
     {
-        public const int STAGES = 60;
+        public int NumStages { get; }
 
         protected string FilePath { get; }
 
@@ -107,12 +25,13 @@ namespace OthelloAI.Patterns
         public int ArrayLength { get; }
         public int NumOfStates { get; }
 
-        protected float[][] StageBasedEvaluations { get; } = new float[STAGES][];
-        protected byte[][] StageBasedEvaluationsB { get; } = new byte[STAGES][];
+        public float[][] StageBasedEvaluations { get; }
+        protected byte[][] StageBasedEvaluationsB { get; }
 
-        public Pattern(string filePath, BoardHasher hasher, PatternType type)
+        public Pattern(string filePath, int n_stages, BoardHasher hasher, PatternType type)
         {
             FilePath = filePath;
+            NumStages = n_stages;
             Hasher = hasher;
             Type = type;
 
@@ -124,7 +43,10 @@ namespace OthelloAI.Patterns
             ArrayLength = NumOfStates;
 #endif
 
-            for (int i = 0; i < STAGES; i++)
+            StageBasedEvaluations = new float[NumStages][];
+            StageBasedEvaluationsB = new byte[NumStages][];
+
+            for (int i = 0; i < NumStages; i++)
             {
                 StageBasedEvaluations[i] = new float[ArrayLength];
                 StageBasedEvaluationsB[i] = new byte[ArrayLength];
@@ -133,7 +55,7 @@ namespace OthelloAI.Patterns
 
         protected int GetStage(Board board)
         {
-            return board.n_stone - 5;
+            return (board.n_stone - 5) / (60 / NumStages);
         }
 
         public void UpdataEvaluation(Board board, float add)
@@ -145,20 +67,23 @@ namespace OthelloAI.Patterns
 
             StageBasedEvaluations[stage][hash] += add;
             StageBasedEvaluations[stage][flipped] -= add;
+
+            StageBasedEvaluationsB[stage][hash] += ConvertToInt8(add);
+            StageBasedEvaluationsB[stage][flipped] -= ConvertToInt8(add);
+        }
+
+        byte ConvertToInt8(float e)
+        {
+            return (byte)Math.Clamp(e * 32 + 128, 0, 255);
         }
 
         public void ApplyTrainedEvaluation()
         {
-            static byte ConvertToInt8(float e)
-            {
-                return (byte)Math.Clamp(e * 32 + 128, 0, 255);
-            }
-
-            for (int stage = 0; stage < STAGES; stage++)
+            for (int stage = 0; stage < NumStages; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
-                    int index = Hasher.ConvertStateToHash(i);
+                    uint index = Hasher.ConvertStateToHash(i);
                     StageBasedEvaluationsB[stage][index] = ConvertToInt8(StageBasedEvaluations[stage][index]);
                 }
             }
@@ -196,13 +121,13 @@ namespace OthelloAI.Patterns
 
         public void Read(BinaryReader reader)
         {
-            for (int stage = 0; stage < STAGES; stage++)
+            for (int stage = 0; stage < NumStages; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
                     float e = reader.ReadSingle();
 
-                    int index = Hasher.ConvertStateToHash(i);
+                    uint index = Hasher.ConvertStateToHash(i);
                     StageBasedEvaluations[stage][index] = e;
                 }
             }
@@ -218,11 +143,11 @@ namespace OthelloAI.Patterns
 
         public void Write(BinaryWriter writer)
         {
-            for (int stage = 0; stage < STAGES; stage++)
+            for (int stage = 0; stage < NumStages; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
-                    int index = Hasher.ConvertStateToHash(i);
+                    uint index = Hasher.ConvertStateToHash(i);
                     writer.Write(StageBasedEvaluations[stage][index]);
                 }
             }
@@ -238,7 +163,7 @@ namespace OthelloAI.Patterns
         {
             for (int i = 0; i < NumOfStates; i++)
             {
-                int hash = Hasher.ConvertStateToHash(i);
+                uint hash = Hasher.ConvertStateToHash(i);
 
                 if (Hasher.HashByPEXT(Hasher.FromHash(hash)) != hash)
                 {
@@ -255,19 +180,50 @@ namespace OthelloAI.Patterns
         {
             for (int i = 0; i < NumOfStates; i++)
             {
-                int index = Hasher.ConvertStateToHash(i);
+                uint index = Hasher.ConvertStateToHash(i);
 
                 if (StageBasedEvaluations[stage][index] > threshold)
                     InfoHash(stage, index);
             }
         }
 
-        public void InfoHash(int stage, int hash)
+        public void InfoHash(int stage, uint hash)
         {
             Console.WriteLine(Hasher.FromHash(hash));
             Console.WriteLine($"Stage : {stage}, Hash : {hash}");
             Console.WriteLine($"Eval : {StageBasedEvaluations[stage][hash]}");
             Console.WriteLine();
+        }
+
+        public static void Test(float[][] src, float[][] dst, ulong src_t, ulong dst_t)
+        {
+            ulong and = src_t & dst_t;
+            int n = Board.BitCount(src_t);
+
+            foreach(uint i in Test(and, n))
+            {
+                uint[] indices1 = Test(src_t & ~dst_t, n).ToArray();
+                float[] e = src.Select(a => indices1.Select(j => a[i | j]).Average()).ToArray();
+
+                uint[] indices2 = Test(~src_t & dst_t, n).ToArray();
+
+                for(int stage = 0; stage < dst.Length; stage++)
+                    foreach(uint j in indices2)
+                        dst[stage][i | j] += e[stage] * 0.5F;
+            }
+        }
+
+        public static IEnumerable<uint> Test(ulong mask, int n_src)
+        {
+            int n_mask = Board.BitCount(mask);
+
+            return Enumerable.Range(0, (int)Math.Pow(3, n_mask)).Select(i =>
+            {
+                (uint i1, uint i2) = BinTerUtil.ConvertTerToBinPair(i, n_mask);
+                uint u1 = System.Runtime.Intrinsics.X86.Bmi2.ParallelBitDeposit(i1, (uint)mask);
+                uint u2 = System.Runtime.Intrinsics.X86.Bmi2.ParallelBitDeposit(i2, (uint)mask);
+                return u2 << n_src | u1;
+            });
         }
     }
 }

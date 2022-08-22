@@ -39,13 +39,13 @@ namespace OthelloAI
             return hash;
         }
 
-        public int ConvertStateToHash(int i)
+        public uint ConvertStateToHash(int i)
         {
 #if BIN_HASH
-            (int b1, int b2) = BinTerUtil.ConvertTerToBinPair(i, HashLength);
+            (uint b1, uint b2) = BinTerUtil.ConvertTerToBinPair(i, HashLength);
             return b1 | (b2 << HashLength);
 #else
-            return i;
+            return (uint) i;
 #endif
         }
 
@@ -83,7 +83,7 @@ namespace OthelloAI
             return result;
         }
 
-        public Board FromHash(int hash)
+        public Board FromHash(uint hash)
         {
 #if BIN_HASH
             return FromBinHash(hash);
@@ -92,10 +92,10 @@ namespace OthelloAI
 #endif
         }
 
-        public Board FromBinHash(int hash)
+        public Board FromBinHash(uint hash)
         {
-            int hash_b = hash & ((1 << HashLength) - 1);
-            int hash_w = hash >> HashLength;
+            uint hash_b = hash & ((1u << HashLength) - 1u);
+            uint hash_w = hash >> HashLength;
 
             ulong b = 0;
             ulong w = 0;
@@ -116,15 +116,14 @@ namespace OthelloAI
             return new Board(b, w);
         }
 
-        public Board FromTerHash(int hash)
+        public Board FromTerHash(uint hash)
         {
             ulong b = 0;
             ulong w = 0;
 
             for (int i = 0; i < HashLength; i++)
             {
-                int id = hash % 3;
-                switch (id)
+                switch (hash % 3)
                 {
                     case 1:
                         b |= Board.Mask(Positions[i]);

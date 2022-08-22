@@ -83,37 +83,6 @@ namespace OthelloAI
         }
     }
 
-
-    class RegionTrainer
-    {
-        public RegionForTraining Region { get; }
-
-        public RegionTrainer(RegionForTraining region)
-        {
-            Region = region;
-        }
-
-        public void Update(Board board, int result)
-        {
-            if (board.n_stone < 20 || board.n_stone > 44)
-                return;
-
-            Region.UpdateWinCountWithRotatingAndFliping(board, result > 0 ? 1 : 0, 1);
-        }
-
-        public static void Train(RegionForTraining region, RecordReader reader)
-        {
-            var trainer = new RegionTrainer(region);
-            reader.OnLoadMove += trainer.Update;
-            reader.OnLoadGame += i =>
-            {
-                if (i % 10000 == 0)
-                    Console.WriteLine(i);
-            };
-            reader.Read();
-        }
-    }
-
     public class PatternTrainer
     {
         public Pattern[] Patterns { get; }
@@ -123,6 +92,53 @@ namespace OthelloAI
         {
             Patterns = patterns;
             LearningRate = lr;
+        }
+
+        public float Test(Board board, int result)
+        {
+            var boards = new RotatedAndMirroredBoards(board);
+            return result - Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards));
+        }
+
+        public static float HyperbolicTangent(float f)
+        {
+            double e1 = Math.Pow(Math.E, f);
+            double e2 = 1 / e1;
+
+            return (float)((e1 - e2) / (e1 + e2));
+        }
+
+        public float UpdateTDL(Board current, Board next)
+        {
+            var boards1 = new RotatedAndMirroredBoards(current);
+            var boards2 = new RotatedAndMirroredBoards(next);
+
+            float e1 = HyperbolicTangent(Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards1)));
+            float e2 = HyperbolicTangent(Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards2)));
+
+            float e = (e2 - e1) * (1 - e1 * e1);
+
+            foreach (var p in Patterns)
+                foreach (var b in boards1)
+                    p.UpdataEvaluation(b, e * LearningRate);
+
+            return e;
+        }
+
+        public float UpdateTDL(Board current, int result)
+        {
+            var boards1 = new RotatedAndMirroredBoards(current);
+
+            float e1 = HyperbolicTangent(Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards1)));
+            float e2 = result;
+
+            float e = (e2 - e1) * (1 - e1 * e1);
+
+            foreach (var p in Patterns)
+                foreach (var b in boards1)
+                    p.UpdataEvaluation(b, e * LearningRate);
+
+            return e;
         }
 
         public float Update(Board board, int result)
@@ -150,6 +166,112 @@ namespace OthelloAI
                     Console.WriteLine(i);
             };
             reader.Read();
+        }
+
+        public static void Train(Pattern[] patterns, float lr, PlayerAI player)
+        {
+            var rand = new Random();
+
+            static bool Step(ref Board board, List<Board> boards, Player player, int stone)
+            {
+                (int x, int y, ulong move) = player.DecideMove(board, stone);
+                if (move != 0)
+                {
+                    board = board.Reversed(move, stone);
+                    boards.Add(board);
+                    return true;
+                }
+                return false;
+            }
+
+            var trainer = new PatternTrainer(patterns, lr);
+            var log = new List<float>();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                Board board = Tester.CreateRnadomGame(rand, 8);
+
+                var errors = new List<float>();
+
+                List<Board> boards = new List<Board>();
+
+                while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
+                {
+                }
+
+                int result = board.GetStoneCountGap();
+                result = result == 0 ? 0 : result > 0 ? 1 : -1;
+
+                foreach(var b in boards)
+                    errors.Add(trainer.UpdateTDL(b, result));
+
+                float error = errors.Select(e => e * e).Average();
+                log.Add(error);
+
+                Console.WriteLine(log.TakeLast(100).Average() * 100);
+
+                if (i % 500 == 0)
+                {
+                    foreach (var p in patterns)
+                        p.Save();
+                }
+            }
+        }
+
+        public static void TrainTDL(Pattern[] patterns, float lr, PlayerAI player)
+        {
+            var rand = new Random();
+
+            static bool Step(ref Board board, Player player, int stone)
+            {
+                (_, _, ulong move) = player.DecideMove(board, stone);
+                if (move != 0)
+                {
+                    board = board.Reversed(move, stone);
+                    return true;
+                }
+                return false;
+            }
+
+            var trainer = new PatternTrainer(patterns, lr);
+            var log = new List<float>();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                Board board = Tester.CreateRnadomGame(rand, 8);
+                Board prev = board;
+                int s = 1;
+
+                var errors = new List<float>();
+
+                while (true)
+                {
+                    if (!Step(ref board, player, s) && !Step(ref board, player, s = -s))
+                        break;
+
+                    if (prev.n_stone < 56)
+                    {
+                        errors.Add(trainer.UpdateTDL(prev, board));
+                        prev = board;
+                    }
+                    s = -s;
+                }
+
+                int result = board.GetStoneCountGap();
+                result = result == 0 ? 0 : result > 0 ? 1 : -1;
+                errors.Add(trainer.UpdateTDL(prev, result));
+
+                float error = errors.Select(e => e * e).Average();
+                log.Add(error);
+
+                Console.WriteLine(log.TakeLast(100).Average() * 100);
+
+                if (i % 500 == 0)
+                {
+                    foreach (var p in patterns)
+                        p.Save();
+                }
+            }
         }
     }
 }
