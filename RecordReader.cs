@@ -16,6 +16,14 @@ namespace OthelloAI
         public abstract event OnLoadGameEventhandler OnLoadGame;
 
         public abstract void Read();
+
+        public static TrainingData CreateTrainingData(RecordReader reader)
+        {
+            var data = new TrainingData();
+            reader.OnLoadMove += data.Add;
+            reader.Read();
+            return data;
+        }
     }
 
     class MyRecordReader : RecordReader

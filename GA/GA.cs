@@ -119,6 +119,8 @@ namespace OthelloAI.GA
         public ICrossover Crossover { get; set; }
         public IMutator Mutator { get; set; }
 
+        public IPopulationEvaluator Evaluator {get; set;}
+
         public static Random Random => ThreadLocalRandom.Value;
 
         public static void Run()
@@ -198,9 +200,9 @@ namespace OthelloAI.GA
 
             PlayerAI player = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParametersSimple(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParametersSimple(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParametersSimple(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
             };
 
@@ -254,6 +256,22 @@ namespace OthelloAI.GA
         }
     }
 
+    public interface IPopulationEvaluator
+    {
+        public List<(Individual, float)> Evaluate(List<Individual> pop);
+    }
+
+    public class PopulationEvaluatorSelfPlay : IPopulationEvaluator
+    {
+        public int 
+
+        public List<(Individual, float)> Evaluate(List<Individual> pop)
+        {
+
+        }
+    }
+
+
     public class Individual
     {
         public float[] Scores { get; } = new float[1];
@@ -261,6 +279,8 @@ namespace OthelloAI.GA
 
         public Pattern[] Patterns { get; }
         public PatternTrainer Trainer { get; }
+
+        public List<float> Log { get; } = new List<float>();
 
         public Individual(ulong[] genome, Pattern[] patterns)
         {

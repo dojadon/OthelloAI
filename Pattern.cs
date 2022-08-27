@@ -17,16 +17,18 @@ namespace OthelloAI.Patterns
     {
         public int NumStages { get; }
 
-        protected string FilePath { get; }
+        public string FilePath { get; }
 
-        protected PatternType Type { get; }
+        public PatternType Type { get; }
         public BoardHasher Hasher { get; }
 
         public int ArrayLength { get; }
         public int NumOfStates { get; }
 
-        public float[][] StageBasedEvaluations { get; }
-        protected byte[][] StageBasedEvaluationsB { get; }
+        public float[][] StageBasedEvaluations { get; private set; }
+        protected byte[][] StageBasedEvaluationsB { get; private set; }
+
+        public float Variance { get; set; }
 
         public Pattern(string filePath, int n_stages, BoardHasher hasher, PatternType type)
         {
@@ -43,6 +45,11 @@ namespace OthelloAI.Patterns
             ArrayLength = NumOfStates;
 #endif
 
+            Reset();
+        }
+
+        public void Reset()
+        {
             StageBasedEvaluations = new float[NumStages][];
             StageBasedEvaluationsB = new byte[NumStages][];
 
@@ -58,7 +65,7 @@ namespace OthelloAI.Patterns
             return (board.n_stone - 5) / (60 / NumStages);
         }
 
-        public void UpdataEvaluation(Board board, float add)
+        public void UpdataEvaluation(Board board, float add, float range)
         {
             int stage = GetStage(board);
 
@@ -68,23 +75,25 @@ namespace OthelloAI.Patterns
             StageBasedEvaluations[stage][hash] += add;
             StageBasedEvaluations[stage][flipped] -= add;
 
-            StageBasedEvaluationsB[stage][hash] += ConvertToInt8(add);
-            StageBasedEvaluationsB[stage][flipped] -= ConvertToInt8(add);
+            StageBasedEvaluationsB[stage][hash] = ConvertToInt8(StageBasedEvaluationsB[stage][hash] + add, range);
+            StageBasedEvaluationsB[stage][flipped] = ConvertToInt8(StageBasedEvaluationsB[stage][flipped] - add, range);
         }
 
-        byte ConvertToInt8(float e)
+        byte ConvertToInt8(float x, float v)
         {
-            return (byte)Math.Clamp(e * 32 + 128, 0, 255);
+            return (byte)Math.Clamp(x / v * 127 + 128, 0, 255);
         }
 
         public void ApplyTrainedEvaluation()
         {
+            float range = StageBasedEvaluations.SelectMany(a => a.Select(Math.Abs).Where(f => f < 10).OrderByDescending(f => f).Take(10)).Average();
+
             for (int stage = 0; stage < NumStages; stage++)
             {
                 for (int i = 0; i < NumOfStates; i++)
                 {
                     uint index = Hasher.ConvertStateToHash(i);
-                    StageBasedEvaluationsB[stage][index] = ConvertToInt8(StageBasedEvaluations[stage][index]);
+                    StageBasedEvaluationsB[stage][index] = ConvertToInt8(StageBasedEvaluations[stage][index], range);
                 }
             }
         }

@@ -22,7 +22,7 @@ namespace OthelloAI
             Add(new TrainingDataElement(b, result));
         }
 
-        public void Add(IEnumerable<Board> boards, int result)
+        public void Add(IEnumerable<Board> boards, float result)
         {
             AddRange(boards.Select(b => new TrainingDataElement(b, result)));
         }
@@ -31,9 +31,9 @@ namespace OthelloAI
     public struct TrainingDataElement
     {
         public readonly Board board;
-        public readonly int result;
+        public readonly float result;
 
-        public TrainingDataElement(Board board, int result)
+        public TrainingDataElement(Board board, float result)
         {
             this.board = board;
             this.result = result;
@@ -43,6 +43,11 @@ namespace OthelloAI
     public class TrainerUtil
     {
         public static TrainingData PlayForTrainingParallel(int n_game, Player player)
+        {
+            return PlayForTrainingParallel(n_game, player, false);
+        }
+
+        public static TrainingData PlayForTrainingParallel(int n_game, Player player, bool bi_result)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -54,6 +59,15 @@ namespace OthelloAI
                     return true;
                 }
                 return false;
+            }
+
+            int GetResult(Board b)
+            {
+                int r = b.GetStoneCountGap();
+                if (!bi_result)
+                    return r;
+
+                return Math.Max(-1, Math.Min(1, r));
             }
 
             int count = 0;
@@ -71,7 +85,7 @@ namespace OthelloAI
                     while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
                     {
                     }
-                    results.Add(boards, board.GetStoneCountGap());
+                    results.Add(boards, GetResult(board));
 
                     Interlocked.Increment(ref count);
                 }
@@ -80,6 +94,46 @@ namespace OthelloAI
             });
 
             return new TrainingData(data.ToList());
+        }
+
+        public static TrainingData PlayForTraining(int n_game, Player player, bool bi_result)
+        {
+            static bool Step(ref Board board, List<Board> boards, Player player, int stone)
+            {
+                (_, _, ulong move) = player.DecideMove(board, stone);
+                if (move != 0)
+                {
+                    board = board.Reversed(move, stone);
+                    boards.Add(board);
+                    return true;
+                }
+                return false;
+            }
+
+            int GetResult(Board b)
+            {
+                int r = b.GetStoneCountGap();
+                if (!bi_result)
+                    return r;
+
+                return Math.Max(-1, Math.Min(1, r));
+            }
+
+            var rand = new Random();
+            var results = new TrainingData();
+
+            for(int i = 0; i < n_game; i++)
+            {
+                Board board = Tester.CreateRnadomGame(rand, 8);
+                List<Board> boards = new List<Board>();
+
+                while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
+                {
+                }
+                results.Add(boards, GetResult(board));
+            }
+
+            return results;
         }
     }
 
@@ -94,7 +148,7 @@ namespace OthelloAI
             LearningRate = lr;
         }
 
-        public float Test(Board board, int result)
+        public float Test(Board board, float result)
         {
             var boards = new RotatedAndMirroredBoards(board);
             return result - Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards));
@@ -120,12 +174,12 @@ namespace OthelloAI
 
             foreach (var p in Patterns)
                 foreach (var b in boards1)
-                    p.UpdataEvaluation(b, e * LearningRate);
+                    p.UpdataEvaluation(b, e * LearningRate, 0.5F);
 
             return e;
         }
 
-        public float UpdateTDL(Board current, int result)
+        public float UpdateTDL(Board current, float result)
         {
             var boards1 = new RotatedAndMirroredBoards(current);
 
@@ -136,12 +190,17 @@ namespace OthelloAI
 
             foreach (var p in Patterns)
                 foreach (var b in boards1)
-                    p.UpdataEvaluation(b, e * LearningRate);
+                    p.UpdataEvaluation(b, e * LearningRate, 0.5F);
 
             return e;
         }
 
-        public float Update(Board board, int result)
+        public float UpdateTDL(TrainingDataElement d)
+        {
+            return UpdateTDL(d.board, d.result);
+        }
+
+        public float Update(Board board, float result)
         {
             var boards = new RotatedAndMirroredBoards(board);
 
@@ -150,7 +209,7 @@ namespace OthelloAI
             foreach (var p in Patterns)
                 foreach (var b in boards)
                 {
-                    p.UpdataEvaluation(b, e * LearningRate);
+                    p.UpdataEvaluation(b, e * LearningRate, 6);
                 }
 
             return e;
@@ -170,43 +229,15 @@ namespace OthelloAI
 
         public static void Train(Pattern[] patterns, float lr, PlayerAI player)
         {
-            var rand = new Random();
-
-            static bool Step(ref Board board, List<Board> boards, Player player, int stone)
-            {
-                (int x, int y, ulong move) = player.DecideMove(board, stone);
-                if (move != 0)
-                {
-                    board = board.Reversed(move, stone);
-                    boards.Add(board);
-                    return true;
-                }
-                return false;
-            }
-
             var trainer = new PatternTrainer(patterns, lr);
             var log = new List<float>();
 
             for (int i = 0; i < 10000; i++)
             {
-                Board board = Tester.CreateRnadomGame(rand, 8);
+                var data = TrainerUtil.PlayForTrainingParallel(16, player, true);
+                var errors = data.Select(trainer.UpdateTDL);
 
-                var errors = new List<float>();
-
-                List<Board> boards = new List<Board>();
-
-                while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
-                {
-                }
-
-                int result = board.GetStoneCountGap();
-                result = result == 0 ? 0 : result > 0 ? 1 : -1;
-
-                foreach(var b in boards)
-                    errors.Add(trainer.UpdateTDL(b, result));
-
-                float error = errors.Select(e => e * e).Average();
-                log.Add(error);
+                log.Add(errors.Select(e => e * e).Average());
 
                 Console.WriteLine(log.TakeLast(100).Average() * 100);
 
