@@ -102,12 +102,12 @@ namespace OthelloAI
             int n_games = 1000;
             int n_mov = 500;
 
-            var file = $"test/co_learning_7ply_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var file = $"test/co_learning_1ply_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(file);
 
             var rankingLog = new List<List<int>>();
 
-            for (int i = 0; i < 25; i++)
+            for (int i = 0; i < 50; i++)
             {
                 foreach (var ind in pop)
                 {
@@ -117,23 +117,28 @@ namespace OthelloAI
                         p.Reset();
                 }
 
-                var trainer = new PopulationEvaluatorCoLearning(7, 50, n_games);
-                trainer.Train(pop);
+                var trainer = new PopulationTrainerCoLearning(1, 54, n_games, true);
+                var scores = trainer.Train(pop);
 
                 //var popEvaluator = new PopulationEvaluatorTournament(3, 54);
                 //popEvaluator.Evaluate(pop);
 
-                var ranking = pop.Select(ind => ind.Score).Ranking().ToList();
+                var ranking = scores.Ranking().ToList();
                 rankingLog.Add(ranking);
 
-                sw.WriteLine(string.Join(", ", pop.Select(ind => ind.Score)) + ",," + string.Join(", ", ranking));
+                sw.WriteLine(string.Join(", ", scores) + ",," + string.Join(", ", ranking));
 
                 Console.WriteLine(i);
             }
 
+            var avg = Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).Average());
+            var var = Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).AverageAndVariance().var);
+
             sw.WriteLine();
-            sw.WriteLine(string.Join(", ", Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).Average())));
-            sw.WriteLine(string.Join(", ", Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).AverageAndVariance().var)));
+            sw.WriteLine(string.Join(", ", avg));
+            sw.WriteLine(string.Join(", ", var));
+            sw.WriteLine();
+            sw.WriteLine(var.Average());
 
             // var popEvaluator = new PopulationEvaluatorTournament(new PopulationEvaluatorSelfPlay(1, 54, n_games, true), 1, 54);
             // var popEvaluator = new PopulationEvaluatorCoLearning(7, 52, n_games);

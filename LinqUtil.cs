@@ -28,6 +28,18 @@ namespace OthelloAI
             return source.Select((obj, i) => (obj, i)).OrderBy(t => t.obj).Select((t, i) => (t, i)).OrderBy(t => t.t.i).Select(t => t.i);
         }
 
+        public static double Variance(this IEnumerable<int> source)
+        {
+            double a = source.Average();
+            return source.Select(i => (i - a) * (i - a)).Average();
+        }
+
+        public static float Variance(this IEnumerable<float> source)
+        {
+            float a = source.Average();
+            return source.Select(i => (i - a) * (i - a)).Average();
+        }
+
         public static (double avg, double var) AverageAndVariance(this IEnumerable<int> source)
         {
             double a = source.Average();
@@ -40,6 +52,20 @@ namespace OthelloAI
             float a = source.Average();
             float v = source.Select(i => (i - a) * (i - a)).Average();
             return (a, v);
+        }
+
+        public static IEnumerable<TResult> ZipThree<T1, T2, T3, TResult>(
+        this IEnumerable<T1> source,
+        IEnumerable<T2> second,
+        IEnumerable<T3> third,
+        Func<T1, T2, T3, TResult> func)
+        {
+            using var e1 = source.GetEnumerator();
+            using var e2 = second.GetEnumerator();
+            using var e3 = third.GetEnumerator();
+
+            while (e1.MoveNext() && e2.MoveNext() && e3.MoveNext())
+                yield return func(e1.Current, e2.Current, e3.Current);
         }
     }
 

@@ -27,8 +27,8 @@ namespace OthelloAI
 
         static void Main()
         {
-            Tester.Test1();
-            return;
+            // Tester.Test1();
+            // return;
 
             GA.GA.Run();
             return;

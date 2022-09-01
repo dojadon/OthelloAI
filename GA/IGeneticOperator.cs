@@ -1,53 +1,82 @@
-﻿using System;
+﻿using OthelloAI.Patterns;
+using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Linq;
-using OthelloAI.Patterns;
 
 namespace OthelloAI.GA
 {
-    interface IGeneticOperator
+    public class GeneticOperators : IGeneticOperator
     {
-        public Individual Operate(List<Individual> pop, Random rand);
+        List<(IGeneticOperator, float prob)> Operators { get; }
+
+        public GeneticOperators(params (IGeneticOperator, float)[] operators)
+        {
+            Operators = operators.ToList();
+        }
+
+        public Individual Operate(Func<Individual> selector, Random rand)
+        {
+            double d = rand.NextDouble();
+
+            float sum = 0;
+            foreach ((var opt, float p) in Operators)
+            {
+                sum += p;
+
+                if (d < sum)
+                    return opt.Operate(selector, rand);
+            }
+
+            return selector();
+        }
     }
 
-    public interface IMutator
+    public interface IGeneticOperator
     {
-        public Individual Mutate(Individual individual, Random rand);
+        public Individual Operate(Func<Individual> selector, Random rand);
     }
 
     public class Mutator : IGeneticOperator
     {
         public ulong Mutate(ulong n, Random rand)
         {
-            int p = rand.Next(19);
-            int q = rand.Next(19);
+            ulong p = 1UL << rand.Next(19);
+            ulong q = 1UL << rand.Next(19);
 
-            if (((n & (1UL << p)) >> p) != ((n & (1UL << q)) >> q))
-            {
-                n ^= (1UL << p);
-                n ^= (1UL << q);
-            }
-            return n;
+            return n ^ p ^ q;
         }
 
         public Individual Mutate(Individual ind, Random rand)
         {
-            return new Individual(ind.Genome.Select(g => Mutate(g, rand)).ToArray());
+            float prob = 1F / ind.Genome.Length;
+
+            return new Individual(ind.Genome.Select(g =>
+            {
+                if (rand.NextDouble() < prob)
+                    return Mutate(g, rand);
+                else
+                    return g;
+
+            }).ToArray());
         }
 
-        public Individual Operate(List<Individual> pop, Random rand)
+        public Individual Operate(Func<Individual> selector, Random rand)
         {
-            return Mutate(rand.Choice(pop), rand);
+            return Mutate(selector(), rand);
         }
     }
 
-    public interface ICrossover
+    public abstract class Crossover : IGeneticOperator
     {
-        public Individual Cx(Individual ind1, Individual ind2, Random rand);
+        public abstract Individual Cx(Individual ind1, Individual ind2, Random rand);
+
+        public Individual Operate(Func<Individual> selector, Random rand)
+        {
+            return Cx(selector(), selector(), rand);
+        }
     }
 
-    public class Crossover : ICrossover
+    public class TopologyCrossover : Crossover
     {
         ulong CrossoverGenome(ulong g1, ulong g2, Random rand)
         {
@@ -64,11 +93,11 @@ namespace OthelloAI.GA
             return result | System.Runtime.Intrinsics.X86.Bmi2.X64.ParallelBitDeposit(b, xor);
         }
 
-        public Individual Cx(Individual ind1, Individual ind2, Random rand)
+        public override Individual Cx(Individual ind1, Individual ind2, Random rand)
         {
             int n_gene = ind1.Genome.Length;
 
-            var pairs = Enumerable.Range(1, n_gene).SelectMany(i => Enumerable.Range(0, i).Select(j => (i, j))).OrderBy(t => Board.BitCount(ind1.Genome[t.i] ^ ind2.Genome[t.j]));
+            var pairs = Enumerable.Range(0, n_gene - 1).SelectMany(i => Enumerable.Range(i + 1, n_gene - i - 1).Select(j => (i, j))).OrderBy(t => Board.BitCount(ind1.Genome[t.i] ^ ind2.Genome[t.j]));
             var added = new List<int>();
             var next_gene = new List<ulong>();
             var patterns = new List<Pattern>();

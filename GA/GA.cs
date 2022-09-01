@@ -5,44 +5,55 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace OthelloAI.GA
 {
-    public interface ISelecter
+    public class Score
     {
-        public List<Individual> Select(List<Individual> individuals, int n, Random rand);
-    }
+        public Individual ind;
+        public float score;
 
-    public class SelectorTournament : ISelecter
-    {
-        public int TournamentSize { get; set; }
-
-        public SelectorTournament(int tournamentSize)
+        public Score(Individual ind, float score)
         {
-            TournamentSize = tournamentSize;
-        }
-
-        public List<Individual> Select(List<Individual> individuals, int n, Random rand)
-        {
-            return Enumerable.Range(0, n).Select(_ => Enumerable.Range(0, TournamentSize).Select(_ => rand.Choice(individuals)).MinBy(ind => ind.Score).First()).ToList();
+            this.ind = ind;
+            this.score = score;
         }
     }
 
-    public class GA
+    public class Score2D : Score
+    {
+        public float score2;
+
+        public Score2D(Individual ind, float score1, float  score2) : base(ind, score1)
+        {
+            this.score2 = score2;
+        }
+    }
+
+    public class ScoreNSGA2 : Score2D
+    {
+        public float congestion;
+        public int rank;
+
+        public ScoreNSGA2(Individual ind, float score1, float score2, int rank, float congestion) : base(ind, score1, score2)
+        {
+            this.congestion = congestion;
+            this.rank = rank;
+        }
+    }
+
+    public class GA<T> where T : Score
     {
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
 
-        public List<Individual> Population { get; set; } = new List<Individual>();
-        public TrainingData CurrentTrainData { get; set; } = new TrainingData();
+        public List<T> Population { get; set; }
 
-        public int Gen { get; set; }
+        public int Gen { get; protected set; }
 
-        public ISelecter Selecter { get; set; }
-        public ICrossover Crossover { get; set; }
-        public IMutator Mutator { get; set; }
-
-        public IPopulationEvaluator Evaluator { get; set; }
+        public ISelector<T> Selecter { get; set; }
+        public INaturalSelector<T> NaturalSelecter { get; set; }
+        public IGeneticOperator GeneticOperator { get; set; }
+        public IPopulationEvaluator<T> Evaluator { get; set; }
 
         public static Random Random => ThreadLocalRandom.Value;
 
@@ -51,71 +62,64 @@ namespace OthelloAI.GA
             StringBuilder builder = new StringBuilder();
 
             string file = "ga/inds.dat";
+            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            var ga = new GA()
+            var ga = new GA<ScoreNSGA2>()
             {
-                Selecter = new SelectorTournament(10),
-                Crossover = new Crossover(),
-                Mutator = new Mutator(),
-                Evaluator = new PopulationEvaluatorTrainingScore(new PopulationTrainerCoLearning(3, 52, 2000, true)),
+                Selecter = new SelectorTournament<ScoreNSGA2>(5, s => s.congestion),
+                NaturalSelecter = new NaturalSelectorNSGA2(),
+                GeneticOperator = new GeneticOperators((new Mutator(), 0.02F), (new TopologyCrossover(), 0.7F)),
+                // Evaluator = new PopulationEvaluatorTrainingScore(new PopulationTrainerCoLearning(1, 54, 1600, true)),
+                Evaluator = new PopulationEvaluatorNSGA2(),
             };
 
-            ga.Init(50);
+            ga.Init(50, 3, 8);
             // ga.Load(file);
 
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 10000; i++)
             {
-                ga.Step(100, 0.7F, 0.0025F);
+                ga.Step(100);
                 ga.Save(file);
 
                 Console.WriteLine($"Gen: {i}");
 
-                var ind = ga.Population.MinBy(ind => ind.Score).First();
+                var score = ga.Population.MinBy(ind => ind.score).First();
+                (float avg, float var) = ga.Population.Select(ind => ind.score).AverageAndVariance();
 
-                using (StreamWriter sw = File.AppendText("ga/log.txt"))
+                using (StreamWriter sw = File.AppendText(log))
                 {
-                    sw.WriteLine(ind.Score);
+                    // sw.WriteLine($"{ind.Score}, {avg}, {var}");
+                    sw.WriteLine(string.Join(", ", ga.Population.Select(ind => ind.score).OrderBy(s => s)));
                 }
-                Console.WriteLine(ind.Score);
+                Console.WriteLine(score.score);
+                Console.WriteLine($"{avg}, {var}");
 
-                foreach (var b in ind.Genome)
+                foreach (var b in score.ind.Genome)
                     Console.WriteLine(new Board(b, 0UL));
             }
         }
 
-        public void Init(int n_pop)
+        public void Init(int n_pop, int n_tuple, int size_tuple)
         {
-            Population = Enumerable.Range(0, n_pop).Select(_ => new Individual(Enumerable.Range(0, 3).Select(_ => Random.GenerateRegion(19, 4)).ToArray())).ToList();
+            var pop = Enumerable.Range(0, n_pop).Select(_ => new Individual(Enumerable.Range(0, n_tuple).Select(_ => Random.GenerateRegion(19, size_tuple)).ToArray())).ToList();
         }
 
-        public void Step(int n, float pb_cx, float pb_mut)
+        public void Step(int n)
         {
-            var offspring = Variation(Population, n, pb_cx, pb_mut);
-            Evaluator.Evaluate(offspring);
-            Population = Selecter.Select(offspring, Population.Count, Random);
+            var offspring = Variation(Population, n);
+            var scores = Evaluator.Evaluate(offspring);
+            Population = NaturalSelecter.Select(scores, Population.Count, Random);
             Gen++;
         }
 
-        public List<Individual> Variation(List<Individual> list, int n, float cxpb, float mutpb)
+        public virtual List<Individual> Variation(List<T> list, int n)
         {
-            return Enumerable.Range(0, n).AsParallel().Select(_ =>
+            Individual VariationInd()
             {
-                var rand = Random;
-                double d = rand.NextDouble();
+                return GeneticOperator.Operate(() => Selecter.Select(list, Random).ind, Random);
+            }
 
-                if (d > mutpb)
-                {
-                    return Mutator.Mutate(rand.Choice(list), rand);
-                }
-                else if (d > cxpb + mutpb)
-                {
-                    return Crossover.Cx(rand.Choice(list), rand.Choice(list), rand);
-                }
-                else
-                {
-                    return rand.Choice(list);
-                }
-            }).ToList();
+            return Enumerable.Range(0, n).AsParallel().Select(_ => VariationInd()).ToList();
         }
 
         public void Load(string file)
@@ -130,7 +134,7 @@ namespace OthelloAI.GA
             {
                 int n_pattern = reader.ReadInt32();
                 var ind = new Individual(Enumerable.Range(0, n_pattern).Select(_ => reader.ReadUInt64()).ToArray());
-                Population.Add(ind);
+                // Population.Add(ind);
             }
         }
 
@@ -142,8 +146,8 @@ namespace OthelloAI.GA
 
             foreach (var ind in Population)
             {
-                writer.Write(ind.Genome.Length);
-                Array.ForEach(ind.Genome, writer.Write);
+                // writer.Write(ind.Genome.Length);
+                // Array.ForEach(ind.Genome, writer.Write);
             }
         }
     }
@@ -151,7 +155,10 @@ namespace OthelloAI.GA
 
     public class Individual
     {
+        public int Congestion { get; set; }
+        public int Nobelity { get; set; }
         public float Score { get; set; }
+
         public ulong[] Genome { get; }
 
         public Pattern[] Patterns { get; }
