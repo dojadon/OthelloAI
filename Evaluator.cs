@@ -10,6 +10,10 @@ namespace OthelloAI
     public abstract class Evaluator
     {
         public abstract int Eval(Board board);
+
+        public virtual void StartSearch(int stone)
+        {
+        }
     }
 
     public class EvaluatorPatternBased : Evaluator
@@ -61,6 +65,8 @@ namespace OthelloAI
         Random Rand { get; } = new Random(DateTime.Now.Millisecond);
         Evaluator[] Evaluators { get; }
 
+        Evaluator Current { get; set; }
+
         public EvaluatorRandomChoice(Evaluator[] evaluators)
         {
             Evaluators = evaluators;
@@ -73,7 +79,12 @@ namespace OthelloAI
 
         public override int Eval(Board board)
         {
-            return Choice().Eval(board);
+            return Current.Eval(board);
+        }
+
+        public override void StartSearch(int stone)
+        {
+            Current = Choice();
         }
     }
 

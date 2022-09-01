@@ -30,18 +30,6 @@ namespace OthelloAI
             Tester.Test1();
             return;
 
-            var evaluator = new EvaluatorPatternBased(PATTERNS);
-            PlayerAI player = new PlayerAI(evaluator)
-            {
-                ParamBeg = new SearchParametersSimple(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 9, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
-                PrintInfo = false,
-            };
-
-            PatternTrainer.Train(PATTERNS, 0.01F, player);
-            return;
-
             GA.GA.Run();
             return;
 
@@ -101,9 +89,9 @@ namespace OthelloAI
             {
                 return new PlayerAI(e)
                 {
-                    ParamBeg = new SearchParametersSimple(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
-                    ParamMid = new SearchParametersSimple(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
-                    ParamEnd = new SearchParametersSimple(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                    ParamBeg = new SearchParameters(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
+                    ParamMid = new SearchParameters(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
+                    ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                     PrintInfo = false,
                 };
             }
@@ -171,9 +159,9 @@ namespace OthelloAI
 
             PlayerAI player = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParametersSimple(depth: 1, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 1, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 1, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 1, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
             };
 
@@ -245,9 +233,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParametersSimple(depth: 6, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 6, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 6, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 6, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
             };
 
@@ -305,9 +293,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParametersSimple(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 9, stage: 10, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 9, stage: 10, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 
             Client client = new Client(p);
@@ -344,9 +332,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParametersSimple(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 9, stage: 16, new CutoffParameters(true, true, true)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 9, stage: 16, new CutoffParameters(true, true, true)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
             string export = "No, Empty, Time, Nodes\r\n";
@@ -383,9 +371,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParametersSimple(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 
             for (int i = 0; i < 1; i++)
@@ -416,9 +404,9 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             Player p1 = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParametersSimple(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
             };
 
             Player p2 = new PlayerManual();

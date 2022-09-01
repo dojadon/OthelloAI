@@ -213,47 +213,17 @@ namespace OthelloAI
         }
     }
 
-    public interface ISearchParameters
-    {
-        public int GetDepth(int n_stone);
-        public CutoffParameters GetCutoffParameters(int n_stone);
-    }
-
-    public class SearchParametersSimple : ISearchParameters
+    public class SearchParameters
     {
         public readonly int depth;
         public readonly int stage;
         public readonly CutoffParameters cutoff_param;
 
-        public SearchParametersSimple(int depth, int stage, CutoffParameters cutoff_param)
+        public SearchParameters(int depth, int stage, CutoffParameters cutoff_param)
         {
             this.depth = depth;
             this.stage = stage;
             this.cutoff_param = cutoff_param;
-        }
-
-        public int GetDepth(int n_stone) => depth;
-
-        public CutoffParameters GetCutoffParameters(int n_stone) => cutoff_param;
-    }
-
-    public class SearchParametersByStage : ISearchParameters
-    {
-        (int depth, ISearchParameters p)[] Params { get; }
-
-        public SearchParametersByStage(params (int depth, ISearchParameters p)[] ps)
-        {
-            Params = ps;
-        }
-
-        public int GetDepth(int n_stone)
-        {
-            throw new NotImplementedException();
-        }
-
-        public CutoffParameters GetCutoffParameters(int n_stone)
-        {
-            throw new NotImplementedException();
         }
     }
 
@@ -261,9 +231,9 @@ namespace OthelloAI
     {
         public const int INF = 1000000;
 
-        public SearchParametersSimple ParamBeg { get; set; }
-        public SearchParametersSimple ParamMid { get; set; }
-        public SearchParametersSimple ParamEnd { get; set; }
+        public SearchParameters ParamBeg { get; set; }
+        public SearchParameters ParamMid { get; set; }
+        public SearchParameters ParamEnd { get; set; }
 
         public Evaluator Evaluator { get; set; }
 
@@ -307,6 +277,8 @@ namespace OthelloAI
 
             if (stone == -1)
                 board = board.ColorFliped();
+
+            Evaluator.StartSearch(stone);
 
             ulong result;
             if (board.n_stone < ParamMid.stage)

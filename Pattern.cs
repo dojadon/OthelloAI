@@ -75,13 +75,13 @@ namespace OthelloAI.Patterns
             StageBasedEvaluations[stage][hash] += add;
             StageBasedEvaluations[stage][flipped] -= add;
 
-            StageBasedEvaluationsB[stage][hash] = ConvertToInt8(StageBasedEvaluationsB[stage][hash] + add, range);
-            StageBasedEvaluationsB[stage][flipped] = ConvertToInt8(StageBasedEvaluationsB[stage][flipped] - add, range);
+            StageBasedEvaluationsB[stage][hash] = ConvertToInt8(StageBasedEvaluations[stage][hash] + add, range);
+            StageBasedEvaluationsB[stage][flipped] = ConvertToInt8(StageBasedEvaluations[stage][flipped] - add, range);
         }
 
-        byte ConvertToInt8(float x, float v)
+        byte ConvertToInt8(float x, float range)
         {
-            return (byte)Math.Clamp(x / v * 127 + 128, 0, 255);
+            return (byte)Math.Clamp(x / range * 127 + 128, 0, 255);
         }
 
         public void ApplyTrainedEvaluation()
@@ -191,8 +191,9 @@ namespace OthelloAI.Patterns
             {
                 uint index = Hasher.ConvertStateToHash(i);
 
-                if (StageBasedEvaluations[stage][index] > threshold)
-                    InfoHash(stage, index);
+                if (StageBasedEvaluations[stage][index] != 0)
+                    Console.WriteLine(StageBasedEvaluationsB[stage][index]);
+                    //InfoHash(stage, index);
             }
         }
 

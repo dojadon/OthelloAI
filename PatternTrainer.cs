@@ -96,7 +96,7 @@ namespace OthelloAI
             return new TrainingData(data.ToList());
         }
 
-        public static TrainingData PlayForTraining(int n_game, Player player, bool bi_result)
+        public static TrainingData PlayForTraining(int n_game, Player player, Random rand, bool bi_result)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -119,7 +119,6 @@ namespace OthelloAI
                 return Math.Max(-1, Math.Min(1, r));
             }
 
-            var rand = new Random();
             var results = new TrainingData();
 
             for(int i = 0; i < n_game; i++)

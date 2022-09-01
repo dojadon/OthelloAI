@@ -37,9 +37,9 @@ namespace OthelloAI
         {
             PlayerAI player = new PlayerAI(new EvaluatorPatternBased_Release())
             {
-                ParamBeg = new SearchParametersSimple(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 42, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 42, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
             };
 

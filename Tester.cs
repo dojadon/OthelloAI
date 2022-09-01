@@ -1,11 +1,8 @@
-﻿using System;
+﻿using OthelloAI.GA;
+using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Linq;
-using OthelloAI.Patterns;
-using OthelloAI.GA;
-using System.Threading.Tasks;
 using System.IO;
+using System.Linq;
 
 namespace OthelloAI
 {
@@ -22,9 +19,30 @@ namespace OthelloAI
 
             Board board = Board.Init;
 
-            for(int i = 0; i < num_moves; i++)
+            for (int i = 0; i < num_moves; i++)
             {
                 board = Step(board);
+            }
+
+            return board;
+        }
+
+        public static Board PlayGame(Board init, Player p1, Player p2)
+        {
+            static bool Step(ref Board board, Player player, int stone)
+            {
+                (_, _, ulong move) = player.DecideMove(board, stone);
+                if (move != 0)
+                {
+                    board = board.Reversed(move, stone);
+                    return true;
+                }
+                return false;
+            }
+
+            Board board = init;
+            while (Step(ref board, p1, 1) | Step(ref board, p2, -1))
+            {
             }
 
             return board;
@@ -64,7 +82,7 @@ namespace OthelloAI
         {
             var rand = new Random();
 
-            // var pop = Enumerable.Range(0, 10).Select(_ => new Individual(Enumerable.Range(0, 4).Select(_ => rand.GenerateRegion(19, 6)).ToArray())).ToList();
+            // var pop = Enumerable.Range(0, 50).Select(_ => new Individual(Enumerable.Range(0, 4).Select(_ => rand.GenerateRegion(19, 6)).ToArray())).ToList();
             // Save(pop, "test/pop.dat");
 
             var pop = Load("test/pop.dat");
@@ -75,45 +93,60 @@ namespace OthelloAI
             //    new Individual(new ulong[] { 0b11111111UL, 0b11000000_11100000_11100000UL, 0b10000000_11100000_11110000UL, 0x8040201008040201UL })
             //};
 
-            var evaluator = new EvaluatorRandomChoice(pop.Select(i => i.CreateEvaluator()).ToArray());
+            foreach (var ind in pop)
+                foreach (var p in ind.Patterns)
+                {
+                    // p.Load();
+                }
 
-            PlayerAI player = new PlayerAI(evaluator)
-            {
-                ParamBeg = new SearchParametersSimple(depth: 3, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParametersSimple(depth: 3, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParametersSimple(depth: 64, stage: 52, new CutoffParameters(true, true, false)),
-                PrintInfo = false,
-            };
+            int n_games = 1000;
+            int n_mov = 500;
 
-            var file = $"test/{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-
+            var file = $"test/co_learning_7ply_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(file);
 
-            void Print(string line)
-            {
-                sw.WriteLine(line);
-                Console.WriteLine(line);
-            }
+            var rankingLog = new List<List<int>>();
 
-            for (int i = 0; i < 500; i++)
+            for (int i = 0; i < 25; i++)
             {
-                var data = TrainerUtil.PlayForTrainingParallel(16, player);
-
-                Parallel.ForEach(pop, ind =>
+                foreach (var ind in pop)
                 {
-                    float e = data.Select(t => ind.Trainer.Update(t.board, t.result)).Select(f => f * f).Average();
-                    ind.Log.Add(e);
-                });
+                    ind.Log.Clear();
 
-                Print(string.Join(", ", pop.Select(i => i.Log.TakeLast(200).Average())));
+                    foreach (var p in ind.Patterns)
+                        p.Reset();
+                }
+
+                var trainer = new PopulationEvaluatorCoLearning(7, 50, n_games);
+                trainer.Train(pop);
+
+                //var popEvaluator = new PopulationEvaluatorTournament(3, 54);
+                //popEvaluator.Evaluate(pop);
+
+                var ranking = pop.Select(ind => ind.Score).Ranking().ToList();
+                rankingLog.Add(ranking);
+
+                sw.WriteLine(string.Join(", ", pop.Select(ind => ind.Score)) + ",," + string.Join(", ", ranking));
+
+                Console.WriteLine(i);
             }
 
-            var test = Enumerable.Range(2001, 15).SelectMany(i => RecordReader.CreateTrainingData(new WthorRecordReader($"WTH/WTH_{i}.wtb")));
-            var error = pop.Select(ind => test.Select(d => ind.Trainer.Test(d.board, d.result)).Select(Math.Abs).Average());
-            Print(string.Join(", ", error));
+            sw.WriteLine();
+            sw.WriteLine(string.Join(", ", Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).Average())));
+            sw.WriteLine(string.Join(", ", Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).AverageAndVariance().var)));
 
-            // 16.165823, 16.374949
-            // 16.213587, 16.305311
+            // var popEvaluator = new PopulationEvaluatorTournament(new PopulationEvaluatorSelfPlay(1, 54, n_games, true), 1, 54);
+            // var popEvaluator = new PopulationEvaluatorCoLearning(7, 52, n_games);
+            // var popEvaluator = new PopulationEvaluatorSelfPlay(1, 52, n_games, true);
+            // popEvaluator.Evaluate(pop);
+
+            // Console.WriteLine(string.Join(", ", pop.Select(ind => ind.Score)));
+            //using StreamWriter sw = File.AppendText(file);
+
+            //for (int i = 0; i < pop[0].Log.Count - n_mov; i++)
+            //{
+            //    sw.WriteLine(string.Join(", ", pop.Select(ind => ind.Log.Skip(i).Take(n_mov).Average())));
+            //}
         }
     }
 }

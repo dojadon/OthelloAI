@@ -22,6 +22,25 @@ namespace OthelloAI
         {
             return source.Skip(Math.Max(0, source.Count() - N));
         }
+
+        public static IEnumerable<int> Ranking<T>(this IEnumerable<T> source)
+        {
+            return source.Select((obj, i) => (obj, i)).OrderBy(t => t.obj).Select((t, i) => (t, i)).OrderBy(t => t.t.i).Select(t => t.i);
+        }
+
+        public static (double avg, double var) AverageAndVariance(this IEnumerable<int> source)
+        {
+            double a = source.Average();
+            double v = source.Select(i => (i - a) * (i - a)).Average();
+            return (a, v);
+        }
+
+        public static (float avg, float var) AverageAndVariance(this IEnumerable<float> source)
+        {
+            float a = source.Average();
+            float v = source.Select(i => (i - a) * (i - a)).Average();
+            return (a, v);
+        }
     }
 
     public static class RandomUtil
@@ -39,6 +58,17 @@ namespace OthelloAI
             }
 
             return list.Take(n);
+        }
+
+        public static (int, int) SamplePair(this Random rand, int size)
+        {
+            int i1 = rand.Next(size);
+            int i2 = rand.Next(size - 1);
+
+            if (i1 == i2)
+                i2 = size - 1;
+
+            return (i1, i2);
         }
 
         public static ulong GenerateRegion(this Random rand, int size, int n_1)
