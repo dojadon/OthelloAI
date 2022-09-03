@@ -48,50 +48,9 @@ namespace OthelloAI.GA
 
     public class NaturalSelectorNSGA2 : INaturalSelector<ScoreNSGA2>
     {
-        public List<List<ScoreNSGA2>> NonDominatedSort(List<ScoreNSGA2> population)
+        public List<ScoreNSGA2> Select(List<ScoreNSGA2> scores, int n, Random rand)
         {
-            var rankedIndividuals = new List<List<ScoreNSGA2>>();
-
-            bool Dominated(ScoreNSGA2 ind1, ScoreNSGA2 ind2)
-            {
-                return ind1.score > ind2.score && ind1.score2 > ind2.score2;
-            }
-
-            bool IsNonDominated(ScoreNSGA2 ind)
-            {
-                return population.Count(ind2 => Dominated(ind, ind2)) == 0;
-            }
-
-            while (population.Count > 0)
-            {
-                var rank0 = population.Where(IsNonDominated).ToList();
-                population.RemoveAll(i => rank0.Contains(i));
-                rankedIndividuals.Add(rank0);
-            }
-
-            return rankedIndividuals;
-        }
-
-        public List<ScoreNSGA2> Select(List<ScoreNSGA2> pop, int n, Random rand)
-        {
-            var ranked = NonDominatedSort(pop);
-
-            var p = new List<ScoreNSGA2>();
-
-            for (int i = 0; i < ranked.Count; i++)
-            {
-                if (p.Count + ranked[i].Count <= n)
-                {
-                    p.AddRange(ranked[i]);
-                }
-                else
-                {
-                    p.AddRange(ranked[i].OrderByDescending(ind => ind.congestion).Take(n - p.Count));
-                    break;
-                }
-            }
-
-            return p;
+            return scores.OrderBy(s => s.rank).ThenBy(s => s.congestion).Take(n).ToList();
         }
     }
 }

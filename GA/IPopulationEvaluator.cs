@@ -44,7 +44,6 @@ namespace OthelloAI.GA
         {
             foreach (var ind in pop)
             {
-                ind.Score = 0;
                 ind.Log.Clear();
             }
 
@@ -114,7 +113,6 @@ namespace OthelloAI.GA
         {
             foreach (var ind in pop)
             {
-                ind.Score = 0;
                 ind.Log.Clear();
             }
 
@@ -176,19 +174,32 @@ namespace OthelloAI.GA
 
     public class PopulationEvaluatorNobeilty : IPopulationEvaluator<Score>
     {
+        public float Distance(Individual i1, Individual i2)
+        {
+            return Individual.ClosestPairs(i1.Genome, i2.Genome).Select(t => i1.Genome[t.Item1] & i2.Genome[t.Item2]).Sum(Board.BitCount);
+        }
+
+        public float CalcNobelity(Individual ind, List<Individual> list, int k)
+        {
+            return list.Select(i2 => Distance(ind, i2)).Sum();
+        }
+
         public List<Score> Evaluate(List<Individual> pop)
         {
-            throw new NotImplementedException();
+            return pop.Select(ind => new Score(ind, CalcNobelity(ind, pop, 15))).ToList();
         }
     }
 
     public class PopulationEvaluatorNSGA2 : IPopulationEvaluator<ScoreNSGA2>
     {
-        IPopulationEvaluator<Score> Evaluator1 { get; }
-        IPopulationEvaluator<Score> Evaluator2 { get; }
+        public IPopulationEvaluator<Score> Evaluator1 { get; set; }
+        public IPopulationEvaluator<Score> Evaluator2 { get; set; }
 
         public List<(Score2D s, float c)> CalcCongection(List<Score2D> scores)
         {
+            if (scores.Count == 1)
+                return new List<(Score2D s, float c)>() { (scores[0], scores[0].score * scores[0].score) };
+
             static float Distance(Score2D i1, Score2D i2)
             {
                 float s1 = i1.score - i2.score;
@@ -204,7 +215,7 @@ namespace OthelloAI.GA
             var c1 = dist.Concat(c0);
             var c2 = c0.Concat(dist);
 
-            return scores.ZipThree(c1, c2, (s, f1, f2) => (s, f1 + f2)).ToList();
+            return ordered.ZipThree(c1, c2, (s, f1, f2) => (s, f1 + f2)).ToList();
         }
 
         public List<ScoreNSGA2> NonDominatedSort(List<Score2D> scores)

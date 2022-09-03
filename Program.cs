@@ -30,7 +30,7 @@ namespace OthelloAI
             // Tester.Test1();
             // return;
 
-            GA.GA.Run();
+            GA.GA<GA.Score>.Run();
             return;
 
             Console.WriteLine($"Support BMI2 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");

@@ -24,7 +24,7 @@ namespace OthelloAI.GA
     {
         public float score2;
 
-        public Score2D(Individual ind, float score1, float  score2) : base(ind, score1)
+        public Score2D(Individual ind, float score1, float score2) : base(ind, score1)
         {
             this.score2 = score2;
         }
@@ -46,12 +46,12 @@ namespace OthelloAI.GA
     {
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
 
-        public List<T> Population { get; set; }
+        public bool IsVaryAll { get; set; }
 
         public int Gen { get; protected set; }
 
         public ISelector<T> Selecter { get; set; }
-        public INaturalSelector<T> NaturalSelecter { get; set; }
+        public INaturalSelector<T> NaturalSelector { get; set; }
         public IGeneticOperator GeneticOperator { get; set; }
         public IPopulationEvaluator<T> Evaluator { get; set; }
 
@@ -67,29 +67,37 @@ namespace OthelloAI.GA
             var ga = new GA<ScoreNSGA2>()
             {
                 Selecter = new SelectorTournament<ScoreNSGA2>(5, s => s.congestion),
-                NaturalSelecter = new NaturalSelectorNSGA2(),
-                GeneticOperator = new GeneticOperators((new Mutator(), 0.02F), (new TopologyCrossover(), 0.7F)),
-                // Evaluator = new PopulationEvaluatorTrainingScore(new PopulationTrainerCoLearning(1, 54, 1600, true)),
-                Evaluator = new PopulationEvaluatorNSGA2(),
+                NaturalSelector = new NaturalSelectorNSGA2(),
+                GeneticOperator = new GeneticOperators((new Mutator(), 0.02F), (new TopologyCrossover(), 1F)),
+                Evaluator = new PopulationEvaluatorNSGA2()
+                {   
+                    Evaluator1 = new PopulationEvaluatorTrainingScore(new PopulationTrainerCoLearning(1, 54, 1600, true)),
+                    Evaluator2 = new PopulationEvaluatorNobeilty(),
+                },
+                IsVaryAll = false,
             };
 
-            ga.Init(50, 3, 8);
+            var pop = ga.Init(50, 100, 3, 8);
             // ga.Load(file);
 
             for (int i = 0; i < 10000; i++)
             {
-                ga.Step(100);
-                ga.Save(file);
+                pop = ga.Step(pop, 100);
+                ga.Save(file, pop.Select(s => s.ind).ToList());
 
                 Console.WriteLine($"Gen: {i}");
 
-                var score = ga.Population.MinBy(ind => ind.score).First();
-                (float avg, float var) = ga.Population.Select(ind => ind.score).AverageAndVariance();
+                var score = pop.MinBy(ind => ind.score).First();
+                (float avg, float var) = pop.Select(ind => ind.score).AverageAndVariance();
 
                 using (StreamWriter sw = File.AppendText(log))
                 {
                     // sw.WriteLine($"{ind.Score}, {avg}, {var}");
-                    sw.WriteLine(string.Join(", ", ga.Population.Select(ind => ind.score).OrderBy(s => s)));
+                    foreach(var s in pop.OrderBy(s => s.score))
+                    {
+                        sw.WriteLine($"{s.ind.Genome[0]}, {s.ind.Genome[1]}, {s.ind.Genome[2]}, {s.score}, {s.score2}, {s.rank}, {s.congestion}");
+                    }
+                    // sw.WriteLine(string.Join(", ", pop.Select(ind => ind.score).OrderBy(s => s)));
                 }
                 Console.WriteLine(score.score);
                 Console.WriteLine($"{avg}, {var}");
@@ -99,55 +107,64 @@ namespace OthelloAI.GA
             }
         }
 
-        public void Init(int n_pop, int n_tuple, int size_tuple)
+        public List<T> Init(int n_pop, int n_offspring, int n_tuple, int size_tuple)
         {
-            var pop = Enumerable.Range(0, n_pop).Select(_ => new Individual(Enumerable.Range(0, n_tuple).Select(_ => Random.GenerateRegion(19, size_tuple)).ToArray())).ToList();
-        }
-
-        public void Step(int n)
-        {
-            var offspring = Variation(Population, n);
+            var offspring = Enumerable.Range(0, n_offspring).Select(_ => new Individual(Enumerable.Range(0, n_tuple).Select(_ => Random.GenerateRegion(19, size_tuple)).ToArray())).ToList();
             var scores = Evaluator.Evaluate(offspring);
-            Population = NaturalSelecter.Select(scores, Population.Count, Random);
-            Gen++;
+            return NaturalSelector.Select(scores, n_pop, Random);
         }
 
-        public virtual List<Individual> Variation(List<T> list, int n)
+        public List<T> Step(List<T> pop, int n)
         {
-            Individual VariationInd()
+            Console.WriteLine("Varying");
+            var offspring = Vary(pop, n);
+            Console.WriteLine("Evaluating");
+            var scores = Evaluator.Evaluate(offspring);
+            Console.WriteLine("Selecting");
+            return NaturalSelector.Select(scores, pop.Count, Random);
+        }
+
+        public virtual List<Individual> Vary(List<T> list, int n)
+        {
+            Individual VaryInd()
             {
                 return GeneticOperator.Operate(() => Selecter.Select(list, Random).ind, Random);
             }
 
-            return Enumerable.Range(0, n).AsParallel().Select(_ => VariationInd()).ToList();
+            if (IsVaryAll)
+                return Enumerable.Range(0, n).AsParallel().Select(_ => VaryInd()).ToList();
+
+            else
+                return list.Select(s => s.ind).Concat(Enumerable.Range(0, n - list.Count).AsParallel().Select(_ => VaryInd())).ToList();
         }
 
-        public void Load(string file)
+        public List<Individual> Load(string file)
         {
             using var reader = new BinaryReader(new FileStream(file, FileMode.Open));
 
             int n = reader.ReadInt32();
-
-            Population.Clear();
+            var pop = new List<Individual>();
 
             for (int i = 0; i < n; i++)
             {
                 int n_pattern = reader.ReadInt32();
                 var ind = new Individual(Enumerable.Range(0, n_pattern).Select(_ => reader.ReadUInt64()).ToArray());
-                // Population.Add(ind);
+                pop.Add(ind);
             }
+
+            return pop;
         }
 
-        public void Save(string file)
+        public void Save(string file, List<Individual> pop)
         {
             using var writer = new BinaryWriter(new FileStream(file, FileMode.Create));
 
-            writer.Write(Population.Count);
+            writer.Write(pop.Count);
 
-            foreach (var ind in Population)
+            foreach (var ind in pop)
             {
-                // writer.Write(ind.Genome.Length);
-                // Array.ForEach(ind.Genome, writer.Write);
+                writer.Write(ind.Genome.Length);
+                Array.ForEach(ind.Genome, writer.Write);
             }
         }
     }
@@ -155,10 +172,6 @@ namespace OthelloAI.GA
 
     public class Individual
     {
-        public int Congestion { get; set; }
-        public int Nobelity { get; set; }
-        public float Score { get; set; }
-
         public ulong[] Genome { get; }
 
         public Pattern[] Patterns { get; }
@@ -178,5 +191,29 @@ namespace OthelloAI.GA
         }
 
         public Evaluator CreateEvaluator() => new EvaluatorPatternBased(Patterns);
+
+        public static (int, int)[] ClosestPairs(ulong[] g1, ulong[] g2)
+        {
+            int n_gene = g1.Length;
+
+            var pairs = Enumerable.Range(0, n_gene).SelectMany(i => Enumerable.Range(0, n_gene).Select(j => (i, j))).OrderBy(t => Board.BitCount(g1[t.i] ^ g2[t.j])).ToList();
+            var added1 = new List<int>();
+            var added2 = new List<int>();
+
+            var result = new List<(int, int)>();
+
+            foreach ((int i, int j) in pairs)
+            {
+                if (added1.Contains(i) || added2.Contains(j))
+                    continue;
+
+                added1.Add(i);
+                added2.Add(j);
+
+                result.Add((i, j));
+            }
+
+            return result.ToArray();
+        }
     }
 }
