@@ -6,16 +6,16 @@ using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI.GA
 {
-    public class GeneticOperators : IGeneticOperator
+    public class GeneticOperators<T> : IGeneticOperator<T> where T : IndividualBase
     {
-        List<(IGeneticOperator, float prob)> Operators { get; }
+        List<(IGeneticOperator<T>, float prob)> Operators { get; }
 
-        public GeneticOperators(params (IGeneticOperator, float)[] operators)
+        public GeneticOperators(params (IGeneticOperator<T>, float)[] operators)
         {
             Operators = operators.ToList();
         }
 
-        public Individual Operate(Func<Individual> selector, Random rand)
+        public T Operate(Func<T> selector, Random rand)
         {
             double d = rand.NextDouble();
 
@@ -32,12 +32,12 @@ namespace OthelloAI.GA
         }
     }
 
-    public interface IGeneticOperator
+    public interface IGeneticOperator<T> where T : IndividualBase
     {
-        public Individual Operate(Func<Individual> selector, Random rand);
+        public T Operate(Func<T> selector, Random rand);
     }
 
-    public class Mutator : IGeneticOperator
+    public class Mutator : IGeneticOperator<Individual>
     {
         public static ulong mask = (1UL << 20) - 1;
 
@@ -71,27 +71,33 @@ namespace OthelloAI.GA
         }
     }
 
-    public abstract class Crossover : IGeneticOperator
+    public abstract class Crossover<T> : IGeneticOperator<T> where T : IndividualBase
     {
-        public abstract Individual Cx(Individual ind1, Individual ind2, Random rand);
+        public abstract T Cx(T ind1, T ind2, Random rand);
 
-        public Individual Operate(Func<Individual> selector, Random rand)
+        public T Operate(Func<T> selector, Random rand)
         {
             return Cx(selector(), selector(), rand);
         }
     }
 
-    public class BiasedCrossover : Crossover
+    public class BiasedCrossover : Crossover<IndividualRK>
     {
         public float Bias { get; }
 
-        public override Individual Cx(Individual ind1, Individual ind2, Random rand)
+        public float[] Cx(float[] g1, float[] g2, Random rand)
         {
-            
+            return g1.Zip(g2, (a1, a2) => rand.NextDouble() < Bias ? a1 : a2).ToArray();
+        }
+
+        public override IndividualRK Cx(IndividualRK ind1, IndividualRK ind2, Random rand)
+        {
+            float[][] gen = ind1.Genome.Zip(ind2.Genome, (g1, g2) => Cx(g1, g2, rand)).ToArray();
+            return new IndividualRK(gen);
         }
     }
 
-    public class TopologyCrossover : Crossover
+    public class TopologyCrossover : Crossover<Individual>
     {
         public static ulong CrossoverGenome(ulong g1, ulong g2, Random rand)
         {
@@ -111,20 +117,16 @@ namespace OthelloAI.GA
         public override Individual Cx(Individual ind1, Individual ind2, Random rand)
         {
             var next_gene = new List<ulong>();
-            var patterns = new List<Pattern>();
 
             foreach ((int i, int j) in Individual.ClosestPairs(ind1.Genome, ind2.Genome))
             {
                 ulong gene = CrossoverGenome(ind1.Genome[i], ind2.Genome[j], rand);
-                var p = new Pattern($"ga/{gene}.dat", 10, new BoardHasherMask(gene), PatternType.ASYMMETRIC);
                 // Pattern.Test(ind1.Patterns[i].StageBasedEvaluations, p.StageBasedEvaluations, ind1.Genome[i], gene);
                 // Pattern.Test(ind1.Patterns[j].StageBasedEvaluations, p.StageBasedEvaluations, ind1.Genome[j], gene);
-
                 next_gene.Add(gene);
-                patterns.Add(p);
             }
 
-            return new Individual(next_gene.ToArray(), patterns.ToArray());
+            return new Individual(next_gene.ToArray());
         }
     }
 }

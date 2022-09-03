@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 
 namespace OthelloAI.GA
 {
-    public interface IPopulationEvaluator<T> where T : Score
+    public interface IPopulationEvaluator<T, U> where T: IndividualBase where U : Score<T>
     {
-        public List<T> Evaluate(List<Individual> pop);
+        public List<U> Evaluate(List<T> pop);
     }
 
-    public class PopulationEvaluatorRandomTournament : IPopulationEvaluator<Score>
+    public class PopulationEvaluatorRandomTournament<T> : IPopulationEvaluator<T, Score<T>> where T : IndividualBase
     {
         public int Depth { get; }
         public int EndStage { get; }
@@ -24,7 +24,7 @@ namespace OthelloAI.GA
             NumGames = n_games;
         }
 
-        public PlayerAI CreatePlayer(Individual ind)
+        public PlayerAI CreatePlayer(T ind)
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
@@ -40,7 +40,7 @@ namespace OthelloAI.GA
             return Enumerable.Range(0, n - 1).SelectMany(i => Enumerable.Range(i + 1, n - i - 1).Select(j => (i, j))).ToArray();
         }
 
-        public List<Score> Evaluate(List<Individual> pop)
+        public List<Score<T>> Evaluate(List<T> pop)
         {
             foreach (var ind in pop)
             {
@@ -78,11 +78,11 @@ namespace OthelloAI.GA
                 }
             });
 
-            return pop.Select(ind => new Score(ind, ind.Log.Average())).ToList();
+            return pop.Select(ind => new Score<T>(ind, ind.Log.Average())).ToList();
         }
     }
 
-    public class PopulationEvaluatorTournament : IPopulationEvaluator<Score>
+    public class PopulationEvaluatorTournament<T> : IPopulationEvaluator<T, Score<T>> where T : IndividualBase
     {
         public int Depth { get; }
         public int EndStage { get; }
@@ -93,7 +93,7 @@ namespace OthelloAI.GA
             EndStage = endStage;
         }
 
-        public PlayerAI CreatePlayer(Individual ind)
+        public PlayerAI CreatePlayer(T ind)
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
@@ -109,7 +109,7 @@ namespace OthelloAI.GA
             return Enumerable.Range(0, n - 1).SelectMany(i => Enumerable.Range(i + 1, n - i - 1).Select(j => (i, j))).ToArray();
         }
 
-        public List<Score> Evaluate(List<Individual> pop)
+        public List<Score<T>> Evaluate(List<T> pop)
         {
             foreach (var ind in pop)
             {
@@ -153,30 +153,30 @@ namespace OthelloAI.GA
                 }
             });
 
-            return pop.Select(ind => new Score(ind, ind.Log.Average())).ToList();
+            return pop.Select(ind => new Score<T>(ind, ind.Log.Average())).ToList();
         }
     }
 
-    public class PopulationEvaluatorTrainingScore : IPopulationEvaluator<Score>
+    public class PopulationEvaluatorTrainingScore<T> : IPopulationEvaluator<T, Score<T>> where T : IndividualBase
     {
-        PopulationTrainer Trainer { get; }
+        PopulationTrainer<T> Trainer { get; }
 
-        public PopulationEvaluatorTrainingScore(PopulationTrainer trainer)
+        public PopulationEvaluatorTrainingScore(PopulationTrainer<T> trainer)
         {
             Trainer = trainer;
         }
 
-        public List<Score> Evaluate(List<Individual> pop)
+        public List<Score<T>> Evaluate(List<T> pop)
         {
             return Trainer.Train(pop);
         }
     }
 
-    public class PopulationEvaluatorNobeilty : IPopulationEvaluator<Score>
+    public class PopulationEvaluatorNobeilty : IPopulationEvaluator<Individual, Score<Individual>>
     {
         public float Distance(Individual i1, Individual i2)
         {
-            return Individual.ClosestPairs(i1.Genome, i2.Genome).Select(t => i1.Genome[t.Item1] & i2.Genome[t.Item2]).Sum(Board.BitCount);
+            return IndividualBase.ClosestPairs(i1.Genome, i2.Genome).Select(t => i1.Genome[t.Item1] & i2.Genome[t.Item2]).Sum(Board.BitCount);
         }
 
         public float CalcNobelity(Individual ind, List<Individual> list, int k)
@@ -184,23 +184,23 @@ namespace OthelloAI.GA
             return list.Select(i2 => Distance(ind, i2)).Sum();
         }
 
-        public List<Score> Evaluate(List<Individual> pop)
+        public List<Score<Individual>> Evaluate(List<Individual> pop)
         {
-            return pop.Select(ind => new Score(ind, CalcNobelity(ind, pop, 15))).ToList();
+            return pop.Select(ind => new Score<Individual>(ind, CalcNobelity(ind, pop, 15))).ToList();
         }
     }
 
-    public class PopulationEvaluatorNSGA2 : IPopulationEvaluator<ScoreNSGA2>
+    public class PopulationEvaluatorNSGA2<T> : IPopulationEvaluator<T, ScoreNSGA2<T>> where T : IndividualBase
     {
-        public IPopulationEvaluator<Score> Evaluator1 { get; set; }
-        public IPopulationEvaluator<Score> Evaluator2 { get; set; }
+        public IPopulationEvaluator<T, Score<T>> Evaluator1 { get; set; }
+        public IPopulationEvaluator<T, Score<T>> Evaluator2 { get; set; }
 
-        public List<(Score2D s, float c)> CalcCongection(List<Score2D> scores)
+        public List<(Score2D<T> s, float c)> CalcCongection(List<Score2D<T>> scores)
         {
             if (scores.Count == 1)
-                return new List<(Score2D s, float c)>() { (scores[0], scores[0].score * scores[0].score) };
+                return new List<(Score2D<T> s, float c)>() { (scores[0], scores[0].score * scores[0].score) };
 
-            static float Distance(Score2D i1, Score2D i2)
+            static float Distance(Score2D<T> i1, Score2D<T> i2)
             {
                 float s1 = i1.score - i2.score;
                 float s2 = i1.score2 - i2.score2;
@@ -218,19 +218,19 @@ namespace OthelloAI.GA
             return ordered.ZipThree(c1, c2, (s, f1, f2) => (s, f1 + f2)).ToList();
         }
 
-        public List<ScoreNSGA2> NonDominatedSort(List<Score2D> scores)
+        public List<ScoreNSGA2<T>> NonDominatedSort(List<Score2D<T>> scores)
         {
-            bool Dominated(Score2D s1, Score2D s2)
+            bool Dominated(Score2D<T> s1, Score2D<T> s2)
             {
                 return s1.score > s2.score && s1.score2 > s2.score2;
             }
 
-            bool IsNonDominated(Score2D s)
+            bool IsNonDominated(Score2D<T> s)
             {
                 return scores.Count(s2 => Dominated(s, s2)) == 0;
             }
 
-            var scoreNSGA2 = new List<ScoreNSGA2>();
+            var scoreNSGA2 = new List<ScoreNSGA2<T>>();
             int rank = 0;
 
             while (scores.Count > 0)
@@ -239,7 +239,7 @@ namespace OthelloAI.GA
                 scores.RemoveAll(i => rank0.Contains(i));
 
                 var cong =  CalcCongection(rank0);
-                scoreNSGA2.AddRange(cong.Select(t => new ScoreNSGA2(t.s.ind, t.s.score, t.s.score2, rank, -t.c)));
+                scoreNSGA2.AddRange(cong.Select(t => new ScoreNSGA2<T>(t.s.ind, t.s.score, t.s.score2, rank, -t.c)));
 
                 rank++;
             }
@@ -247,18 +247,18 @@ namespace OthelloAI.GA
             return scoreNSGA2;
         }
 
-        public List<ScoreNSGA2> Evaluate(List<Individual> pop)
+        public List<ScoreNSGA2<T>> Evaluate(List<T> pop)
         {
             var score1 = Evaluator1.Evaluate(pop);
             var score2 = Evaluator2.Evaluate(pop);
 
-            var score = score1.Zip(score2).Select(t => new Score2D(t.First.ind, t.First.score, t.Second.score)).ToList();
+            var score = score1.Zip(score2).Select(t => new Score2D<T>(t.First.ind, t.First.score, t.Second.score)).ToList();
 
             return NonDominatedSort(score);
         }
     }
 
-    public abstract class PopulationTrainer
+    public abstract class PopulationTrainer<T> where T : IndividualBase
     {
         public int Depth { get; }
         public int EndStage { get; }
@@ -284,21 +284,21 @@ namespace OthelloAI.GA
             };
         }
 
-        public PlayerAI CreatePlayer(Individual ind)
+        public PlayerAI CreatePlayer(T ind)
         {
             return CreatePlayer(ind.CreateEvaluator());
         }
 
-        public abstract List<Score> Train(List<Individual> pop);
+        public abstract List<Score<T>> Train(List<T> pop);
     }
 
-    public class PopulationTrainerCoLearning : PopulationTrainer
+    public class PopulationTrainerCoLearning<T> : PopulationTrainer<T> where T : IndividualBase
     {
         public PopulationTrainerCoLearning(int depth, int endStage, int numGames, bool isParallel) : base(depth, endStage, numGames, isParallel)
         {
         }
 
-        public override List<Score> Train(List<Individual> pop)
+        public override List<Score<T>> Train(List<T> pop)
         {
             var evaluator = new EvaluatorRandomChoice(pop.Select(i => i.CreateEvaluator()).ToArray());
             Player player = CreatePlayer(evaluator);
@@ -316,30 +316,30 @@ namespace OthelloAI.GA
                 // Console.WriteLine($"{i} / {NumGames / 16}");
             }
 
-            return pop.Select(ind => new Score(ind, ind.Log.TakeLast(ind.Log.Count / 4).Average())).ToList();
+            return pop.Select(ind => new Score<T>(ind, ind.Log.TakeLast(ind.Log.Count / 4).Average())).ToList();
         }
     }
 
-    public class PopulationTrainerSelfPlay : PopulationTrainer
-    {
+    public class PopulationTrainerSelfPlay<T> : PopulationTrainer<T> where T : IndividualBase
+    { 
         public PopulationTrainerSelfPlay(int depth, int endStage, int numGames, bool isParallel) : base(depth, endStage, numGames, isParallel)
         {
         }
 
-        public override List<Score> Train(List<Individual> pop)
+        public override List<Score<T>> Train(List<T> pop)
         {
             if (IsParallel)
             {
-                return pop.AsParallel().Select(ind => new Score(ind, Train(ind))).ToList();
+                return pop.AsParallel().Select(ind => new Score<T>(ind, Train(ind))).ToList();
             }
             else
             {
 
-                return pop.Select(ind => new Score(ind, Train(ind))).ToList();
+                return pop.Select(ind => new Score<T>(ind, Train(ind))).ToList();
             }
         }
 
-        public float Train(Individual ind)
+        public float Train(T ind)
         {
             var rand = new Random();
             PlayerAI player = CreatePlayer(ind);

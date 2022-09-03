@@ -8,41 +8,41 @@ using System.Threading;
 
 namespace OthelloAI.GA
 {
-    public class Score
+    public class Score<T>
     {
-        public Individual ind;
+        public Individual<T> ind;
         public float score;
 
-        public Score(Individual ind, float score)
+        public Score(Individual<T> ind, float score)
         {
             this.ind = ind;
             this.score = score;
         }
     }
 
-    public class Score2D : Score
+    public class Score2D<T> : Score<T>
     {
         public float score2;
 
-        public Score2D(Individual ind, float score1, float score2) : base(ind, score1)
+        public Score2D(Individual<T> ind, float score1, float score2) : base(ind, score1)
         {
             this.score2 = score2;
         }
     }
 
-    public class ScoreNSGA2 : Score2D
+    public class ScoreNSGA2<T> : Score2D<T>
     {
         public float congestion;
         public int rank;
 
-        public ScoreNSGA2(Individual ind, float score1, float score2, int rank, float congestion) : base(ind, score1, score2)
+        public ScoreNSGA2(Individual<T> ind, float score1, float score2, int rank, float congestion) : base(ind, score1, score2)
         {
             this.congestion = congestion;
             this.rank = rank;
         }
     }
 
-    public class GA<T> where T : Score
+    public class GA<T, U> where U : Score<T>
     {
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
 
@@ -50,10 +50,10 @@ namespace OthelloAI.GA
 
         public int Gen { get; protected set; }
 
-        public ISelector<T> Selecter { get; set; }
-        public INaturalSelector<T> NaturalSelector { get; set; }
-        public IGeneticOperator GeneticOperator { get; set; }
-        public IPopulationEvaluator<T> Evaluator { get; set; }
+        public ISelector<T, U> Selecter { get; set; }
+        public INaturalSelector<T, U> NaturalSelector { get; set; }
+        public IGeneticOperator<T> GeneticOperator { get; set; }
+        public IPopulationEvaluator<T, U> Evaluator { get; set; }
 
         public static Random Random => ThreadLocalRandom.Value;
 
@@ -64,14 +64,14 @@ namespace OthelloAI.GA
             string file = "ga/inds.dat";
             var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            var ga = new GA<ScoreNSGA2>()
+            var ga = new GA<Individual, ScoreNSGA2<Individual>>()
             {
-                Selecter = new SelectorTournament<ScoreNSGA2>(5, s => s.congestion),
-                NaturalSelector = new NaturalSelectorNSGA2(),
-                GeneticOperator = new GeneticOperators((new Mutator(), 0.02F), (new TopologyCrossover(), 1F)),
-                Evaluator = new PopulationEvaluatorNSGA2()
+                Selecter = new SelectorTournament<Individual, ScoreNSGA2<Individual>>(5, s => s.congestion),
+                NaturalSelector = new NaturalSelectorNSGA2<Individual>(),
+                GeneticOperator = new GeneticOperators<Individual>((new Mutator(), 0.02F), (new TopologyCrossover(), 1F)),
+                Evaluator = new PopulationEvaluatorNSGA2<Individual>()
                 {   
-                    Evaluator1 = new PopulationEvaluatorTrainingScore(new PopulationTrainerCoLearning(1, 54, 1600, true)),
+                    Evaluator1 = new PopulationEvaluatorTrainingScore<Individual>(new PopulationTrainerCoLearning<Individual>(1, 54, 1600, true)),
                     Evaluator2 = new PopulationEvaluatorNobeilty(),
                 },
                 IsVaryAll = false,
@@ -107,14 +107,14 @@ namespace OthelloAI.GA
             }
         }
 
-        public List<T> Init(int n_pop, int n_offspring, int n_tuple, int size_tuple)
+        public List<U> Init(int n_pop, int n_offspring, int n_tuple, int size_tuple)
         {
             var offspring = Enumerable.Range(0, n_offspring).Select(_ => new Individual(Enumerable.Range(0, n_tuple).Select(_ => Random.GenerateRegion(19, size_tuple)).ToArray())).ToList();
             var scores = Evaluator.Evaluate(offspring);
             return NaturalSelector.Select(scores, n_pop, Random);
         }
 
-        public List<T> Step(List<T> pop, int n)
+        public List<U> Step(List<U> pop, int n)
         {
             Console.WriteLine("Varying");
             var offspring = Vary(pop, n);
@@ -124,9 +124,9 @@ namespace OthelloAI.GA
             return NaturalSelector.Select(scores, pop.Count, Random);
         }
 
-        public virtual List<Individual> Vary(List<T> list, int n)
+        public virtual List<T> Vary(List<U> list, int n)
         {
-            Individual VaryInd()
+            T VaryInd()
             {
                 return GeneticOperator.Operate(() => Selecter.Select(list, Random).ind, Random);
             }
@@ -169,25 +169,49 @@ namespace OthelloAI.GA
         }
     }
 
-
-    public class Individual
+    public class IndividualRK : IndividualBase
     {
-        public ulong[] Genome { get; }
+        public float[][] Genome { get; }
+        public int TupleSize { get; }
 
+        public IndividualRK()
+        {
+
+        }
+
+        public IndividualRK(float[][] genome)
+        {
+            Genome = genome;
+        }
+
+        public ulong Decode(float[] keys)
+        {
+            var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(TupleSize);
+
+            ulong g = 0;
+            foreach(var i in indices)
+                g |= 1UL << i;
+            return g;
+        }
+    }
+
+    public class Individual<T>
+    {
+        public T[] Genome { get; }
         public Pattern[] Patterns { get; }
         public PatternTrainer Trainer { get; }
 
         public List<float> Log { get; } = new List<float>();
 
-        public Individual(ulong[] genome, Pattern[] patterns)
+        public Func<T, ulong> Decoder { get; }
+
+        public IndividualBase(T[] genome, Func<T, ulong> decoder)
         {
             Genome = genome;
-            Patterns = patterns;
-            Trainer = new PatternTrainer(Patterns, 0.002F);
-        }
+            Decoder = decoder;
 
-        public Individual(ulong[] genome) : this(genome, genome.Select(g => new Pattern($"ga/{g}.dat", 10, new BoardHasherMask(g), PatternType.ASYMMETRIC)).ToArray())
-        {
+            Patterns = genome.Select(decoder).Select(g => new Pattern($"ga/{g}.dat", 10, new BoardHasherMask(g), PatternType.ASYMMETRIC)).ToArray();
+            Trainer = new PatternTrainer(Patterns, 0.002F);
         }
 
         public Evaluator CreateEvaluator() => new EvaluatorPatternBased(Patterns);
