@@ -6,7 +6,7 @@ using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI.GA
 {
-    public class GeneticOperators<T> : IGeneticOperator<T> where T : IndividualBase
+    public class GeneticOperators<T> : IGeneticOperator<T>
     {
         List<(IGeneticOperator<T>, float prob)> Operators { get; }
 
@@ -15,7 +15,7 @@ namespace OthelloAI.GA
             Operators = operators.ToList();
         }
 
-        public T Operate(Func<T> selector, Random rand)
+        public Individual<T> Operate(Func<Individual<T>> selector, Random rand)
         {
             double d = rand.NextDouble();
 
@@ -32,12 +32,12 @@ namespace OthelloAI.GA
         }
     }
 
-    public interface IGeneticOperator<T> where T : IndividualBase
+    public interface IGeneticOperator<T>
     {
-        public T Operate(Func<T> selector, Random rand);
+        public Individual<T> Operate(Func<Individual<T>> selector, Random rand);
     }
 
-    public class Mutator : IGeneticOperator<Individual>
+    public class Mutator : IGeneticOperator<ulong>
     {
         public static ulong mask = (1UL << 20) - 1;
 
@@ -51,53 +51,58 @@ namespace OthelloAI.GA
             return g ^ p ^ q;
         }
 
-        public Individual Mutate(Individual ind, Random rand)
+        public Individual<ulong> Mutate(Individual<ulong> ind, Random rand)
         {
             float prob = 1F / ind.Genome.Length;
 
-            return new Individual(ind.Genome.Select(g =>
+            return new Individual<ulong>(ind.Genome.Select(g =>
             {
                 if (rand.NextDouble() < prob)
                     return Mutate(g, rand);
                 else
                     return g;
 
-            }).ToArray());
+            }).ToArray(), ind.Decoder);
         }
 
-        public Individual Operate(Func<Individual> selector, Random rand)
+        public Individual<ulong> Operate(Func<Individual<ulong>> selector, Random rand)
         {
             return Mutate(selector(), rand);
         }
     }
 
-    public abstract class Crossover<T> : IGeneticOperator<T> where T : IndividualBase
+    public abstract class Crossover<T> : IGeneticOperator<T>
     {
-        public abstract T Cx(T ind1, T ind2, Random rand);
+        public abstract Individual<T> Cx(Individual<T> ind1, Individual<T> ind2, Random rand);
 
-        public T Operate(Func<T> selector, Random rand)
+        public Individual<T> Operate(Func<Individual<T>> selector, Random rand)
         {
             return Cx(selector(), selector(), rand);
         }
     }
 
-    public class BiasedCrossover : Crossover<IndividualRK>
+    public abstract class CrossoverSeparately<T> : Crossover<T>
     {
-        public float Bias { get; }
+        public abstract T Cx(T ind1,T ind2, Random rand);
 
-        public float[] Cx(float[] g1, float[] g2, Random rand)
+        public override Individual<T> Cx(Individual<T> ind1, Individual<T> ind2, Random rand)
         {
-            return g1.Zip(g2, (a1, a2) => rand.NextDouble() < Bias ? a1 : a2).ToArray();
-        }
-
-        public override IndividualRK Cx(IndividualRK ind1, IndividualRK ind2, Random rand)
-        {
-            float[][] gen = ind1.Genome.Zip(ind2.Genome, (g1, g2) => Cx(g1, g2, rand)).ToArray();
-            return new IndividualRK(gen);
+            return new Individual<T>(ind1.Genome.Zip(ind2.Genome, (g1, g2) => Cx(g1, g2, rand)).ToArray(), ind1.Decoder);
         }
     }
 
-    public class TopologyCrossover : Crossover<Individual>
+
+    public class BiasedCrossover<T> : CrossoverSeparately<T>
+    {
+        public float Bias { get; }
+
+        public override T Cx(T g1, T g2, Random rand)
+        {
+            return rand.NextDouble() < Bias ? g1 : g2;
+        }
+    }
+
+    public class TopologyCrossover : Crossover<ulong>
     {
         public static ulong CrossoverGenome(ulong g1, ulong g2, Random rand)
         {
@@ -114,11 +119,11 @@ namespace OthelloAI.GA
             return result | Bmi2.X64.ParallelBitDeposit(b, xor);
         }
 
-        public override Individual Cx(Individual ind1, Individual ind2, Random rand)
+        public override Individual<ulong> Cx(Individual<ulong> ind1, Individual<ulong> ind2, Random rand)
         {
             var next_gene = new List<ulong>();
 
-            foreach ((int i, int j) in Individual.ClosestPairs(ind1.Genome, ind2.Genome))
+            foreach ((int i, int j) in Individual<ulong>.ClosestPairs(ind1.Genome, ind2.Genome))
             {
                 ulong gene = CrossoverGenome(ind1.Genome[i], ind2.Genome[j], rand);
                 // Pattern.Test(ind1.Patterns[i].StageBasedEvaluations, p.StageBasedEvaluations, ind1.Genome[i], gene);
@@ -126,7 +131,7 @@ namespace OthelloAI.GA
                 next_gene.Add(gene);
             }
 
-            return new Individual(next_gene.ToArray());
+            return new Individual<ulong>(next_gene.ToArray(), ind1.Decoder);
         }
     }
 }

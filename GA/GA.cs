@@ -47,8 +47,8 @@ namespace OthelloAI.GA
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
 
         public bool IsVaryAll { get; set; }
-
-        public int Gen { get; protected set; }
+        public Func<int, T> GenomeGenerator { get; set; }
+        public Func<T, ulong> Decoder { get; set; }
 
         public ISelector<T, U> Selecter { get; set; }
         public INaturalSelector<T, U> NaturalSelector { get; set; }
@@ -57,43 +57,45 @@ namespace OthelloAI.GA
 
         public static Random Random => ThreadLocalRandom.Value;
 
-        public static void Run()
+        public ulong Decode(float[] keys)
         {
-            StringBuilder builder = new StringBuilder();
+            var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(8);
 
-            string file = "ga/inds.dat";
-            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            ulong g = 0;
+            foreach (var i in indices)
+                g |= 1UL << i;
+            return g;
+        }
 
-            var ga = new GA<Individual, ScoreNSGA2<Individual>>()
+        public static void TestNSGA2()
+        {
+            var ga = new GA<ulong, ScoreNSGA2<ulong>>()
             {
-                Selecter = new SelectorTournament<Individual, ScoreNSGA2<Individual>>(5, s => s.congestion),
-                NaturalSelector = new NaturalSelectorNSGA2<Individual>(),
-                GeneticOperator = new GeneticOperators<Individual>((new Mutator(), 0.02F), (new TopologyCrossover(), 1F)),
-                Evaluator = new PopulationEvaluatorNSGA2<Individual>()
-                {   
-                    Evaluator1 = new PopulationEvaluatorTrainingScore<Individual>(new PopulationTrainerCoLearning<Individual>(1, 54, 1600, true)),
+                GenomeGenerator = i => Random.GenerateRegion(19, i),
+                Decoder = u => u,
+
+                Selecter = new SelectorTournament<ulong, ScoreNSGA2<ulong>>(5, s => s.congestion),
+                NaturalSelector = new NaturalSelectorNSGA2<ulong>(),
+                GeneticOperator = new GeneticOperators<ulong>((new Mutator(), 0.02F), (new TopologyCrossover(), 1F)),
+                Evaluator = new PopulationEvaluatorNSGA2<ulong>()
+                {
+                    Evaluator1 = new PopulationEvaluatorTrainingScore<ulong>(new PopulationTrainerCoLearning<ulong>(1, 54, 1600, true)),
                     Evaluator2 = new PopulationEvaluatorNobeilty(),
                 },
                 IsVaryAll = false,
             };
 
-            var pop = ga.Init(50, 100, 3, 8);
-            // ga.Load(file);
+            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            for (int i = 0; i < 10000; i++)
+            ga.Run(ga.Init(50, 100, 3, 8), pop =>
             {
-                pop = ga.Step(pop, 100);
-                ga.Save(file, pop.Select(s => s.ind).ToList());
-
-                Console.WriteLine($"Gen: {i}");
-
                 var score = pop.MinBy(ind => ind.score).First();
                 (float avg, float var) = pop.Select(ind => ind.score).AverageAndVariance();
 
                 using (StreamWriter sw = File.AppendText(log))
                 {
                     // sw.WriteLine($"{ind.Score}, {avg}, {var}");
-                    foreach(var s in pop.OrderBy(s => s.score))
+                    foreach (var s in pop.OrderBy(s => s.score))
                     {
                         sw.WriteLine($"{s.ind.Genome[0]}, {s.ind.Genome[1]}, {s.ind.Genome[2]}, {s.score}, {s.score2}, {s.rank}, {s.congestion}");
                     }
@@ -104,29 +106,37 @@ namespace OthelloAI.GA
 
                 foreach (var b in score.ind.Genome)
                     Console.WriteLine(new Board(b, 0UL));
+            });
+        }
+
+        public void Run(List<U> pop,  Action<List<U>> logger)
+        {
+            for (int i = 0; i < 10000; i++)
+            {
+                pop = Step(pop, 100);
+
+                Console.WriteLine($"Gen: {i}");
+                logger(pop);
             }
         }
 
         public List<U> Init(int n_pop, int n_offspring, int n_tuple, int size_tuple)
         {
-            var offspring = Enumerable.Range(0, n_offspring).Select(_ => new Individual(Enumerable.Range(0, n_tuple).Select(_ => Random.GenerateRegion(19, size_tuple)).ToArray())).ToList();
+            var offspring = Enumerable.Range(0, n_offspring).Select(_ => new Individual<T>(Enumerable.Range(0, n_tuple).Select(_ => GenomeGenerator(size_tuple)).ToArray(), Decoder)).ToList();
             var scores = Evaluator.Evaluate(offspring);
             return NaturalSelector.Select(scores, n_pop, Random);
         }
 
         public List<U> Step(List<U> pop, int n)
         {
-            Console.WriteLine("Varying");
             var offspring = Vary(pop, n);
-            Console.WriteLine("Evaluating");
             var scores = Evaluator.Evaluate(offspring);
-            Console.WriteLine("Selecting");
             return NaturalSelector.Select(scores, pop.Count, Random);
         }
 
-        public virtual List<T> Vary(List<U> list, int n)
+        public virtual List<Individual<T>> Vary(List<U> list, int n)
         {
-            T VaryInd()
+            Individual<T> VaryInd()
             {
                 return GeneticOperator.Operate(() => Selecter.Select(list, Random).ind, Random);
             }
@@ -138,61 +148,35 @@ namespace OthelloAI.GA
                 return list.Select(s => s.ind).Concat(Enumerable.Range(0, n - list.Count).AsParallel().Select(_ => VaryInd())).ToList();
         }
 
-        public List<Individual> Load(string file)
-        {
-            using var reader = new BinaryReader(new FileStream(file, FileMode.Open));
+        //public List<Individual<T>> Load(string file)
+        //{
+        //    using var reader = new BinaryReader(new FileStream(file, FileMode.Open));
 
-            int n = reader.ReadInt32();
-            var pop = new List<Individual>();
+        //    int n = reader.ReadInt32();
+        //    var pop = new List<Individual<T>>();
 
-            for (int i = 0; i < n; i++)
-            {
-                int n_pattern = reader.ReadInt32();
-                var ind = new Individual(Enumerable.Range(0, n_pattern).Select(_ => reader.ReadUInt64()).ToArray());
-                pop.Add(ind);
-            }
+        //    for (int i = 0; i < n; i++)
+        //    {
+        //        int n_pattern = reader.ReadInt32();
+        //        var ind = new Individual<T>(Enumerable.Range(0, n_pattern).Select(_ => reader.ReadUInt64()).ToArray());
+        //        pop.Add(ind);
+        //    }
 
-            return pop;
-        }
+        //    return pop;
+        //}
 
-        public void Save(string file, List<Individual> pop)
-        {
-            using var writer = new BinaryWriter(new FileStream(file, FileMode.Create));
+        //public void Save(string file, List<Individual<T>> pop)
+        //{
+        //    using var writer = new BinaryWriter(new FileStream(file, FileMode.Create));
 
-            writer.Write(pop.Count);
+        //    writer.Write(pop.Count);
 
-            foreach (var ind in pop)
-            {
-                writer.Write(ind.Genome.Length);
-                Array.ForEach(ind.Genome, writer.Write);
-            }
-        }
-    }
-
-    public class IndividualRK : IndividualBase
-    {
-        public float[][] Genome { get; }
-        public int TupleSize { get; }
-
-        public IndividualRK()
-        {
-
-        }
-
-        public IndividualRK(float[][] genome)
-        {
-            Genome = genome;
-        }
-
-        public ulong Decode(float[] keys)
-        {
-            var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(TupleSize);
-
-            ulong g = 0;
-            foreach(var i in indices)
-                g |= 1UL << i;
-            return g;
-        }
+        //    foreach (var ind in pop)
+        //    {
+        //        writer.Write(ind.Genome.Length);
+        //        Array.ForEach(ind.Genome, writer.Write);
+        //    }
+        //}
     }
 
     public class Individual<T>
@@ -205,7 +189,7 @@ namespace OthelloAI.GA
 
         public Func<T, ulong> Decoder { get; }
 
-        public IndividualBase(T[] genome, Func<T, ulong> decoder)
+        public Individual(T[] genome, Func<T, ulong> decoder)
         {
             Genome = genome;
             Decoder = decoder;

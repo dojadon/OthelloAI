@@ -4,12 +4,12 @@ using System.Linq;
 
 namespace OthelloAI.GA
 {
-    public interface ISelector<T, U> where U : Score<Individual<T>>
+    public interface ISelector<T, U> where U : Score<T>
     {
         public U Select(List<U> individuals, Random rand);
     }
 
-    public class SelectorTournament<T, U> : ISelector<T, U> where U : Score<T>
+    public class SelectorTournament<T,U> : ISelector<T, U> where U : Score<T>
     {
         public int TournamentSize { get; set; }
         public Func<U, float> Score { get; }
@@ -26,12 +26,12 @@ namespace OthelloAI.GA
         }
     }
 
-    public interface INaturalSelector<T, U> where T : IndividualBase where U : Score<T>
+    public interface INaturalSelector<T, U>where U : Score<T>
     {
         public List<U> Select(List<U> individuals, int n, Random rand);
     }
 
-    public class NaturalSelector<T, U> : INaturalSelector<T, U> where T : IndividualBase where U : Score<T>
+    public class NaturalSelector<T, U> : INaturalSelector<T, U> where U : Score<T>
     {
         public ISelector<T, U> Selector { get; }
 
@@ -46,7 +46,7 @@ namespace OthelloAI.GA
         }
     }
 
-    public class NaturalSelectorNSGA2<T> : INaturalSelector<T, ScoreNSGA2<T>> where T : IndividualBase
+    public class NaturalSelectorNSGA2<T> : INaturalSelector<T, ScoreNSGA2<T>>
     {
         public List<ScoreNSGA2<T>> Select(List<ScoreNSGA2<T>> scores, int n, Random rand)
         {
