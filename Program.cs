@@ -27,10 +27,8 @@ namespace OthelloAI
 
         static void Main()
         {
+            GA.GATest.TestBRKGA();
             // Tester.Test1();
-            // return;
-
-            GA.GA<GA.Score>.Run();
             return;
 
             Console.WriteLine($"Support BMI2 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");
@@ -56,6 +54,9 @@ namespace OthelloAI
 
             // PATTERN_EDGE2X.Info(32, 2F);
 
+            // Tester.Test1();
+            // GA.GA<float[], GA.Score<float[]>>.TestBRKGA();
+            Test();
             // Train();
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
@@ -69,28 +70,25 @@ namespace OthelloAI
 
         static void Test2()
         {
-            Pattern[] p1 = PATTERNS;
-            Pattern[] p2 = PATTERNS.Select(p => new Pattern("old/" + p.FilePath, p.NumStages, p.Hasher, p.Type)).ToArray();
+            Pattern[] p1 =  { new Pattern("p11.dat", 10, new BoardHasherMask(0b01110000_11111011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p12.dat", 10, new BoardHasherMask(0b10100000_11000011_11000011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p13.dat", 10, new BoardHasherMask(0b01100000_11100010_11000011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p14.dat", 10, new BoardHasherMask(0b11100000_11100000_11100001UL), PatternType.ASYMMETRIC),
+            };
+            Pattern[] p2 = PATTERNS;
 
-           // foreach (var p in p1)
-                //p.Load();
+            foreach (var p in p1)
+                p.Load();
 
             foreach (var p in p2)
                 p.Load();
-
-            for(int i = 0; i < 10; i++)
-            {
-                p2[0].Info(20 + i, 0);
-            }
-
-            return;
 
             PlayerAI Create(Evaluator e)
             {
                 return new PlayerAI(e)
                 {
-                    ParamBeg = new SearchParameters(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
-                    ParamMid = new SearchParameters(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
+                    ParamBeg = new SearchParameters(depth: 3, stage: 0, new CutoffParameters(true, true, false)),
+                    ParamMid = new SearchParameters(depth: 3, stage: 16, new CutoffParameters(true, true, false)),
                     ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                     PrintInfo = false,
                 };
@@ -106,6 +104,7 @@ namespace OthelloAI
                     if (move != 0)
                     {
                         board = board.Reversed(move, stone);
+                        // Console.WriteLine(board);
                         return true;
                     }
                     return false;
@@ -127,7 +126,7 @@ namespace OthelloAI
 
             for (int i = 0; i < 1000; i++)
             {
-                int result = Play(player2, player1);
+                int result = Play(player1, player2);
 
                 if (result > 0)
                     w1++;
@@ -140,41 +139,42 @@ namespace OthelloAI
 
         static void Test()
         {
-            Pattern[] p1 = { new Pattern("p11.dat", 10, new BoardHasherMask(0b10100101_11110000UL), PatternType.ASYMMETRIC),
-                                    new Pattern("p12.dat", 10, new BoardHasherMask(0b1000001_1010001_10000011UL), PatternType.ASYMMETRIC),
-                                    new Pattern("p13.dat", 10, new BoardHasherMask(0b100000_10101000_00111100UL), PatternType.ASYMMETRIC),
-                                    new Pattern("p14.dat", 10, new BoardHasherMask(0b10000000_11101111UL), PatternType.ASYMMETRIC),
+            Pattern[] p1 = { new Pattern("p11.dat", 10, new BoardHasherMask(0b01110000_11111011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p12.dat", 10, new BoardHasherMask(0b10100000_11000011_11000011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p13.dat", 10, new BoardHasherMask(0b01100000_11100010_11000011UL), PatternType.ASYMMETRIC),
+                                    new Pattern("p14.dat", 10, new BoardHasherMask(0b11100000_11100000_11100001UL), PatternType.ASYMMETRIC),
             };
 
-            Pattern[] p2 = { new Pattern("p21.dat", 10, new BoardHasherMask(0b11111111UL), PatternType.ASYMMETRIC),
-                                    new Pattern("p22.dat", 10, new BoardHasherMask(0b11000000_11100000_11100000UL), PatternType.ASYMMETRIC),
-                                    new Pattern("p23.dat", 10, new BoardHasherMask(0b10000000_11100000_11110000UL), PatternType.ASYMMETRIC),
-                                    new Pattern("p24.dat", 10, new BoardHasherMask(0x8040201008040201UL), PatternType.ASYMMETRIC),
-            };
+            //Pattern[] p2 = { new Pattern("p21.dat", 10, new BoardHasherMask(0b11111111UL), PatternType.ASYMMETRIC),
+            //                        new Pattern("p22.dat", 10, new BoardHasherMask(0b11000000_11100000_11100000UL), PatternType.ASYMMETRIC),
+            //                        new Pattern("p23.dat", 10, new BoardHasherMask(0b10000000_11100000_11110000UL), PatternType.ASYMMETRIC),
+            //};
+
+            Pattern[] p2 = PATTERNS;
 
             PatternTrainer[] trainers = { new PatternTrainer(p1, 0.01F), new PatternTrainer(p2, 0.01F) };
-            Evaluator[] evaluators = { new EvaluatorPatternBased(p1), new EvaluatorPatternBased(p2) };
+            (Evaluator, float)[] evaluators = { (new EvaluatorPatternBased(p1), 0.5F), (new EvaluatorPatternBased(p2), 0.5F) };
 
-            var evaluator = new EvaluatorRandomChoice(evaluators);
+            var evaluator = new EvaluatorBiasedRandomChoice(evaluators);
 
             PlayerAI player = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 1, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 1, stage: 16, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 7, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 7, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
             };
 
-            List<float>[] scores = { new List<float>(), new List<float>() };
-
             for (int i = 0; i < 10000; i++)
             {
-                var data = TrainerUtil.PlayForTrainingParallel(10, player);
+                var data = TrainerUtil.PlayForTrainingParallel(16, player);
 
-                foreach (var (trainer, s) in trainers.Zip(scores))
+                foreach (var trainer in trainers)
                 {
-                    s.Add(data.Select(t => trainer.Update(t.board, t.result)).Select(f => f * f).Average());
-                    Console.Write(s.TakeLast(100).Average() + ", ");
+                    foreach (var d in data)
+                        trainer.Update(d.board, d.result);
+
+                    Console.Write(trainer.Log.TakeLast(10000).Average() + ", ");
                 }
 
                 Console.WriteLine();

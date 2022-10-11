@@ -6,10 +6,11 @@ namespace OthelloAI.GA
 {
     public interface ISelector<T, U> where U : Score<T>
     {
-        public U Select(List<U> individuals, Random rand);
+        public U Select(List<U> scores, Random rand);
+        public (U, U) SelectPair(List<U> scores, Random rand);
     }
 
-    public class SelectorTournament<T,U> : ISelector<T, U> where U : Score<T>
+    public class SelectorTournament<T, U> : ISelector<T, U> where U : Score<T>
     {
         public int TournamentSize { get; set; }
         public Func<U, float> Score { get; }
@@ -20,13 +21,34 @@ namespace OthelloAI.GA
             Score = score;
         }
 
-        public U Select(List<U> individuals, Random rand)
+        public U Select(List<U> scores, Random rand)
         {
-            return Enumerable.Range(0, TournamentSize).Select(_ => rand.Choice(individuals)).MinBy(Score).First();
+            return Enumerable.Range(0, TournamentSize).Select(_ => rand.Choice(scores)).MinBy(Score).First();
+        }
+
+        public (U, U) SelectPair(List<U> scores, Random rand)
+        {
+            return (Select(scores, rand), Select(scores, rand));
         }
     }
 
-    public interface INaturalSelector<T, U>where U : Score<T>
+    public class SelectorEliteBiased<T> : ISelector<T, ScoreElite<T>>
+    {
+        public ScoreElite<T> Select(List<ScoreElite<T>> scores, Random rand)
+        {
+            throw new NotImplementedException();
+        }
+
+        public (ScoreElite<T>, ScoreElite<T>) SelectPair(List<ScoreElite<T>> scores, Random rand)
+        {
+            var elite = rand.Choice(scores.Where(s => s.is_elite).ToList());
+            var non_elite = rand.Choice(scores.Where(s => !s.is_elite).ToList());
+
+            return (elite, non_elite);
+        }
+    }
+
+    public interface INaturalSelector<T, U> where U : Score<T>
     {
         public List<U> Select(List<U> individuals, int n, Random rand);
     }

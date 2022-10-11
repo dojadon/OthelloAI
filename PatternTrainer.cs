@@ -72,7 +72,7 @@ namespace OthelloAI
 
             int count = 0;
 
-            var data = Enumerable.Range(0, 16).AsParallel().SelectMany(i =>
+            var data = Enumerable.Range(0, 16).AsParallel().Select(i =>
             {
                 var results = new TrainingData();
                 var rand = new Random();
@@ -91,7 +91,7 @@ namespace OthelloAI
                 }
 
                 return results;
-            });
+            }).ToList().SelectMany(d => d);
 
             return new TrainingData(data.ToList());
         }
@@ -140,6 +140,8 @@ namespace OthelloAI
     {
         public Pattern[] Patterns { get; }
         public float LearningRate { get; }
+
+        public List<float> Log { get; } = new List<float>();
 
         public PatternTrainer(Pattern[] patterns, float lr)
         {
@@ -210,6 +212,8 @@ namespace OthelloAI
                 {
                     p.UpdataEvaluation(b, e * LearningRate, 6);
                 }
+
+            Log.Add(e * e);
 
             return e;
         }

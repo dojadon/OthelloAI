@@ -60,6 +60,43 @@ namespace OthelloAI
         }
     }
 
+    public class EvaluatorBiasedRandomChoice : Evaluator
+    {
+        Random Rand { get; } = new Random(DateTime.Now.Millisecond);
+        (Evaluator e, float prob)[] Evaluators { get; }
+
+        Evaluator Current { get; set; }
+
+        public EvaluatorBiasedRandomChoice((Evaluator, float)[] evaluators)
+        {
+            Evaluators = evaluators;
+        }
+
+        Evaluator Choice()
+        {
+            double d = Rand.NextDouble();
+
+            float total = 0;
+            foreach((Evaluator e, float prob) in Evaluators)
+            {
+                if (d < (total += prob))
+                    return e;
+            }
+
+            return Evaluators[^1].e;
+        }
+
+        public override int Eval(Board board)
+        {
+            return Current.Eval(board);
+        }
+
+        public override void StartSearch(int stone)
+        {
+            Current = Choice();
+        }
+    }
+
     public class EvaluatorRandomChoice : Evaluator
     {
         Random Rand { get; } = new Random(DateTime.Now.Millisecond);
