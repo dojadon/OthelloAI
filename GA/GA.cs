@@ -1,5 +1,4 @@
-﻿using OthelloAI.Patterns;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -148,14 +147,17 @@ namespace OthelloAI.GA
 
             static float[] Combine(float[][] g)
             {
+                if (g.Length == 1)
+                    return g[0];
+
                 return Enumerable.Range(0, g[0].Length).Select(i => g.Select(a => a[i]).Min()).ToArray();
             }
 
             var info = new GenomeInfo<float[]>()
             {
-                NumTuple = 10,
-                SizeMin = 2,
-                SizeMax = 3,
+                NumTuple = 12,
+                SizeMin = 9,
+                SizeMax = 9,
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
                 Combiner = Combine,
@@ -307,13 +309,21 @@ namespace OthelloAI.GA
             Size = size;
             Info = info;
 
-            NumTuples = (int)Math.Pow(3, info.SizeMax - Size);
-            Tuples = Enumerable.Range(0, NumTuples).Select(i =>
+            if(info.SizeMax == Size)
             {
-                int n = genome.Length / NumTuples;
-                T g = info.Combiner(genome.Skip(n * i).Take(n).ToArray());
-                return info.Decoder(g, Size);
-            }).ToArray();
+                NumTuples = 1;
+                Tuples = new ulong[] { info.Decoder(info.Combiner(genome), Size) };
+            }
+            else
+            {
+                NumTuples = (int)Math.Pow(3, info.SizeMax - Size);
+                Tuples = Enumerable.Range(0, NumTuples).Select(i =>
+                {
+                    int n = genome.Length / NumTuples;
+                    T g = info.Combiner(genome.Skip(n * i).Take(n).ToArray());
+                    return info.Decoder(g, Size);
+                }).ToArray();
+            }
 
             Patterns = Tuples.Select(g => new Pattern($"ga/{g}.dat", 10, new BoardHasherMask(g), PatternType.ASYMMETRIC)).ToArray();
         }

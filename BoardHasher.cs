@@ -1,98 +1,58 @@
-﻿using OthelloAI.Patterns;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI
 {
+    public enum HashType
+    {
+        BIN, TER
+    }
+
     public abstract class BoardHasher
     {
+        public abstract HashType HashType { get; }
+
+        public int ArrayLength => HashType switch
+        {
+            HashType.BIN => (int)Math.Pow(2, HashLength * 2),
+            HashType.TER => (int)Math.Pow(3, HashLength),
+            _ => throw new NotImplementedException(),
+        };
+
         public abstract int HashLength { get; }
         public abstract int[] Positions { get; }
-        public int HashBinByPEXT(in Board b) => HashByPEXT(b.bitB) | (HashByPEXT(b.bitW) << HashLength);
-        public int HashTerByPEXT(in Board b) => BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitB), HashLength) + 2 * BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitW), HashLength);
 
-        public int HashByPEXT(in Board b)
+        public abstract int Hash(in Board b);
+
+        public abstract uint ConvertStateToHash(int i);
+
+        public abstract int FlipHash(int hash);
+
+        public abstract Board FromHash(uint hash);
+    }
+
+    public abstract class BoardHasherBin : BoardHasher
+    {
+        public override HashType HashType => HashType.BIN;
+
+        public override int Hash(in Board b) => Hash(b.bitB) | (Hash(b.bitW) << HashLength);
+
+        public abstract int Hash(ulong b);
+
+        public override uint ConvertStateToHash(int i)
         {
-#if BIN_HASH
-            return HashByPEXT(b.bitB) | (HashByPEXT(b.bitW) << HashLength);
-#else
-            return BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitB), HashLength) + 2 * BinTerUtil.ConvertBinToTer(HashByPEXT(b.bitW), HashLength);
-#endif
-        }
-
-        public abstract int HashByPEXT(ulong b);
-
-        public int HashByScanning(Board board)
-        {
-            int hash = 0;
-
-            for(int i = 0; i < Positions.Length; i++)
-            {
-                int pos = Positions[Positions.Length - 1 - i];
-
-                hash *= 3;
-                hash += (int)((board.bitB >> pos) & 1);
-                hash += (int)((board.bitW >> pos) & 1) * 2;
-            }
-            return hash;
-        }
-
-        public uint ConvertStateToHash(int i)
-        {
-#if BIN_HASH
             (uint b1, uint b2) = BinTerUtil.ConvertTerToBinPair(i, HashLength);
             return b1 | (b2 << HashLength);
-#else
-            return (uint) i;
-#endif
         }
 
-        public int FlipHash(int hash)
+        public override int FlipHash(int hash)
         {
-#if BIN_HASH
             return (hash >> HashLength) | ((hash & ((1 << HashLength) - 1)) << HashLength);
-#else
-            int result = 0;
-
-            for (int i = 0; i < HashLength; i++)
-            {
-                int s = hash % 3;
-                hash /= 3;
-                s = s == 0 ? 0 : (s == 1 ? 2 : 1);
-                result += s * BinTerUtil.POW3_TABLE[i];
-            }
-            return result;
-#endif
         }
 
-        public int FlipBinHash(int hash) => (hash >> HashLength) | ((hash & ((1 << HashLength) - 1)) << HashLength);
-
-        public int FlipTerHash(int hash)
-        {
-            int result = 0;
-
-            for (int i = 0; i < HashLength; i++)
-            {
-                int s = hash % 3;
-                hash /= 3;
-                s = s == 0 ? 0 : (s == 1 ? 2 : 1);
-                result += s * BinTerUtil.POW3_TABLE[i];
-            }
-            return result;
-        }
-
-        public Board FromHash(uint hash)
-        {
-#if BIN_HASH
-            return FromBinHash(hash);
-#else
-            return FromTerHash(hash);
-#endif
-        }
-
-        public Board FromBinHash(uint hash)
+        public override Board FromHash(uint hash)
         {
             uint hash_b = hash & ((1u << HashLength) - 1u);
             uint hash_w = hash >> HashLength;
@@ -115,8 +75,32 @@ namespace OthelloAI
             }
             return new Board(b, w);
         }
+    }
 
-        public Board FromTerHash(uint hash)
+    public abstract class BoardHasherTer : BoardHasher
+    {
+        public override HashType HashType => HashType.TER;
+
+        public override uint ConvertStateToHash(int i)
+        {
+            return (uint) i;
+        }
+
+        public override int FlipHash(int hash)
+        {
+            int result = 0;
+
+            for (int i = 0; i < HashLength; i++)
+            {
+                int s = hash % 3;
+                hash /= 3;
+                s = s == 0 ? 0 : (s == 1 ? 2 : 1);
+                result += s * BinTerUtil.POW3_TABLE[i];
+            }
+            return result;
+        }
+
+        public override Board FromHash(uint hash)
         {
             ulong b = 0;
             ulong w = 0;
@@ -139,13 +123,72 @@ namespace OthelloAI
         }
     }
 
-    public class BoardHasherMask : BoardHasher
+    public class BoardhasherTerFromBin : BoardHasherTer
+    {
+        public BoardHasherBin HasherBin { get; }
+
+        public override int HashLength => HasherBin.HashLength;
+
+        public override int[] Positions => HasherBin.Positions;
+
+        public override int Hash(in Board b) => BinTerUtil.ConvertBinToTer(HasherBin.Hash(b.bitB), HashLength) + 2 * BinTerUtil.ConvertBinToTer(HasherBin.Hash(b.bitW), HashLength);
+    }
+
+    public class BoardHasherScanning : BoardHasherTer
+    {
+        public override int[] Positions { get; }
+        public override int HashLength => Positions.Length;
+
+        public BoardHasherScanning(int[] positions)
+        {
+            Positions = positions;
+        }
+
+        public override int Hash(in Board board)
+        {
+            int hash = 0;
+
+            for (int i = 0; i < Positions.Length; i++)
+            {
+                int pos = Positions[i];
+
+                hash *= 3;
+                hash += (int)((board.bitB >> pos) & 1);
+                hash += (int)((board.bitW >> pos) & 1) * 2;
+            }
+            return hash;
+        }
+    }
+
+    public class BoardHasherScanning2 : BoardHasherTer
+    {
+        public override int[] Positions { get; }
+        public override int HashLength => Positions.Length;
+
+        public int Pos1 { get; }
+        public int Pos2 { get; }
+
+        public BoardHasherScanning2(int pos1, int pos2)
+        {
+            Positions = new int[] { pos1, pos2};
+
+            Pos1 = pos1;
+            Pos2 = pos2;
+        }
+
+        public override int Hash(in Board board)
+        {
+            return (int)((board.bitB >> Pos1) & 1) * 3 + (int)((board.bitW >> Pos1) & 1) * 6 + (int)((board.bitB >> Pos2) & 1) + (int)((board.bitW >> Pos2) & 1) * 2;
+        }
+    }
+
+    public class BoardHasherMask : BoardHasherBin
     {
         public ulong Mask { get; }
         public override int HashLength { get; }
         public override int[] Positions { get; }
 
-        public override int HashByPEXT(ulong b) => (int)Bmi2.X64.ParallelBitExtract(b, Mask);
+        public override int Hash(ulong b) => (int)Bmi2.X64.ParallelBitExtract(b, Mask);
 
         public BoardHasherMask(ulong mask)
         {
@@ -159,17 +202,19 @@ namespace OthelloAI
                 if (((mask >> i) & 1) != 0)
                     list.Add(i);
             }
+            list.Reverse();
+
             Positions = list.ToArray();
         }
     }
 
-    public class BoardHasherLine1 : BoardHasher
+    public class BoardHasherLine1 : BoardHasherBin
     {
         public int Line { get; }
         public override int HashLength => 8;
         public override int[] Positions { get; } = Enumerable.Range(0, 8).ToArray();
 
-        public override int HashByPEXT(ulong b) => (int)((b >> (Line * 8)) & 0xFF);
+        public override int Hash(ulong b) => (int)((b >> (Line * 8)) & 0xFF);
 
         public BoardHasherLine1(int line)
         {

@@ -3,8 +3,67 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace OthelloAI.Patterns
+namespace OthelloAI
 {
+    public abstract class PatternWeights
+    {
+        public abstract void Reset();
+
+        public abstract int Eval(Board b);
+        public abstract float EvalTraining(Board b);
+
+        public abstract void Read(BinaryReader reader);
+        public abstract void Write(BinaryWriter writer);
+    }
+
+    public class PatternWeightsArray : PatternWeights
+    {
+        public BoardHasher Hasher { get; }
+
+        public float[] Weights { get; private set; }
+        protected byte[] WeightsB { get; private set; }
+
+        public int NumOfStates { get; }
+
+        public override void Reset()
+        {
+            Weights = new float[NumOfStates];
+            WeightsB = new byte[NumOfStates];
+        }
+
+        public override int Eval(Board b)
+        {
+            return WeightsB[Hasher.Hash(b)];
+        }
+
+        public override float EvalTraining(Board b)
+        {
+            return Weights[Hasher.Hash(b)];
+        }
+
+        public override void Read(BinaryReader reader)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                float e = reader.ReadSingle();
+
+                uint index = Hasher.ConvertStateToHash(i);
+                Weights[index] = e;
+            }
+        }
+
+        public override void Write(BinaryWriter writer)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                uint index = Hasher.ConvertStateToHash(i);
+
+                float e = Weights[index];
+                writer.Write(e);
+            }
+        }
+    }
+
     public enum PatternType
     {
         X_SYMMETRIC,
@@ -22,13 +81,10 @@ namespace OthelloAI.Patterns
         public PatternType Type { get; }
         public BoardHasher Hasher { get; }
 
-        public int ArrayLength { get; }
         public int NumOfStates { get; }
 
         public float[][] StageBasedEvaluations { get; private set; }
         protected byte[][] StageBasedEvaluationsB { get; private set; }
-
-        public float Variance { get; set; }
 
         public Pattern(string filePath, int n_stages, BoardHasher hasher, PatternType type)
         {
@@ -37,13 +93,12 @@ namespace OthelloAI.Patterns
             Hasher = hasher;
             Type = type;
 
-            NumOfStates = (int)Math.Pow(3, Hasher.HashLength);
+            //if (Hasher.HashLength > 2)
+            //    Hasher = new BoardHasherScanning(Hasher.Positions);
+            //else
+            //    Hasher = new BoardHasherScanning2(Hasher.Positions[0], Hasher.Positions[1]);
 
-#if BIN_HASH
-            ArrayLength = (int)Math.Pow(2, 2 * Hasher.HashLength);
-#else
-            ArrayLength = NumOfStates;
-#endif
+            NumOfStates = (int)Math.Pow(3, Hasher.HashLength);
 
             Reset();
         }
@@ -55,8 +110,8 @@ namespace OthelloAI.Patterns
 
             for (int i = 0; i < NumStages; i++)
             {
-                StageBasedEvaluations[i] = new float[ArrayLength];
-                StageBasedEvaluationsB[i] = new byte[ArrayLength];
+                StageBasedEvaluations[i] = new float[Hasher.ArrayLength];
+                StageBasedEvaluationsB[i] = new byte[Hasher.ArrayLength];
             }
         }
 
@@ -69,7 +124,7 @@ namespace OthelloAI.Patterns
         {
             int stage = GetStage(board);
 
-            int hash = Hasher.HashByPEXT(board);
+            int hash = Hasher.Hash(board);
             int flipped = Hasher.FlipHash(hash);
 
             StageBasedEvaluations[stage][hash] += add;
@@ -101,7 +156,7 @@ namespace OthelloAI.Patterns
         public int EvalByPEXTHashing(RotatedAndMirroredBoards b)
         {
             byte[] e = StageBasedEvaluationsB[GetStage(b.rot0)];
-            byte _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
+            byte _Eval(in Board borad) => e[Hasher.Hash(borad)];
 
             return Type switch
             {
@@ -116,7 +171,7 @@ namespace OthelloAI.Patterns
         public float EvalTrainingByPEXTHashing(RotatedAndMirroredBoards b)
         {
             float[] e = StageBasedEvaluations[GetStage(b.rot0)];
-            float _Eval(in Board borad) => e[Hasher.HashByPEXT(borad)];
+            float _Eval(in Board borad) => e[Hasher.Hash(borad)];
 
             return Type switch
             {
@@ -174,11 +229,11 @@ namespace OthelloAI.Patterns
             {
                 uint hash = Hasher.ConvertStateToHash(i);
 
-                if (Hasher.HashByPEXT(Hasher.FromHash(hash)) != hash)
+                if (Hasher.Hash(Hasher.FromHash(hash)) != hash)
                 {
                     Console.WriteLine(Hasher.FromHash(hash));
-                    Console.WriteLine($"{hash}, {Hasher.HashByPEXT(Hasher.FromHash(hash))}");
-                    Console.WriteLine($"{hash}, {(hash >> Hasher.HashLength)}, {(hash & ((1 << Hasher.HashLength) - 1)) << Hasher.HashLength}");
+                    Console.WriteLine($"{hash}, {Hasher.Hash(Hasher.FromHash(hash))}");
+                    Console.WriteLine($"{hash}, {hash >> Hasher.HashLength}, {(hash & (1 << Hasher.HashLength) - 1) << Hasher.HashLength}");
                     return false;
                 }
             }
@@ -193,7 +248,7 @@ namespace OthelloAI.Patterns
 
                 if (StageBasedEvaluations[stage][index] != 0)
                     Console.WriteLine(StageBasedEvaluationsB[stage][index]);
-                    //InfoHash(stage, index);
+                //InfoHash(stage, index);
             }
         }
 
@@ -210,15 +265,15 @@ namespace OthelloAI.Patterns
             ulong and = src_t & dst_t;
             int n = Board.BitCount(src_t);
 
-            foreach(uint i in Test(and, n))
+            foreach (uint i in Test(and, n))
             {
                 uint[] indices1 = Test(src_t & ~dst_t, n).ToArray();
                 float[] e = src.Select(a => indices1.Select(j => a[i | j]).Average()).ToArray();
 
                 uint[] indices2 = Test(~src_t & dst_t, n).ToArray();
 
-                for(int stage = 0; stage < dst.Length; stage++)
-                    foreach(uint j in indices2)
+                for (int stage = 0; stage < dst.Length; stage++)
+                    foreach (uint j in indices2)
                         dst[stage][i | j] += e[stage] * 0.5F;
             }
         }
