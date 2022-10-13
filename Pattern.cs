@@ -5,65 +5,6 @@ using System.Linq;
 
 namespace OthelloAI
 {
-    public abstract class PatternWeights
-    {
-        public abstract void Reset();
-
-        public abstract int Eval(Board b);
-        public abstract float EvalTraining(Board b);
-
-        public abstract void Read(BinaryReader reader);
-        public abstract void Write(BinaryWriter writer);
-    }
-
-    public class PatternWeightsArray : PatternWeights
-    {
-        public BoardHasher Hasher { get; }
-
-        public float[] Weights { get; private set; }
-        protected byte[] WeightsB { get; private set; }
-
-        public int NumOfStates { get; }
-
-        public override void Reset()
-        {
-            Weights = new float[NumOfStates];
-            WeightsB = new byte[NumOfStates];
-        }
-
-        public override int Eval(Board b)
-        {
-            return WeightsB[Hasher.Hash(b)];
-        }
-
-        public override float EvalTraining(Board b)
-        {
-            return Weights[Hasher.Hash(b)];
-        }
-
-        public override void Read(BinaryReader reader)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                float e = reader.ReadSingle();
-
-                uint index = Hasher.ConvertStateToHash(i);
-                Weights[index] = e;
-            }
-        }
-
-        public override void Write(BinaryWriter writer)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-
-                float e = Weights[index];
-                writer.Write(e);
-            }
-        }
-    }
-
     public enum PatternType
     {
         X_SYMMETRIC,
@@ -82,6 +23,8 @@ namespace OthelloAI
         public BoardHasher Hasher { get; }
 
         public int NumOfStates { get; }
+
+        public PatternWeights[] StagebasedWeights { get; private set; }
 
         public float[][] StageBasedEvaluations { get; private set; }
         protected byte[][] StageBasedEvaluationsB { get; private set; }
@@ -130,8 +73,8 @@ namespace OthelloAI
             StageBasedEvaluations[stage][hash] += add;
             StageBasedEvaluations[stage][flipped] -= add;
 
-            StageBasedEvaluationsB[stage][hash] = ConvertToInt8(StageBasedEvaluations[stage][hash] + add, range);
-            StageBasedEvaluationsB[stage][flipped] = ConvertToInt8(StageBasedEvaluations[stage][flipped] - add, range);
+            StageBasedEvaluationsB[stage][hash] = ConvertToInt8(StageBasedEvaluations[stage][hash], range);
+            StageBasedEvaluationsB[stage][flipped] = ConvertToInt8(StageBasedEvaluations[stage][flipped], range);
         }
 
         byte ConvertToInt8(float x, float range)

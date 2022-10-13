@@ -21,6 +21,8 @@ namespace OthelloAI
             _ => throw new NotImplementedException(),
         };
 
+        public int NumOfStates => (int)Math.Pow(3, HashLength);
+
         public abstract int HashLength { get; }
         public abstract int[] Positions { get; }
 
