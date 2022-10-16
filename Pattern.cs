@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -15,91 +14,61 @@ namespace OthelloAI
 
     public class Pattern
     {
-        public int NumStages { get; }
+        public static Pattern Create(BoardHasher hasher, int n_stages, PatternType type, string file = "")
+        {
+            PatternWeights[] weights_stage;
 
-        public string FilePath { get; }
+            if (hasher.Positions.Length > 1)
+            {
+                weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeightsArray(hasher)).ToArray();
+            }
+            else
+            {
+                ulong mask1 = 1UL << hasher.Positions[0];
+                ulong mask2 = 1UL << hasher.Positions[1];
+
+                weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeights2Disc(mask1, mask2)).ToArray();
+            }
+
+            var weights = new PatternWeightsStagebased(weights_stage);
+            return new Pattern(weights, type) { FilePath = file };
+        }
+
+        public string FilePath { get; set; }
 
         public PatternType Type { get; }
-        public BoardHasher Hasher { get; }
 
-        public int NumOfStates { get; }
+        public PatternWeights Weights { get; private set; }
 
-        public PatternWeights[] StagebasedWeights { get; private set; }
-
-        public float[][] StageBasedEvaluations { get; private set; }
-        protected byte[][] StageBasedEvaluationsB { get; private set; }
-
-        public Pattern(string filePath, int n_stages, BoardHasher hasher, PatternType type)
+        public Pattern(PatternWeights weights, PatternType type)
         {
-            FilePath = filePath;
-            NumStages = n_stages;
-            Hasher = hasher;
+            Weights = weights;
             Type = type;
-
-            //if (Hasher.HashLength > 2)
-            //    Hasher = new BoardHasherScanning(Hasher.Positions);
-            //else
-            //    Hasher = new BoardHasherScanning2(Hasher.Positions[0], Hasher.Positions[1]);
-
-            NumOfStates = (int)Math.Pow(3, Hasher.HashLength);
 
             Reset();
         }
 
         public void Reset()
         {
-            StageBasedEvaluations = new float[NumStages][];
-            StageBasedEvaluationsB = new byte[NumStages][];
-
-            for (int i = 0; i < NumStages; i++)
-            {
-                StageBasedEvaluations[i] = new float[Hasher.ArrayLength];
-                StageBasedEvaluationsB[i] = new byte[Hasher.ArrayLength];
-            }
-        }
-
-        protected int GetStage(Board board)
-        {
-            return (board.n_stone - 5) / (60 / NumStages);
+            Weights.Reset();
         }
 
         public void UpdataEvaluation(Board board, float add, float range)
         {
-            int stage = GetStage(board);
-
-            int hash = Hasher.Hash(board);
-            int flipped = Hasher.FlipHash(hash);
-
-            StageBasedEvaluations[stage][hash] += add;
-            StageBasedEvaluations[stage][flipped] -= add;
-
-            StageBasedEvaluationsB[stage][hash] = ConvertToInt8(StageBasedEvaluations[stage][hash], range);
-            StageBasedEvaluationsB[stage][flipped] = ConvertToInt8(StageBasedEvaluations[stage][flipped], range);
-        }
-
-        byte ConvertToInt8(float x, float range)
-        {
-            return (byte)Math.Clamp(x / range * 127 + 128, 0, 255);
+            Weights.UpdataEvaluation(board, add, range);
         }
 
         public void ApplyTrainedEvaluation()
         {
-            float range = StageBasedEvaluations.SelectMany(a => a.Select(Math.Abs).Where(f => f < 10).OrderByDescending(f => f).Take(10)).Average();
+            float[] w = Weights.GetWeights();
+            float range = w.Select(Math.Abs).OrderByDescending(f => f).Take(Math.Max(w.Length / 4, w.Length / 100)).Average();
 
-            for (int stage = 0; stage < NumStages; stage++)
-            {
-                for (int i = 0; i < NumOfStates; i++)
-                {
-                    uint index = Hasher.ConvertStateToHash(i);
-                    StageBasedEvaluationsB[stage][index] = ConvertToInt8(StageBasedEvaluations[stage][index], range);
-                }
-            }
+            Weights.ApplyTrainedEvaluation(range);
         }
 
         public int EvalByPEXTHashing(RotatedAndMirroredBoards b)
         {
-            byte[] e = StageBasedEvaluationsB[GetStage(b.rot0)];
-            byte _Eval(in Board borad) => e[Hasher.Hash(borad)];
+            int _Eval(in Board board) => Weights.Eval(board);
 
             return Type switch
             {
@@ -113,8 +82,7 @@ namespace OthelloAI
 
         public float EvalTrainingByPEXTHashing(RotatedAndMirroredBoards b)
         {
-            float[] e = StageBasedEvaluations[GetStage(b.rot0)];
-            float _Eval(in Board borad) => e[Hasher.Hash(borad)];
+            float _Eval(in Board board) => Weights.EvalTraining(board);
 
             return Type switch
             {
@@ -128,17 +96,7 @@ namespace OthelloAI
 
         public void Read(BinaryReader reader)
         {
-            for (int stage = 0; stage < NumStages; stage++)
-            {
-                for (int i = 0; i < NumOfStates; i++)
-                {
-                    float e = reader.ReadSingle();
-
-                    uint index = Hasher.ConvertStateToHash(i);
-                    StageBasedEvaluations[stage][index] = e;
-                }
-            }
-
+            Weights.Read(reader);
             ApplyTrainedEvaluation();
         }
 
@@ -150,88 +108,13 @@ namespace OthelloAI
 
         public void Write(BinaryWriter writer)
         {
-            for (int stage = 0; stage < NumStages; stage++)
-            {
-                for (int i = 0; i < NumOfStates; i++)
-                {
-                    uint index = Hasher.ConvertStateToHash(i);
-                    writer.Write(StageBasedEvaluations[stage][index]);
-                }
-            }
+            Weights.Write(writer);
         }
 
         public void Save()
         {
             using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
             Write(writer);
-        }
-
-        public bool Test()
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint hash = Hasher.ConvertStateToHash(i);
-
-                if (Hasher.Hash(Hasher.FromHash(hash)) != hash)
-                {
-                    Console.WriteLine(Hasher.FromHash(hash));
-                    Console.WriteLine($"{hash}, {Hasher.Hash(Hasher.FromHash(hash))}");
-                    Console.WriteLine($"{hash}, {hash >> Hasher.HashLength}, {(hash & (1 << Hasher.HashLength) - 1) << Hasher.HashLength}");
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        public void Info(int stage, float threshold)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-
-                if (StageBasedEvaluations[stage][index] != 0)
-                    Console.WriteLine(StageBasedEvaluationsB[stage][index]);
-                //InfoHash(stage, index);
-            }
-        }
-
-        public void InfoHash(int stage, uint hash)
-        {
-            Console.WriteLine(Hasher.FromHash(hash));
-            Console.WriteLine($"Stage : {stage}, Hash : {hash}");
-            Console.WriteLine($"Eval : {StageBasedEvaluations[stage][hash]}");
-            Console.WriteLine();
-        }
-
-        public static void Test(float[][] src, float[][] dst, ulong src_t, ulong dst_t)
-        {
-            ulong and = src_t & dst_t;
-            int n = Board.BitCount(src_t);
-
-            foreach (uint i in Test(and, n))
-            {
-                uint[] indices1 = Test(src_t & ~dst_t, n).ToArray();
-                float[] e = src.Select(a => indices1.Select(j => a[i | j]).Average()).ToArray();
-
-                uint[] indices2 = Test(~src_t & dst_t, n).ToArray();
-
-                for (int stage = 0; stage < dst.Length; stage++)
-                    foreach (uint j in indices2)
-                        dst[stage][i | j] += e[stage] * 0.5F;
-            }
-        }
-
-        public static IEnumerable<uint> Test(ulong mask, int n_src)
-        {
-            int n_mask = Board.BitCount(mask);
-
-            return Enumerable.Range(0, (int)Math.Pow(3, n_mask)).Select(i =>
-            {
-                (uint i1, uint i2) = BinTerUtil.ConvertTerToBinPair(i, n_mask);
-                uint u1 = System.Runtime.Intrinsics.X86.Bmi2.ParallelBitDeposit(i1, (uint)mask);
-                uint u2 = System.Runtime.Intrinsics.X86.Bmi2.ParallelBitDeposit(i2, (uint)mask);
-                return u2 << n_src | u1;
-            });
         }
     }
 }

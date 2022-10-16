@@ -10,27 +10,27 @@ namespace OthelloAI
     {
         public const int NUM_STAGES = 10;
 
-        public static readonly Pattern PATTERN_EDGE2X = new Pattern("e_edge_x.dat", NUM_STAGES, new BoardHasherMask(0b01000010_11111111UL), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_EDGE_BLOCK = new Pattern("e_edge_block.dat", NUM_STAGES, new BoardHasherMask(0b00111100_10111101UL), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_CORNER_BLOCK = new Pattern("e_corner_block.dat", NUM_STAGES, new BoardHasherMask(0b00000111_00000111_00000111UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_CORNER = new Pattern("e_corner.dat", NUM_STAGES, new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_LINE1 = new Pattern("e_line1.dat", NUM_STAGES, new BoardHasherLine1(1), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_LINE2 = new Pattern("e_line2.dat", NUM_STAGES, new BoardHasherLine1(2), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_LINE3 = new Pattern("e_line3.dat", NUM_STAGES, new BoardHasherLine1(3), PatternType.X_SYMMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL8 = new Pattern("e_diag8.dat", NUM_STAGES, new BoardHasherMask(0x8040201008040201UL), PatternType.DIAGONAL);
-        public static readonly Pattern PATTERN_DIAGONAL7 = new Pattern("e_diag7.dat", NUM_STAGES, new BoardHasherMask(0x1020408102040UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL6 = new Pattern("e_diag6.dat", NUM_STAGES, new BoardHasherMask(0x10204081020UL), PatternType.XY_SYMMETRIC);
-        public static readonly Pattern PATTERN_DIAGONAL5 = new Pattern("e_diag5.dat", NUM_STAGES, new BoardHasherMask(0x102040810UL), PatternType.XY_SYMMETRIC);
+        public static readonly Pattern PATTERN_EDGE2X = Pattern.Create(new BoardHasherMask(0b01000010_11111111UL), NUM_STAGES, PatternType.X_SYMMETRIC, "e_edge_x.dat");
+        public static readonly Pattern PATTERN_EDGE_BLOCK = Pattern.Create(new BoardHasherMask(0b00111100_10111101UL), NUM_STAGES, PatternType.X_SYMMETRIC, "e_edge_block.dat");
+        public static readonly Pattern PATTERN_CORNER_BLOCK = Pattern.Create(new BoardHasherMask(0b00000111_00000111_00000111UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_corner_block.dat");
+        public static readonly Pattern PATTERN_CORNER = Pattern.Create(new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_corner.dat");
+        public static readonly Pattern PATTERN_LINE1 = Pattern.Create(new BoardHasherLine1(1), NUM_STAGES, PatternType.X_SYMMETRIC, "e_line1.dat");
+        public static readonly Pattern PATTERN_LINE2 = Pattern.Create(new BoardHasherLine1(2), NUM_STAGES, PatternType.X_SYMMETRIC, "e_line2.dat");
+        public static readonly Pattern PATTERN_LINE3 = Pattern.Create(new BoardHasherLine1(3), NUM_STAGES, PatternType.X_SYMMETRIC, "e_line3.dat");
+        public static readonly Pattern PATTERN_DIAGONAL8 = Pattern.Create(new BoardHasherMask(0x8040201008040201UL), NUM_STAGES, PatternType.DIAGONAL, "e_diag8.dat");
+        public static readonly Pattern PATTERN_DIAGONAL7 = Pattern.Create(new BoardHasherMask(0x1020408102040UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag7.dat");
+        public static readonly Pattern PATTERN_DIAGONAL6 = Pattern.Create(new BoardHasherMask(0x10204081020UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag6.dat");
+        public static readonly Pattern PATTERN_DIAGONAL5 = Pattern.Create(new BoardHasherMask(0x102040810UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag5.dat");
 
         public static readonly Pattern[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER,
             PATTERN_LINE1, PATTERN_LINE2, PATTERN_LINE3, PATTERN_DIAGONAL8, PATTERN_DIAGONAL7, PATTERN_DIAGONAL6, PATTERN_DIAGONAL5 };
 
         static void Main()
         {
-            Test2();
+            Tester.TestE();
             return;
-            GA.GATest.TestBRKGA();
-            // Tester.Test1();
+            // GA.GATest.TestBRKGA();
+            Train();
             return;
 
             Console.WriteLine($"Support BMI2 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");
@@ -38,27 +38,18 @@ namespace OthelloAI
             Console.WriteLine($"Support AVX : {System.Runtime.Intrinsics.X86.Avx.IsSupported}");
 
             Console.WriteLine();
-#if BIN_HASH
-            Console.WriteLine("Pattern Hashing Type : Bin");
-#elif TER_HASH
-            Console.WriteLine("Pattern Hashing Type : Ter");
-#else
-            Console.WriteLine("Pattern Hashing Type : Undefined");
-#endif
-            Console.WriteLine();
 
             foreach (Pattern p in PATTERNS)
             {
                 p.Load();
                 Console.WriteLine(p);
-                Console.WriteLine(p.Test());
             }
 
             // PATTERN_EDGE2X.Info(32, 2F);
 
             // Tester.Test1();
             // GA.GA<float[], GA.Score<float[]>>.TestBRKGA();
-            Test();
+            // Test();
             // Train();
             // MPCParamSolver.Test();
             // StartUpdataEvaluation();
@@ -74,7 +65,7 @@ namespace OthelloAI
         {
             string[] s = "330697	344967	116611	14447	70585	395203	329487	276724	262399	132703	312259	156047".Split();
 
-            Pattern[] p1 = s.Select(t => new Pattern($"p{t}.dat", 10, new BoardHasherMask(ulong.Parse(t)), PatternType.ASYMMETRIC)).ToArray();
+            Pattern[] p1 = s.Select(t => Pattern.Create(new BoardHasherMask(ulong.Parse(t)), 10, PatternType.ASYMMETRIC, $"p{t}.dat")).ToArray();
 
             //Pattern[] p1 =  { new Pattern("p11.dat", 10, new BoardHasherMask(0b01110000_11111011UL), PatternType.ASYMMETRIC),
             //                        new Pattern("p12.dat", 10, new BoardHasherMask(0b10100000_11000011_11000011UL), PatternType.ASYMMETRIC),
@@ -148,7 +139,7 @@ namespace OthelloAI
         {
             string[] s = "330697	344967	116611	14447	70585	395203	329487	276724	262399	132703	312259	156047".Split();
 
-            Pattern[] p1 = s.Select(t => new Pattern($"p{t}.dat", 10, new BoardHasherMask(ulong.Parse(t)), PatternType.ASYMMETRIC)).ToArray();
+            Pattern[] p1 = s.Select(t => Pattern.Create(new BoardHasherMask(ulong.Parse(t)), 10, PatternType.ASYMMETRIC, $"p{t}.dat")).ToArray();
 
             //Pattern[] p1 = { new Pattern("p11.dat", 10, new BoardHasherMask(0b01110000_11111011UL), PatternType.ASYMMETRIC),
             //                        new Pattern("p12.dat", 10, new BoardHasherMask(0b10100000_11000011_11000011UL), PatternType.ASYMMETRIC),
@@ -185,7 +176,7 @@ namespace OthelloAI
                     foreach (var d in data)
                         trainer.Update(d.board, d.result);
 
-                    Console.Write(trainer.Log.TakeLast(10000).Average() + ", ");
+                    Console.Write(trainer.Log.TakeLast(100000).Average() + ", ");
                 }
 
                 Console.WriteLine();

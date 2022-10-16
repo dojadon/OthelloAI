@@ -1,6 +1,4 @@
-﻿using OthelloAI.GA;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
 using System.Linq;
 
@@ -46,6 +44,39 @@ namespace OthelloAI
             }
 
             return board;
+        }
+
+        public static void TestE()
+        {
+            var rand = new Random();
+            var timer = new System.Diagnostics.Stopwatch();
+            int n = (int) 1E+7;
+
+            BoardHasher CreateRandomHasher(int n)
+            {
+                // return new BoardHasherMask(rand.GenerateRegion(24, n));
+                return new BoardHasherScanning(new BoardHasherMask(rand.GenerateRegion(24, n)).Positions);
+            }
+
+            for (int size = 2; size < 11; size++)
+            {
+                var patterns = Enumerable.Range(0, 100).Select(_ => Pattern.Create(CreateRandomHasher(size), 1, PatternType.ASYMMETRIC)).ToArray();
+                timer.Reset();
+
+                for (int i = 0; i < n; i++)
+                {
+                    var p = rand.Choice(patterns);
+                    var b = new RotatedAndMirroredBoards(rand.NextBoard());
+
+                    timer.Start();
+                    p.EvalByPEXTHashing(b);
+                    timer.Stop();
+                }
+
+                var time_s = (double) timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency / n;
+                var time_nano = time_s * 1E+9;
+                Console.WriteLine($"{size}, {time_nano}");
+            }
         }
 
         //public static void Test1()

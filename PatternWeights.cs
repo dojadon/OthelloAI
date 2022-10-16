@@ -28,6 +28,11 @@ namespace OthelloAI
     {
         PatternWeights[] Weights { get; }
 
+        public PatternWeightsStagebased(PatternWeights[] weights)
+        {
+            Weights = weights;
+        }
+
         protected int GetStage(Board board)
         {
             return (board.n_stone - 5) / (60 / Weights.Length);
@@ -102,8 +107,8 @@ namespace OthelloAI
 
         public override void Reset()
         {
-            Weights = new float[NumOfStates];
-            WeightsB = new byte[NumOfStates];
+            Weights = new float[Hasher.ArrayLength];
+            WeightsB = new byte[Hasher.ArrayLength];
         }
 
         public override int Eval(Board b)
@@ -165,6 +170,12 @@ namespace OthelloAI
         public ulong mask1, mask2;
         public float w_xx, w_xy, w_x0, w_0x;
         public byte b_xx, b_xy, b_x0, b_0x;
+
+        public PatternWeights2Disc(ulong mask1, ulong mask2)
+        {
+            this.mask1 = mask1;
+            this.mask2 = mask2;
+        }
 
         public override float[] GetWeights() => new float[] { w_xx, w_xy, w_x0, w_0x };
 

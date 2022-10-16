@@ -155,9 +155,9 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumTuple = 12,
-                SizeMin = 9,
-                SizeMax = 9,
+                NumTuple = 10,
+                SizeMin = 2,
+                SizeMax = 3,
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
                 Combiner = Combine,
@@ -325,7 +325,7 @@ namespace OthelloAI.GA
                 }).ToArray();
             }
 
-            Patterns = Tuples.Select(g => new Pattern($"ga/{g}.dat", 10, new BoardHasherMask(g), PatternType.ASYMMETRIC)).ToArray();
+            Patterns = Tuples.Select(g => Pattern.Create(new BoardHasherMask(g), 10, PatternType.ASYMMETRIC)).ToArray();
         }
 
         public override bool Equals(object obj)

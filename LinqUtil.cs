@@ -71,9 +71,33 @@ namespace OthelloAI
 
     public static class RandomUtil
     {
+        public static ulong NextUInt64(this Random rand)
+        {
+            byte[] buf = new byte[8];
+            rand.NextBytes(buf);
+            return BitConverter.ToUInt64(buf, 0);
+        }
+
+        public static Board NextBoard(this Random rand)
+        {
+            ulong b = rand.NextUInt64();
+            ulong w = rand.NextUInt64();
+
+            ulong empty = b & w;
+            b = b & ~empty;
+            w = w & ~empty;
+
+            return new Board(b, w);
+        }
+
         public static T Choice<T>(this Random rand, List<T> list)
         {
             return list[rand.Next(list.Count)];
+        }
+
+        public static T Choice<T>(this Random rand, T[] array)
+        {
+            return array[rand.Next(array.Length)];
         }
 
         public static IEnumerable<T> Sample<T>(this Random rand, List<T> list, int n)
