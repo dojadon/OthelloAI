@@ -51,14 +51,14 @@ namespace OthelloAI.GA
             return rand.NextDouble() < Bias ? a1 : a2;
         }
 
-        public float[] Cx(float[] g1, float[] g2, Random rand)
+        public float[] CxArray(float[] g1, float[] g2, Random rand)
         {
             return g1.Zip(g2, (a1, a2) => Cx(a1, a2, rand)).ToArray();
         }
 
         public GenomeGroup<float[]> Cx(GenomeGroup<float[]> g1, GenomeGroup<float[]> g2, Random rand)
         {
-            var gene = g1.Genome.Zip(g2.Genome, (a1, a2) => Cx(a1, a2, rand)).ToArray();
+            var gene = CxArray(g1.Genome, g2.Genome, rand);
             int size = Cx(g1.Size, g2.Size, rand);
 
             return new GenomeGroup<float[]>(gene, size);

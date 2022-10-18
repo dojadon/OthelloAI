@@ -27,10 +27,8 @@ namespace OthelloAI
 
         static void Main()
         {
-            Tester.TestE();
-            return;
-            // GA.GATest.TestBRKGA();
-            Train();
+            GA.GATest.TestBRKGA();
+            //Train();
             return;
 
             Console.WriteLine($"Support BMI2 : {System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported}");

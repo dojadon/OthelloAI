@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -61,13 +60,15 @@ namespace OthelloAI.GA
         public int SizeMax { get; set; }
         public int SizeMin { get; set; }
 
+        public int MaxNumWeights { get; set; }
+
         public Individual<T> Generate(Random rand)
         {
-            int n = (int) Math.Pow(3, SizeMax - SizeMin);
+            int n = (int)Math.Pow(3, SizeMax - SizeMin);
 
             GenomeGroup<T> CreateGenome()
             {
-                return new GenomeGroup<T>(Enumerable.Range(0, n).Select(_ => GenomeGenerator()).ToArray(), rand.Next(SizeMin, SizeMax + 1));
+                return new GenomeGroup<T>(GenomeGenerator(), rand.Next(SizeMin, SizeMax + 1));
             }
 
             return new Individual<T>(Enumerable.Range(0, NumTuple).Select(_ => CreateGenome()).ToArray(), this);
@@ -155,23 +156,28 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumTuple = 10,
-                SizeMin = 2,
-                SizeMax = 3,
+                NumTuple = 27,
+                SizeMin = 5,
+                SizeMax = 7,
+                MaxNumWeights = (int)Math.Pow(3, 8),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
                 Combiner = Combine,
             };
 
-            var ga = new GA<float[], Score<float[]>>()
+            var ga = new GA<float[], ScoreNSGA2<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 1600, true)),
-                Variator = new VariatorEliteArchive<float[]>()
+                Evaluator = new PopulationEvaluatorNSGA2<float[]>()
                 {
-                    NumElites = 20,
-                    NumCx = 70,
-                    NumMutants = 10,
+                    Evaluator1 = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 4800, true)),
+                    Evaluator2 = new PopulationEvaluatorExeCost<float[]>(),
+                },
+                Variator = new VariatorEliteArchiveNSGA2<float[]>()
+                {
+                    NumElites = 40,
+                    NumCx = 140,
+                    NumMutants = 20,
                     Crossover = new CrossoverEliteBiased(0.7F),
                     Generator = info,
                 },
@@ -195,38 +201,37 @@ namespace OthelloAI.GA
             };
 
             var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw = File.AppendText(log);
 
-            ga.Run(ga.Init(100), (n_gen, pop) =>
+            ga.Run(ga.Init(200), (n_gen, pop) =>
             {
                 var score = pop.MinBy(ind => ind.score).First();
 
-                using (StreamWriter sw = File.AppendText(log))
+                foreach (var s in pop.OrderBy(s => s.rank).ThenBy(s => s.score))
                 {
-                    foreach (var s in pop.OrderBy(s => s.score))
-                    {
-                        sw.WriteLine(s.score + ", " + string.Join(", ",  s.ind.Tuples.SelectMany(t => t.Tuples)));
-                    }
-                    // sw.WriteLine(string.Join(", ", pop.Select(ind => ind.score).OrderBy(s => s)));
+                    sw.WriteLine(s.score + ", " + s.score2 + ", " + s.rank + ", " + string.Join(", ", s.ind.Tuples.Select(t => t.TupleBit)));
                 }
+                sw.Flush();
 
-                ulong[] tuples = score.ind.Tuples.SelectMany(t => t.Tuples).ToArray();
-
-                foreach(var s in pop)
-                {
-                    Console.WriteLine(s.ind.Tuples.Select(t => t.NumTuples).Sum());
-                }
+                ulong[] tuples = score.ind.Tuples.Select(t => t.TupleBit).ToArray();
 
                 for (int i = 0; i < tuples.Length / 2.0F; i++)
                 {
                     var b1 = tuples[i * 2];
-                    var b2 = tuples[i * 2 + 1];
 
-                    Console.WriteLine(new Board(b1, Board.HorizontalMirror(b2)));
+                    if (i * 2 + 1 < tuples.Length)
+                    {
+                        var b2 = tuples[i * 2 + 1];
+                        Console.WriteLine(new Board(b1, Board.HorizontalMirror(b2)));
+                    }
+                    else
+                    {
+                        Console.WriteLine(new Board(b1, 0));
+                    }
                 }
 
                 Console.WriteLine($"Gen : {n_gen}");
-                Console.WriteLine(score.score);
-                Console.WriteLine(score.ind.Tuples.Select(t => t.NumTuples).Sum());
+                Console.WriteLine(score.score + ", " + score.score2);
                 Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => t.Size)));
             });
         }
@@ -239,9 +244,6 @@ namespace OthelloAI.GA
         public GenomeInfo<T> Info { get; set; }
         public IndividualIO<T> IO { get; set; }
 
-        public ISelector<T, U> Selecter { get; set; }
-        public INaturalSelector<T, U> NaturalSelector { get; set; }
-        public GeneticOperators<T, U> GeneticOperator { get; set; }
         public IPopulationEvaluator<T, U> Evaluator { get; set; }
         public IVariator<T, U> Variator { get; set; }
 
@@ -268,7 +270,6 @@ namespace OthelloAI.GA
                 logger(i, scores);
 
                 pop = Variator.Vary(scores, Random);
-                // pop = pop.Distinct(Generator).ToList();
 
                 IO.Save("ga/ind.dat", pop);
             }
@@ -282,50 +283,36 @@ namespace OthelloAI.GA
 
     public class GenomeGroup<T>
     {
-        public T[] Genome { get; }
+        public T Genome { get; }
         public int Size { get; }
+        public int NumWeights { get; }
 
-        public GenomeGroup(T[] genome, int size)
+        public GenomeGroup(T genome, int size)
         {
             Genome = genome;
             Size = size;
+            NumWeights = (int)Math.Pow(3, Size);
         }
     }
 
     public class Tuple<T>
     {
-        public T[] Genome { get; }
-        public ulong[] Tuples { get; }
-        public Pattern[] Patterns { get; }
+        public T Genome { get; }
+        public ulong TupleBit { get; }
+        public Pattern Pattern { get; }
 
         public GenomeInfo<T> Info { get; }
 
         public int Size { get; }
-        public int NumTuples { get; }
 
-        public Tuple(T[] genome, int size, GenomeInfo<T> info)
+        public Tuple(T genome, int size, GenomeInfo<T> info)
         {
             Genome = genome;
             Size = size;
             Info = info;
 
-            if(info.SizeMax == Size)
-            {
-                NumTuples = 1;
-                Tuples = new ulong[] { info.Decoder(info.Combiner(genome), Size) };
-            }
-            else
-            {
-                NumTuples = (int)Math.Pow(3, info.SizeMax - Size);
-                Tuples = Enumerable.Range(0, NumTuples).Select(i =>
-                {
-                    int n = genome.Length / NumTuples;
-                    T g = info.Combiner(genome.Skip(n * i).Take(n).ToArray());
-                    return info.Decoder(g, Size);
-                }).ToArray();
-            }
-
-            Patterns = Tuples.Select(g => Pattern.Create(new BoardHasherMask(g), 10, PatternType.ASYMMETRIC)).ToArray();
+            TupleBit = info.Decoder(genome, Size);
+            Pattern = Pattern.Create(new BoardHasherMask(TupleBit), 10, PatternType.ASYMMETRIC);
         }
 
         public override bool Equals(object obj)
@@ -341,16 +328,12 @@ namespace OthelloAI.GA
             if (ReferenceEquals(this, y))
                 return true;
 
-            for (int i = 0; i < Tuples.Length; i++)
-                if (Tuples[i] != y.Tuples[i])
-                    return false;
-
-            return true;
+            return Size == y.Size && TupleBit == y.TupleBit;
         }
 
         public override int GetHashCode()
         {
-            return Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next));
+            return HashCode.Combine(Size, TupleBit);
         }
     }
 
@@ -368,10 +351,23 @@ namespace OthelloAI.GA
             Genome = genome;
             Info = info;
 
-            Tuples = Genome.Select(g => new Tuple<T>(g.Genome, g.Size, info)).ToArray();
+            var list = new List<Tuple<T>>();
+
+            int n_weights = 0;
+            foreach (var g in Genome)
+            {
+                if (n_weights + g.NumWeights > info.MaxNumWeights)
+                    continue;
+
+                n_weights += g.NumWeights;
+
+                list.Add(new Tuple<T>(g.Genome, g.Size, info));
+            }
+
+            Tuples = list.OrderBy(t => t.TupleBit).ToArray();
         }
 
-        public Pattern[] GetPatterns() => Tuples.SelectMany(t => t.Patterns).ToArray();
+        public Pattern[] GetPatterns() => Tuples.Select(t => t.Pattern).ToArray();
 
         public Evaluator CreateEvaluator() => new EvaluatorPatternBased(GetPatterns());
 
@@ -389,7 +385,7 @@ namespace OthelloAI.GA
                 return true;
 
             for (int i = 0; i < Tuples.Length; i++)
-                if (Tuples[i] != y.Tuples[i])
+                if (Tuples[i].TupleBit != y.Tuples[i].TupleBit)
                     return false;
 
             return true;
@@ -397,7 +393,7 @@ namespace OthelloAI.GA
 
         public override int GetHashCode()
         {
-            return Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next));
+            return Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next.TupleBit));
         }
 
         public static (int, int)[] ClosestPairs(T[] g1, T[] g2, Func<T, T, float> distance)

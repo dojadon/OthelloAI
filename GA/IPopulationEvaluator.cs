@@ -186,15 +186,15 @@ namespace OthelloAI.GA
         public IPopulationEvaluator<T, Score<T>> Evaluator1 { get; set; }
         public IPopulationEvaluator<T, Score<T>> Evaluator2 { get; set; }
 
-        public List<(Score2D<T> s, float c)> CalcCongection(List<Score2D<T>> scores)
+        public List<(Score2D<T> s, float c)> CalcCongection(List<Score2D<T>> scores, float range1, float range2)
         {
             if (scores.Count == 1)
                 return new List<(Score2D<T> s, float c)>() { (scores[0], scores[0].score * scores[0].score) };
 
-            static float Distance(Score2D<T> i1, Score2D<T> i2)
+            float Distance(Score2D<T> i1, Score2D<T> i2)
             {
-                float s1 = i1.score - i2.score;
-                float s2 = i1.score2 - i2.score2;
+                float s1 = (i1.score - i2.score) / range1;
+                float s2 = (i1.score2 - i2.score2) / range2;
                 return (float)Math.Sqrt(s1 * s1 + s2 * s2);
             }
 
@@ -224,12 +224,15 @@ namespace OthelloAI.GA
             var scoreNSGA2 = new List<ScoreNSGA2<T>>();
             int rank = 0;
 
+            float range1 = scores.Max(s => s.score) - scores.Min(s => s.score);
+            float range2 = scores.Max(s => s.score2) - scores.Min(s => s.score2);
+
             while (scores.Count > 0)
             {
                 var rank0 = scores.Where(IsNonDominated).ToList();
                 scores.RemoveAll(i => rank0.Contains(i));
 
-                var cong = CalcCongection(rank0);
+                var cong = CalcCongection(rank0, range1, range2);
                 scoreNSGA2.AddRange(cong.Select(t => new ScoreNSGA2<T>(t.s.ind, t.s.score, t.s.score2, rank, -t.c)));
 
                 rank++;
@@ -248,6 +251,26 @@ namespace OthelloAI.GA
             return NonDominatedSort(score);
         }
     }
+
+    public class PopulationEvaluatorExeCost<T> : IPopulationEvaluator<T, Score<T>>
+    {
+        public static readonly float[] TIME = { 0, 0, 403.9F, 426.06F, 454.05F, 479.2F, 506.6F, 534.2F, 568.2F, 728.4F, 837.2F };
+
+        public PopulationEvaluatorExeCost()
+        {
+        }
+
+        public List<Score<T>> Evaluate(List<Individual<T>> pop)
+        {
+            return pop.Select(i => new Score<T>(i, Evaluate(i))).ToList();
+        }
+
+        public float Evaluate(Individual<T> ind)
+        {
+            return ind.Tuples.Sum(t => TIME[t.Size]) * 8 * 1E-3F + (float)GATest.Random.NextDouble() * 5E-3F;
+        }
+    }
+
 
     public class PopulationEvaluatorElite<T> : IPopulationEvaluator<T, ScoreElite<T>>
     {
@@ -318,7 +341,7 @@ namespace OthelloAI.GA
 
                 Parallel.ForEach(trainers, trainer => data.ForEach(t => trainer.Update(t.board, t.result)));
 
-                Console.WriteLine($"{i} / {NumGames / 16}");
+                // Console.WriteLine($"{i} / {NumGames / 16}");
             }
 
             return trainers.Select(trainer => trainer.Log.TakeLast(trainer.Log.Count / 4).Average()).ToList();
