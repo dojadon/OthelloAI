@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace OthelloAI.GA
@@ -39,21 +38,14 @@ namespace OthelloAI.GA
             };
         }
 
-        public static (int, int)[] Combinations(int n)
-        {
-            return Enumerable.Range(0, n - 1).SelectMany(i => Enumerable.Range(i + 1, n - i - 1).Select(j => (i, j))).ToArray();
-        }
-
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            Trainer.Train(pop.Select(ind=> ind.GetPatterns()).ToList());
+            Trainer.Train(pop.Select(ind => ind.GetPatterns()).ToList());
 
             foreach (var ind in pop)
             {
                 ind.Log.Clear();
             }
-
-            int count = 0;
 
             Parallel.For(0, NumGames, i =>
             {
@@ -70,9 +62,6 @@ namespace OthelloAI.GA
 
                 Board b = Tester.PlayGame(Tester.CreateRnadomGame(rand, 6), p1, p2);
                 int result = b.GetStoneCountGap();
-
-                Interlocked.Increment(ref count);
-                // Console.WriteLine($"{count} / {NumGames} : {pair.Item1} vs {pair.Item2} : {result}");
 
                 if (result > 0)
                 {
@@ -345,7 +334,7 @@ namespace OthelloAI.GA
 
                 Parallel.ForEach(trainers, trainer => data.ForEach(t => trainer.Update(t.board, t.result)));
 
-                // Console.WriteLine($"{i} / {NumGames / 16}");
+                Console.WriteLine($"{i} / {NumGames / 16}");
             }
 
             return trainers.Select(trainer => trainer.Log.TakeLast(trainer.Log.Count / 4).Average()).ToList();

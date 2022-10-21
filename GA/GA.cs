@@ -268,20 +268,20 @@ namespace OthelloAI.GA
 
                 else if(t1 > t2)
                 {
-                    float f = n1 * (t1 - t2) / (t2 * (n2 - n1));
-                    return (0, f);
+                    float f = n2 * (t1 - t2) / (t1 * (n2 - n1));
+                    return (f, 0);
                 }
                 else
                 {
-                    float f = n1 * (t2 - t1) / (t1 * (n2 - n1));
-                    return (f, 0);
+                    float f = n2 * (t2 - t1) / (t2 * (n2 - n1));
+                    return (0, f);
                 }
             }
 
             var info = new GenomeInfo<float[]>()
             {
                 NumTuple = 27,
-                SizeMin = 4,
+                SizeMin = 5,
                 SizeMax = 7,
                 MaxNumWeights = (int)Math.Pow(3, 8),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
@@ -291,7 +291,7 @@ namespace OthelloAI.GA
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 1, 54, 100 * 50)
+                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 2, 54, 100 * 50)
                 {
                     GetDepthFraction = GetDepthFraction
                 },

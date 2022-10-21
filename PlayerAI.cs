@@ -612,8 +612,8 @@ namespace OthelloAI
             if (search.IsCanceled)
                 return -1000000;
 
-            if(depth == 0 && Depth_Prob > 0 && GA.GATest.Random.NextDouble() < Depth_Prob)
-                depth = 1;
+            if(depth == 1 && Depth_Prob > 0 && GA.GATest.Random.NextDouble() < Depth_Prob)
+                depth = 0;
 
             if (depth <= 0)
                 return Eval(move.reversed);
