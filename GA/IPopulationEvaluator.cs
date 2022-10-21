@@ -18,6 +18,8 @@ namespace OthelloAI.GA
         public int EndStage { get; }
         public int NumGames { get; }
 
+        public Func<Individual<T>, float> GetDepthFraction { get; set; } = _ => 0;
+
         public PopulationEvaluatorRandomTournament(PopulationTrainer trainer, int depth, int endStage, int n_games)
         {
             Trainer = trainer;
@@ -34,6 +36,7 @@ namespace OthelloAI.GA
                 ParamMid = new SearchParameters(depth: Depth, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: EndStage, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
+                Depth_Prob = GetDepthFraction(ind),
             };
         }
 

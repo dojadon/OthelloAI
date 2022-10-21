@@ -247,13 +247,13 @@ namespace OthelloAI
 
         protected int EvalFinishedGame(Board board)
         {
-            SearchedNodeCount++;
+            // SearchedNodeCount++;
             return board.GetStoneCountGap() * 10000;
         }
 
         protected int EvalLastMove(Board board)
         {
-            SearchedNodeCount++;
+            // SearchedNodeCount++;
             return (board.GetStoneCountGap() + board.GetReversedCountOnLastMove()) * 10000;
         }
 
@@ -578,6 +578,8 @@ namespace OthelloAI
             return max;
         }
 
+        public float Depth_Prob { get; set; } = 0;
+
         public int Negamax(Search search, Board board, ulong moves, CutoffParameters param, int depth, int alpha, int beta)
         {
             int max = -1000000;
@@ -609,6 +611,9 @@ namespace OthelloAI
         {
             if (search.IsCanceled)
                 return -1000000;
+
+            if(depth == 0 && Depth_Prob > 0 && GA.GATest.Random.NextDouble() < Depth_Prob)
+                depth = 1;
 
             if (depth <= 0)
                 return Eval(move.reversed);

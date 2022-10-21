@@ -27,7 +27,9 @@ namespace OthelloAI
 
         static void Main()
         {
-            GA.GATest.TestBRKGA();
+            Tester.TestB();
+            // Tester.TestE();
+            // GA.GATest.TestBRKGA();
             //Train();
             return;
 
@@ -90,7 +92,7 @@ namespace OthelloAI
                 };
             }
 
-            Random rand = new Random();
+            Random rand = new();
 
             int Play(PlayerAI p1, PlayerAI p2)
             {

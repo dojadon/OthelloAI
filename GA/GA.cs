@@ -134,7 +134,7 @@ namespace OthelloAI.GA
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
 
-        public static void TestBRKGA()
+        public static void TestBRKGA_NSGA2()
         {
             static ulong Decode(float[] keys, int size)
             {
@@ -163,6 +163,99 @@ namespace OthelloAI.GA
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
                 Combiner = Combine,
+            };
+
+            var ga = new GA<float[], ScoreNSGA2<float[]>>()
+            {
+                Info = info,
+                Evaluator = new PopulationEvaluatorNSGA2<float[]>()
+                {
+                    Evaluator1 = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 4800, true)),
+                    Evaluator2 = new PopulationEvaluatorExeCost<float[]>(),
+                },
+                Variator = new VariatorEliteArchiveNSGA2<float[]>()
+                {
+                    NumElites = 40,
+                    NumCx = 140,
+                    NumMutants = 20,
+                    Crossover = new CrossoverEliteBiased(0.7F),
+                    Generator = info,
+                },
+
+                IO = new IndividualIO<float[]>()
+                {
+                    Decoder = Decode,
+                    ReadGenome = reader =>
+                    {
+                        var gene = new float[reader.ReadInt32()];
+                        for (int i = 0; i < gene.Length; i++)
+                            gene[i] = reader.ReadSingle();
+                        return gene;
+                    },
+                    WriteGenome = (gene, writer) =>
+                    {
+                        writer.Write(gene.Length);
+                        Array.ForEach(gene, writer.Write);
+                    }
+                },
+            };
+
+            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw = File.AppendText(log);
+
+            ga.Run(ga.Init(200), (n_gen, pop) =>
+            {
+                var score = pop.MinBy(ind => ind.score).First();
+
+                foreach (var s in pop.OrderBy(s => s.rank).ThenBy(s => s.score))
+                {
+                    sw.WriteLine(s.score + ", " + s.score2 + ", " + s.rank + ", " + string.Join(", ", s.ind.Tuples.Select(t => t.TupleBit)));
+                }
+                sw.Flush();
+
+                ulong[] tuples = score.ind.Tuples.Select(t => t.TupleBit).ToArray();
+
+                for (int i = 0; i < tuples.Length / 2.0F; i++)
+                {
+                    var b1 = tuples[i * 2];
+
+                    if (i * 2 + 1 < tuples.Length)
+                    {
+                        var b2 = tuples[i * 2 + 1];
+                        Console.WriteLine(new Board(b1, Board.HorizontalMirror(b2)));
+                    }
+                    else
+                    {
+                        Console.WriteLine(new Board(b1, 0));
+                    }
+                }
+
+                Console.WriteLine($"Gen : {n_gen}");
+                Console.WriteLine(score.score + ", " + score.score2);
+                Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => t.Size)));
+            });
+        }
+
+        public static void TestBRKGA()
+        {
+            static ulong Decode(float[] keys, int size)
+            {
+                var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(size);
+
+                ulong g = 0;
+                foreach (var i in indices)
+                    g |= 1UL << i;
+                return g;
+            }
+
+            var info = new GenomeInfo<float[]>()
+            {
+                NumTuple = 27,
+                SizeMin = 5,
+                SizeMax = 7,
+                MaxNumWeights = (int)Math.Pow(3, 8),
+                GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
+                Decoder = Decode,
             };
 
             var ga = new GA<float[], ScoreNSGA2<float[]>>()
