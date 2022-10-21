@@ -18,7 +18,7 @@ namespace OthelloAI.GA
         public int EndStage { get; }
         public int NumGames { get; }
 
-        public Func<Individual<T>, float> GetDepthFraction { get; set; } = _ => 0;
+        public Func<Individual<T>, Individual<T>, (float, float)> GetDepthFraction { get; set; } = (_, _) => (0, 0);
 
         public PopulationEvaluatorRandomTournament(PopulationTrainer trainer, int depth, int endStage, int n_games)
         {
@@ -36,7 +36,6 @@ namespace OthelloAI.GA
                 ParamMid = new SearchParameters(depth: Depth, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: EndStage, new CutoffParameters(true, true, false)),
                 PrintInfo = false,
-                Depth_Prob = GetDepthFraction(ind),
             };
         }
 
@@ -66,6 +65,8 @@ namespace OthelloAI.GA
 
                 PlayerAI p1 = CreatePlayer(ind1);
                 PlayerAI p2 = CreatePlayer(ind2);
+
+                (p1.Depth_Prob, p2.Depth_Prob) = GetDepthFraction(ind1, ind2);
 
                 Board b = Tester.PlayGame(Tester.CreateRnadomGame(rand, 6), p1, p2);
                 int result = b.GetStoneCountGap();

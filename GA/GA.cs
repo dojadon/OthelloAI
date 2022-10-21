@@ -134,6 +134,8 @@ namespace OthelloAI.GA
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
 
+        public static readonly float[] TIME = { 0, 0, 403.9F, 426.06F, 454.05F, 479.2F, 506.6F, 534.2F, 568.2F, 728.4F, 837.2F };
+
         public static void TestBRKGA_NSGA2()
         {
             static ulong Decode(float[] keys, int size)
@@ -203,7 +205,7 @@ namespace OthelloAI.GA
             var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
-            ga.Run(ga.Init(200), (n_gen, pop) =>
+            ga.Run(ga.Init(200), (n_gen, time, pop) =>
             {
                 var score = pop.MinBy(ind => ind.score).First();
 
@@ -248,29 +250,56 @@ namespace OthelloAI.GA
                 return g;
             }
 
+            static float CalcExeCost(Individual<float[]> ind)
+            {
+                return ind.Tuples.Sum(t => TIME[t.Size]);
+            }
+
+            static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2)
+            {
+                float t1 = CalcExeCost(ind1);
+                float t2 = CalcExeCost(ind2);
+
+                int n1 = 34;
+                int n2 = 70;
+
+                if (Math.Abs(t1 - t2) < 20)
+                    return (0, 0);
+
+                else if(t1 > t2)
+                {
+                    float f = n1 * (t1 - t2) / (t2 * (n2 - n1));
+                    return (0, f);
+                }
+                else
+                {
+                    float f = n1 * (t2 - t1) / (t1 * (n2 - n1));
+                    return (f, 0);
+                }
+            }
+
             var info = new GenomeInfo<float[]>()
             {
                 NumTuple = 27,
-                SizeMin = 5,
+                SizeMin = 4,
                 SizeMax = 7,
                 MaxNumWeights = (int)Math.Pow(3, 8),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
 
-            var ga = new GA<float[], ScoreNSGA2<float[]>>()
+            var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorNSGA2<float[]>()
+                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 1, 54, 100 * 50)
                 {
-                    Evaluator1 = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 4800, true)),
-                    Evaluator2 = new PopulationEvaluatorExeCost<float[]>(),
+                    GetDepthFraction = GetDepthFraction
                 },
-                Variator = new VariatorEliteArchiveNSGA2<float[]>()
+                Variator = new VariatorEliteArchive<float[]>()
                 {
-                    NumElites = 40,
-                    NumCx = 140,
-                    NumMutants = 20,
+                    NumElites = 20,
+                    NumCx = 70,
+                    NumMutants = 10,
                     Crossover = new CrossoverEliteBiased(0.7F),
                     Generator = info,
                 },
@@ -296,13 +325,13 @@ namespace OthelloAI.GA
             var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
-            ga.Run(ga.Init(200), (n_gen, pop) =>
+            ga.Run(ga.Init(100), (n_gen, time, pop) =>
             {
                 var score = pop.MinBy(ind => ind.score).First();
 
-                foreach (var s in pop.OrderBy(s => s.rank).ThenBy(s => s.score))
+                foreach (var s in pop.OrderBy(s => s.score))
                 {
-                    sw.WriteLine(s.score + ", " + s.score2 + ", " + s.rank + ", " + string.Join(", ", s.ind.Tuples.Select(t => t.TupleBit)));
+                    sw.WriteLine(s.score + ", " + string.Join(", ", s.ind.Tuples.Select(t => t.TupleBit)));
                 }
                 sw.Flush();
 
@@ -323,8 +352,8 @@ namespace OthelloAI.GA
                     }
                 }
 
-                Console.WriteLine($"Gen : {n_gen}");
-                Console.WriteLine(score.score + ", " + score.score2);
+                Console.WriteLine($"Gen : {n_gen}, {time}");
+                Console.WriteLine(score.score);
                 Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => t.Size)));
             });
         }
@@ -353,14 +382,20 @@ namespace OthelloAI.GA
             return a1.Zip(a2, (b1, b2) => b1.PadRight(len) + b2).Aggregate((b1, b2) => b1 + Environment.NewLine + b2);
         }
 
-        public void Run(List<Individual<T>> pop, Action<int, List<U>> logger)
+        public void Run(List<Individual<T>> pop, Action<int, float, List<U>> logger)
         {
+            var timer = new System.Diagnostics.Stopwatch();
+
             for (int i = 0; i < 10000; i++)
             {
+                timer.Restart();
+
                 Console.WriteLine("Evaluate");
                 var scores = Evaluator.Evaluate(pop);
 
-                logger(i, scores);
+                timer.Stop();
+                float time = (float) timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
+                logger(i, time, scores);
 
                 pop = Variator.Vary(scores, Random);
 
