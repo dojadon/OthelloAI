@@ -60,13 +60,14 @@ namespace OthelloAI
 
         public void ApplyTrainedEvaluation()
         {
-            float[] w = Weights.GetWeights();
-            float range = w.Select(Math.Abs).OrderByDescending(f => f).Take(Math.Max(w.Length / 4, w.Length / 100)).Average();
+            // float[] w = Weights.GetWeights();
+            // float range = w.Select(Math.Abs).OrderByDescending(f => f).Take(Math.Max(w.Length / 4, w.Length / 100)).Average();
+            float range = 10;
 
             Weights.ApplyTrainedEvaluation(range);
         }
 
-        public int EvalByPEXTHashing(RotatedAndMirroredBoards b)
+        public int Eval(RotatedAndMirroredBoards b)
         {
             int _Eval(in Board board) => Weights.Eval(board);
 
@@ -75,12 +76,13 @@ namespace OthelloAI
                 PatternType.X_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot270) - 128 * 4,
                 PatternType.XY_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot90) - 128 * 4,
                 PatternType.DIAGONAL => _Eval(b.rot0) + _Eval(b.inv_rot0) - 128 * 2,
-                PatternType.ASYMMETRIC => b.Sum(bi => _Eval(bi)),
+                PatternType.ASYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.rot90) + _Eval(b.inv_rot90) + 
+                                                            _Eval(b.rot180) + _Eval(b.inv_rot180) + _Eval(b.rot270) + _Eval(b.inv_rot270) - 128 * 8,
                 _ => throw new NotImplementedException(),
             };
         }
 
-        public float EvalTrainingByPEXTHashing(RotatedAndMirroredBoards b)
+        public float EvalTraining(RotatedAndMirroredBoards b)
         {
             float _Eval(in Board board) => Weights.EvalTraining(board);
 
@@ -89,7 +91,8 @@ namespace OthelloAI
                 PatternType.X_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot270),
                 PatternType.XY_SYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.inv_rot90) + _Eval(b.rot90),
                 PatternType.DIAGONAL => _Eval(b.rot0) + _Eval(b.inv_rot0),
-                PatternType.ASYMMETRIC => b.Sum(bi => _Eval(bi)),
+                PatternType.ASYMMETRIC => _Eval(b.rot0) + _Eval(b.inv_rot0) + _Eval(b.rot90) + _Eval(b.inv_rot90) +
+                                                            _Eval(b.rot180) + _Eval(b.inv_rot180) + _Eval(b.rot270) + _Eval(b.inv_rot270),
                 _ => throw new NotImplementedException(),
             };
         }

@@ -27,9 +27,9 @@ namespace OthelloAI
 
         static void Main()
         {
-            // Tester.TestB();
+            Tester.TestC();
             // Tester.TestE();
-            GA.GATest.TestBRKGA();
+            // GA.GATest.TestBRKGA();
             //Train();
             return;
 
@@ -304,14 +304,17 @@ namespace OthelloAI
             client.Run("localhost", 25033, "Gen2");
         }
 
-        public static bool Step(ref Board board, Player player, int stone, bool print)
+        public static bool Step(ref Board board, PlayerAI player, int stone, bool print)
         {
-            (_, _, ulong move) = player.DecideMove(board, stone);
+            (_, _, ulong move, float e) = player.DecideMoveWithEvaluation(board, stone);
             if (move != 0)
             {
                 board = board.Reversed(move, stone);
                 if (print)
+                {
+                    Console.WriteLine($"Evaluation : {e}");
                     Console.WriteLine(board);
+                }
                 return true;
             }
             return false;
@@ -373,15 +376,15 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
+                ParamBeg = new SearchParameters(depth: 9, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 9, stage: 16, new CutoffParameters(true, true, false)),
                 ParamEnd = new SearchParameters(depth: 64, stage: 44, new CutoffParameters(true, true, false)),
             };
 
             for (int i = 0; i < 1; i++)
             {
                 board = new Board(Board.InitB, Board.InitW);
-                //board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
+                // board = board.Reversed(Board.Mask(2, 3)).Reversed(Board.Mask(4, 2));
 
                 while (Step(ref board, p, 1, true) | Step(ref board, p, -1, true))
                 {
@@ -393,40 +396,12 @@ namespace OthelloAI
                 Console.WriteLine(i);
             }
 
-            Console.WriteLine($"Average : {p.Times.Average()}");
-            Console.WriteLine($"Min : {p.Times.Min()}");
-            Console.WriteLine($"Max : {p.Times.Max()}");
-            Console.WriteLine();
-            Console.WriteLine(string.Join("\r\n", p.Times));
-            Console.WriteLine();
-        }
-
-        static void StartManualGame()
-        {
-            Evaluator evaluator = new EvaluatorPatternBased_Release();
-            Player p1 = new PlayerAI(evaluator)
-            {
-                ParamBeg = new SearchParameters(depth: 11, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 11, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParameters(depth: 64, stage: 40, new CutoffParameters(true, true, false)),
-            };
-
-            Player p2 = new PlayerManual();
-
-            Board board = new Board();
-
-            for (int i = 0; i < 1; i++)
-            {
-                board = new Board(Board.InitB, Board.InitW, 4);
-
-                while (Step(ref board, p1, 1, true) | Step(ref board, p2, -1, true))
-                {
-                }
-            }
-            Console.WriteLine();
-            Console.WriteLine();
-            Console.WriteLine($"B: {board.GetStoneCount(1)}");
-            Console.WriteLine($"W: {board.GetStoneCount(-1)}");
+            //Console.WriteLine($"Average : {p.Times.Average()}");
+            //Console.WriteLine($"Min : {p.Times.Min()}");
+            //Console.WriteLine($"Max : {p.Times.Max()}");
+            //Console.WriteLine();
+            //Console.WriteLine(string.Join("\r\n", p.Times));
+            //Console.WriteLine();
         }
     }
 }

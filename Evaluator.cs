@@ -32,7 +32,7 @@ namespace OthelloAI
         protected int EvalByPEXTHashing(Board board)
         {
             var boards = new RotatedAndMirroredBoards(board);
-            return Patterns.Sum(p => p.EvalByPEXTHashing(boards));
+            return Patterns.Sum(p => p.Eval(boards));
         }
     }
 
@@ -47,15 +47,15 @@ namespace OthelloAI
         {
             var boards = new RotatedAndMirroredBoards(board);
 
-            return Program.PATTERN_EDGE2X.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_EDGE_BLOCK.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_CORNER_BLOCK.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_CORNER.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_LINE1.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_LINE2.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_LINE3.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_DIAGONAL8.EvalByPEXTHashing(boards)
-                    + Program.PATTERN_DIAGONAL7.EvalByPEXTHashing(boards);
+            return Program.PATTERN_EDGE2X.Eval(boards)
+                    + Program.PATTERN_EDGE_BLOCK.Eval(boards)
+                    + Program.PATTERN_CORNER_BLOCK.Eval(boards)
+                    + Program.PATTERN_CORNER.Eval(boards)
+                    + Program.PATTERN_LINE1.Eval(boards)
+                    + Program.PATTERN_LINE2.Eval(boards)
+                    + Program.PATTERN_LINE3.Eval(boards)
+                    + Program.PATTERN_DIAGONAL8.Eval(boards)
+                    + Program.PATTERN_DIAGONAL7.Eval(boards);
         }
     }
 

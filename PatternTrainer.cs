@@ -151,7 +151,7 @@ namespace OthelloAI
         public float Test(Board board, float result)
         {
             var boards = new RotatedAndMirroredBoards(board);
-            return result - Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards));
+            return result - Patterns.Sum(p => p.EvalTraining(boards));
         }
 
         public static float HyperbolicTangent(float f)
@@ -167,8 +167,8 @@ namespace OthelloAI
             var boards1 = new RotatedAndMirroredBoards(current);
             var boards2 = new RotatedAndMirroredBoards(next);
 
-            float e1 = HyperbolicTangent(Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards1)));
-            float e2 = HyperbolicTangent(Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards2)));
+            float e1 = HyperbolicTangent(Patterns.Sum(p => p.EvalTraining(boards1)));
+            float e2 = HyperbolicTangent(Patterns.Sum(p => p.EvalTraining(boards2)));
 
             float e = (e2 - e1) * (1 - e1 * e1);
 
@@ -183,7 +183,7 @@ namespace OthelloAI
         {
             var boards1 = new RotatedAndMirroredBoards(current);
 
-            float e1 = HyperbolicTangent(Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards1)));
+            float e1 = HyperbolicTangent(Patterns.Sum(p => p.EvalTraining(boards1)));
             float e2 = result;
 
             float e = (e2 - e1) * (1 - e1 * e1);
@@ -204,7 +204,7 @@ namespace OthelloAI
         {
             var boards = new RotatedAndMirroredBoards(board);
 
-            float e = result - Patterns.Sum(p => p.EvalTrainingByPEXTHashing(boards));
+            float e = result - Patterns.Sum(p => p.EvalTraining(boards));
 
             foreach (var p in Patterns)
                 foreach (var b in boards)

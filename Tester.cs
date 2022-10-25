@@ -148,17 +148,17 @@ namespace OthelloAI
                 return board.GetStoneCountGap();
             }
 
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 11; i++)
             {
                 PlayerAI player = new PlayerAI(new EvaluatorPatternBased(patterns))
                 {
-                    ParamBeg = new SearchParameters(depth: 2, stage: 0, new CutoffParameters(true, true, false)),
-                    ParamMid = new SearchParameters(depth: 2, stage: 16, new CutoffParameters(true, true, false)),
+                    ParamBeg = new SearchParameters(depth: 3, stage: 0, new CutoffParameters(true, true, false)),
+                    ParamMid = new SearchParameters(depth: 3, stage: 16, new CutoffParameters(true, true, false)),
                     ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
                     PrintInfo = false,
                 };
 
-                player.Depth_Prob = i * 0.2F;
+                player.Depth_Prob = i * 0.1F;
 
                 double avg = Enumerable.Range(0, 1000).AsParallel().SelectMany(i =>
                 {
@@ -167,7 +167,70 @@ namespace OthelloAI
                     return c;
                 }).Average();
 
-                Console.WriteLine($"{player.Depth_Prob}, {avg}");
+                Console.WriteLine($"{i}, {avg}");
+            }
+        }
+
+        public static void TestC()
+        {
+            var rand = new Random();
+            Pattern[] patterns = Program.PATTERNS;
+
+            foreach (var p in patterns)
+                p.Load();
+
+            (IEnumerable<float>, IEnumerable<float>) Play(PlayerAI p1, PlayerAI p2)
+            {
+                bool Step(ref Board board, PlayerAI player, int stone, List<float> evaluations)
+                {
+                    (int x, int y, ulong move, float e) = player.DecideMoveWithEvaluation(board, stone);
+
+                    if (move != 0)
+                    {
+                        board = board.Reversed(move, stone);
+                        evaluations.Add(e);
+                        return true;
+                    }
+                    return false;
+                }
+
+                Board board = Board.Init;
+                List<float> e1 = new List<float>();
+                List<float> e2 = new List<float>();
+
+                while (e1.Count < 10 || e2.Count < 10)
+                {
+                    e1 = new List<float>();
+                    e2 = new List<float>();
+
+                    board = Tester.CreateRnadomGame(GA.GATest.Random, 8);
+                    while (Step(ref board, p1, 1, e1) | Step(ref board, p2, -1, e2))
+                    {
+                    }
+                }
+
+                int result = board.GetStoneCountGap();
+                var error1 = e1.Select(e => (e - result) * (e - result));
+                var error2 = e2.Select(e => (e - result) * (e - result));
+
+                return (error1, error2);
+            }
+
+            for (int i = 1; i < 10; i++)
+            {
+                PlayerAI player = new PlayerAI(new EvaluatorPatternBased(patterns))
+                {
+                    ParamBeg = new SearchParameters(depth: i, stage: 0, new CutoffParameters(true, true, false)),
+                    ParamMid = new SearchParameters(depth: i, stage: 16, new CutoffParameters(true, true, false)),
+                    ParamEnd = new SearchParameters(depth: 64, stage: 54 - i, new CutoffParameters(true, true, false)),
+                    PrintInfo = false,
+                };
+
+                var e = Enumerable.Range(0, 100).AsParallel().Select(i => Play(player, player)).ToArray();
+                (float a1, float v1) = e.SelectMany(t => t.Item1).OrderByDescending(a => a).Skip(200).AverageAndVariance();
+                (float a2, float v2) = e.SelectMany(t => t.Item2).OrderByDescending(a => a).Skip(200).AverageAndVariance();
+
+                Console.WriteLine($"{i}, {a1}, {a2}");
             }
         }
 
@@ -194,7 +257,7 @@ namespace OthelloAI
                     var b = new RotatedAndMirroredBoards(rand.NextBoard());
 
                     timer.Start();
-                    p.EvalByPEXTHashing(b);
+                    p.Eval(b);
                     timer.Stop();
                 }
 

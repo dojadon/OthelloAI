@@ -229,7 +229,7 @@ namespace OthelloAI
 
     public class PlayerAI : Player
     {
-        public const int INF = 1000000;
+        public const int INF = 10000000;
 
         public SearchParameters ParamBeg { get; set; }
         public SearchParameters ParamMid { get; set; }
@@ -335,6 +335,45 @@ namespace OthelloAI
             return (x, y, result);
         }
 
+        public (int x, int y, ulong move, float e) DecideMoveWithEvaluation(Board board, int stone)
+        {
+            SearchedNodeCount = 0;
+            for (int i = 0; i < ProbcutNode1.Length; i++)
+            {
+                ProbcutNode1[i] = ProbcutNode2[i] = 0;
+            }
+
+            Search search = new Search();
+
+            if (stone == -1)
+                board = board.ColorFliped();
+
+            Evaluator.StartSearch(stone);
+
+            ulong result;
+            float e;
+
+            if (board.n_stone < ParamMid.stage)
+            {
+                (result, e) = SolveIterativeDeepeningWithEvaluation(board, ParamBeg.cutoff_param, ParamBeg.depth, 2, 3);
+            }
+            else if (board.n_stone < ParamEnd.stage)
+            {
+                (result, e) = SolveIterativeDeepeningWithEvaluation(board, ParamMid.cutoff_param, ParamMid.depth, 2, 3);
+            }
+            else
+            {
+                (result, e) = SolveRoot(search, board, ParamEnd.cutoff_param, 64);
+
+                if (Math.Abs(e) >= 10000)
+                    e /= 10000;
+            }
+
+            (int x, int y) = Board.ToPos(result);
+
+            return (x, y, result, e);
+        }
+
         public ulong SolveIterativeDeepening(Board board, CutoffParameters param, int depth, int interval, int times)
         {
             var search = new Search();
@@ -352,6 +391,29 @@ namespace OthelloAI
 
                 if (d >= depth)
                     return move;
+
+                search = new SearchIterativeDeepening(search.Table, interval);
+                d += interval;
+            }
+        }
+
+        public (ulong , float) SolveIterativeDeepeningWithEvaluation(Board board, CutoffParameters param, int depth, int interval, int times)
+        {
+            var search = new Search();
+            int d = depth - interval * (times - 1);
+
+            while (true)
+            {
+                if (PrintInfo)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($"Depth {d}");
+                }
+
+                (ulong move, int e) = SolveRoot(search, board, param, d);
+
+                if (d >= depth)
+                    return (move, e * 10 / 127.0F);
 
                 search = new SearchIterativeDeepening(search.Table, interval);
                 d += interval;
@@ -417,7 +479,7 @@ namespace OthelloAI
             search.OrderMoves(array, depth);
 
             Move result = array[0];
-            int max = -Solve(search, array[0], param, depth - 1, -1000000, 1000000);
+            int max = -Solve(search, array[0], param, depth - 1, -INF, INF);
             int alpha = max;
 
             if (PrintInfo)
@@ -432,7 +494,7 @@ namespace OthelloAI
                 if (alpha < eval)
                 {
                     alpha = eval;
-                    eval = -Solve(search, move, param, depth - 1, -1000000, -alpha);
+                    eval = -Solve(search, move, param, depth - 1, -INF, -alpha);
                     alpha = Math.Max(alpha, eval);
 
                     if (PrintInfo)

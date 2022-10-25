@@ -75,7 +75,7 @@ namespace OthelloAI.GA
                 }
             });
 
-            return pop.Select(ind => new Score<T>(ind, ind.Log.Average())).ToList();
+            return pop.Select(ind => new Score<T>(ind, -ind.Log.Average())).ToList();
         }
     }
 
@@ -334,7 +334,7 @@ namespace OthelloAI.GA
 
                 Parallel.ForEach(trainers, trainer => data.ForEach(t => trainer.Update(t.board, t.result)));
 
-                Console.WriteLine($"{i} / {NumGames / 16}");
+                // Console.WriteLine($"{i} / {NumGames / 16}");
             }
 
             return trainers.Select(trainer => trainer.Log.TakeLast(trainer.Log.Count / 4).Average()).ToList();
