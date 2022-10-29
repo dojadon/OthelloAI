@@ -189,7 +189,7 @@ namespace OthelloAI
 
             public int Compare([AllowNull] Move x, [AllowNull] Move y)
             {
-                return Eval(x) - Eval(y) > 0 ? 1 : -1;
+                return Comparer<float>.Default.Compare(Eval(x), Eval(y));
             }
         }
     }
@@ -245,12 +245,7 @@ namespace OthelloAI
     {
         public const int INF = 10000000;
 
-        public SearchParameters ParamBeg { get; set; }
-        public SearchParameters ParamMid { get; set; }
-        public SearchParameters ParamEnd { get; set; }
-
         public SearchParameters[] Params { get; set; }
-
         public Evaluator Evaluator { get; set; }
 
         public List<float> Times { get; } = new List<float>();
@@ -265,12 +260,6 @@ namespace OthelloAI
         {
             // SearchedNodeCount++;
             return board.GetStoneCountGap() * 10000;
-        }
-
-        protected float EvalLastMove(Board board)
-        {
-            // SearchedNodeCount++;
-            return (board.GetStoneCountGap() + board.GetReversedCountOnLastMove()) * 10000;
         }
 
         public float Eval(Board board)
@@ -297,9 +286,9 @@ namespace OthelloAI
             ulong result = 0;
             float e = 0;
 
-            foreach(var param in Params)
+            foreach(var param in Params.OrderByDescending(p => p.stage))
             {
-                if (board.n_stone >= param.stage)
+                if (board.n_stone < param.stage)
                     continue;
 
                 (result, e) = SolveRoot(board, param);

@@ -147,18 +147,18 @@ namespace OthelloAI
                 return board.GetStoneCountGap();
             }
 
-            for (int i = 0; i < 11; i++)
+            for (int i = 1; i < 9; i++)
             {
                 PlayerAI player = new PlayerAI(new EvaluatorPatternBased(patterns))
                 {
-                    Params = new[] { new SearchParameters(depth: 3, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                    Params = new[] { new SearchParameters(depth: i, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 50, SearchType.Normal, new CutoffParameters(true, true, false))},
                     PrintInfo = false,
                 };
 
-                player.Depth_Prob = i * 0.1F;
+                // player.Depth_Prob = i * 0.1F;
 
-                double avg = Enumerable.Range(0, 1000).AsParallel().SelectMany(i =>
+                double avg = Enumerable.Range(0, 100).AsParallel().SelectMany(i =>
                 {
                     List<long> c = new();
                     Play(player, player, c);

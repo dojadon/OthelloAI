@@ -27,7 +27,7 @@ namespace OthelloAI
 
         static void Main()
         {
-            Tester.TestC();
+            Tester.TestA();
             // Tester.TestE();
             // GA.GATest.TestBRKGA();
             //Train();
@@ -349,7 +349,7 @@ namespace OthelloAI
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                p.SolveEndGame(board, p.ParamEnd.cutoff_param);
+                p.SolveEndGame(board, p.Params[^1].cutoff_param);
                 sw.Stop();
                 float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
