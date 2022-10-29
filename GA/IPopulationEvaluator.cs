@@ -31,9 +31,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
-                ParamBeg = new SearchParameters(depth: Depth, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: Depth, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParameters(depth: 64, stage: EndStage, new CutoffParameters(true, true, false)),
+                Params = new[] { new SearchParameters(depth: Depth, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: EndStage, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
             };
         }
@@ -96,9 +95,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
-                ParamBeg = new SearchParameters(depth: Depth, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: Depth, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParameters(depth: 64, stage: EndStage, new CutoffParameters(true, true, false)),
+                Params = new[] { new SearchParameters(depth: Depth, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: EndStage, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
             };
         }
@@ -297,9 +295,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(e)
             {
-                ParamBeg = new SearchParameters(depth: Depth, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: Depth, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParameters(depth: 64, stage: EndStage, new CutoffParameters(true, true, false)),
+                Params = new[] { new SearchParameters(depth: Depth, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: EndStage, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
             };
         }

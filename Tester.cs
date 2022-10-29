@@ -83,9 +83,8 @@ namespace OthelloAI
                 {
                     PlayerAI p1 = new PlayerAI(new EvaluatorPatternBased(patterns))
                     {
-                        ParamBeg = new SearchParameters(depth: i, stage: 0, new CutoffParameters(true, true, false)),
-                        ParamMid = new SearchParameters(depth: i, stage: 16, new CutoffParameters(true, true, false)),
-                        ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                        Params = new[] { new SearchParameters(depth: i, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                         PrintInfo = false,
                     };
 
@@ -93,9 +92,8 @@ namespace OthelloAI
 
                     PlayerAI p2 = new PlayerAI(new EvaluatorPatternBased(patterns))
                     {
-                        ParamBeg = new SearchParameters(depth: j, stage: 0, new CutoffParameters(true, true, false)),
-                        ParamMid = new SearchParameters(depth: j, stage: 16, new CutoffParameters(true, true, false)),
-                        ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                        Params = new[] { new SearchParameters(depth: j, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                         PrintInfo = false,
                     };
 
@@ -153,9 +151,8 @@ namespace OthelloAI
             {
                 PlayerAI player = new PlayerAI(new EvaluatorPatternBased(patterns))
                 {
-                    ParamBeg = new SearchParameters(depth: 3, stage: 0, new CutoffParameters(true, true, false)),
-                    ParamMid = new SearchParameters(depth: 3, stage: 16, new CutoffParameters(true, true, false)),
-                    ParamEnd = new SearchParameters(depth: 64, stage: 48, new CutoffParameters(true, true, false)),
+                    Params = new[] { new SearchParameters(depth: 3, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                     PrintInfo = false,
                 };
 
@@ -182,11 +179,9 @@ namespace OthelloAI
 
             PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorPatternBased(patterns))
             {
-                ParamBeg = new SearchParameters(depth: 1 + i * 2, stage: 0, new CutoffParameters(true, true, false)),
-                ParamMid = new SearchParameters(depth: 1 + i * 2, stage: 16, new CutoffParameters(true, true, false)),
-                ParamEnd = new SearchParameters(depth: 64, stage: 54 - i, new CutoffParameters(true, true, false)),
+                Params = new[] { new SearchParameters(depth: 1 + i * 2, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
-
             }).ToArray();
 
             IEnumerable<float>[][] Play()

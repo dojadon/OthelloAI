@@ -219,16 +219,24 @@ namespace OthelloAI
         }
     }
 
+    public enum SearchType
+    {
+        Normal,
+        IterativeDeepening
+    }
+
     public class SearchParameters
     {
         public readonly int depth;
         public readonly int stage;
+        public readonly SearchType type;
         public readonly CutoffParameters cutoff_param;
 
-        public SearchParameters(int depth, int stage, CutoffParameters cutoff_param)
+        public SearchParameters(int depth, int stage, SearchType type, CutoffParameters cutoff_param)
         {
             this.depth = depth;
             this.stage = stage;
+            this.type = type;
             this.cutoff_param = cutoff_param;
         }
     }
@@ -240,6 +248,8 @@ namespace OthelloAI
         public SearchParameters ParamBeg { get; set; }
         public SearchParameters ParamMid { get; set; }
         public SearchParameters ParamEnd { get; set; }
+
+        public SearchParameters[] Params { get; set; }
 
         public Evaluator Evaluator { get; set; }
 
@@ -266,122 +276,57 @@ namespace OthelloAI
         public float Eval(Board board)
         {
             SearchedNodeCount++;
-            if(board.n_stone % 2 == 0 ^ color == 1)
-                return Evaluator.Eval(board);
-            else
-                return -Evaluator.Eval(board.ColorFliped());
+            return Evaluator.Eval(board);
         }
-
-        int color;
 
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
-            SearchedNodeCount = 0;
-
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-
-            color = stone;
-            if (stone == -1)
-                board = board.ColorFliped();
-
-            Evaluator.StartSearch(stone);
-
-            ulong result;
-            if (board.n_stone < ParamMid.stage)
-            {
-                result = SolveIterativeDeepening(board, ParamBeg.cutoff_param, ParamBeg.depth, 2, 3);
-                //(result, _) = SolveRoot(search, board, ParamBeg.cutoff_param, ParamBeg.depth);
-            }
-            else if (board.n_stone < ParamEnd.stage)
-            {
-                result = SolveIterativeDeepening(board, ParamMid.cutoff_param, ParamMid.depth, 2, 3);
-                // (result, _) = SolveRoot(search, board, ParamMid.cutoff_param, ParamMid.depth);
-            }
-            else 
-            {
-                (result, _) = SolveRoot(new Search(ParamEnd.cutoff_param), board, 64);
-            }
-
-            sw.Stop();
-
-            if (result != 0)
-            {
-                float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
-                Times.Add(time);
-
-                if (PrintInfo)
-                {
-                    Console.WriteLine($"Taken Time : {time} ms");
-                    Console.WriteLine($"Nodes : {SearchedNodeCount}");
-                }
-            }
-
-            (int x, int y) = Board.ToPos(result);
-
-            return (x, y, result);
+            (int x, int y, ulong move, _) = DecideMoveWithEvaluation(board, stone);
+            return (x, y, move);
         }
 
         public (int x, int y, ulong move, float e) DecideMoveWithEvaluation(Board board, int stone)
         {
             SearchedNodeCount = 0;
 
-            color = stone;
             if (stone == -1)
                 board = board.ColorFliped();
 
             Evaluator.StartSearch(stone);
 
-            ulong result;
-            float e;
+            ulong result = 0;
+            float e = 0;
 
-            if (board.n_stone < ParamMid.stage)
+            foreach(var param in Params)
             {
-                (result, e) = SolveIterativeDeepeningWithEvaluation(board, ParamBeg.cutoff_param, ParamBeg.depth, 2, 3);
+                if (board.n_stone >= param.stage)
+                    continue;
+
+                (result, e) = SolveRoot(board, param);
+                break;
             }
-            else if (board.n_stone < ParamEnd.stage)
-            {
-                (result, e) = SolveIterativeDeepeningWithEvaluation(board, ParamMid.cutoff_param, ParamMid.depth, 2, 3);
-            }
+
+            if (Math.Abs(e) >= 10000)
+                e /= 10000;
             else
-            {
-                (result, e) = SolveRoot(new Search(ParamEnd.cutoff_param), board, 64);
-
-                if (Math.Abs(e) >= 10000)
-                    e /= 10000;
-            }
+                e = e * 10 / 127.0F;
 
             (int x, int y) = Board.ToPos(result);
 
             return (x, y, result, e);
         }
 
-        public ulong SolveIterativeDeepening(Board board, CutoffParameters param, int depth, int interval, int times)
+        public (ulong, float) SolveRoot(Board board, SearchParameters param) => param.type switch
+        {
+            SearchType.Normal => SolveRoot(new Search(param.cutoff_param), board, param.depth),
+            SearchType.IterativeDeepening => SolveIterativeDeepening(board, param.cutoff_param, param.depth, 2, 3),
+            _ => (0, 0)
+        };
+
+        public (ulong , float) SolveIterativeDeepening(Board board, CutoffParameters param, int depth, int interval, int times)
         {
             var search = new Search(param);
-            int d = depth - interval * (times - 1);
-
-            while (true)
-            {
-                if (PrintInfo)
-                {
-                    Console.WriteLine();
-                    Console.WriteLine($"Depth {d}");
-                }
-
-                (ulong move, _) = SolveRoot(search, board, d);
-
-                if (d >= depth)
-                    return move;
-
-                search = new SearchIterativeDeepening(param, search.Table, interval);
-                d += interval;
-            }
-        }
-
-        public (ulong , float) SolveIterativeDeepeningWithEvaluation(Board board, CutoffParameters param, int depth, int interval, int times)
-        {
-            var search = new Search(param);
-            int d = depth - interval * (times - 1);
+            int d = depth - interval * Math.Min(times - 1, (int) Math.Ceiling((double) depth / interval) - 1);
 
             while (true)
             {
@@ -394,14 +339,14 @@ namespace OthelloAI
                 (ulong move, float e) = SolveRoot(search, board, d);
 
                 if (d >= depth)
-                    return (move, e * 10 / 127.0F);
+                    return (move, e);
 
                 search = new SearchIterativeDeepening(param, search.Table, interval);
                 d += interval;
             }
         }
 
-        public (ulong, int) SolveEndGame(Search search, Board board, CutoffParameters param)
+        public (ulong, int) SolveEndGame(Board board, CutoffParameters param)
         {
             Move root = new Move(board);
 
@@ -616,10 +561,6 @@ namespace OthelloAI
         }
 
         public bool PrintInfo { get; set; } = true;
-
-        public int[] ProbcutNode1 = new int[12];
-        public int[] ProbcutNode2 = new int[12];
-
 
         public static int ordering_depth = 57;
         public static int transposition = 1;
