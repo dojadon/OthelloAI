@@ -8,7 +8,7 @@ namespace OthelloAI
 {
     static class Program
     {
-        public const int NUM_STAGES = 10;
+        public const int NUM_STAGES = 60;
 
         public static readonly Pattern PATTERN_EDGE2X = Pattern.Create(new BoardHasherMask(0b01000010_11111111UL), NUM_STAGES, PatternType.X_SYMMETRIC, "e_edge_x.dat");
         public static readonly Pattern PATTERN_EDGE_BLOCK = Pattern.Create(new BoardHasherMask(0b00111100_10111101UL), NUM_STAGES, PatternType.X_SYMMETRIC, "e_edge_block.dat");

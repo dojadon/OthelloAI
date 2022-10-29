@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace OthelloAI
@@ -104,8 +105,8 @@ namespace OthelloAI
                     {
                         return Play(p1, p2) switch
                         {
-                            <0 => 0,
-                            >0 => 1,
+                            < 0 => 0,
+                            > 0 => 1,
                             0 => 0.5
                         };
                     }).Average();
@@ -179,58 +180,72 @@ namespace OthelloAI
             foreach (var p in patterns)
                 p.Load();
 
-            (IEnumerable<float>, IEnumerable<float>) Play(PlayerAI p1, PlayerAI p2)
+            PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorPatternBased(patterns))
             {
-                bool Step(ref Board board, PlayerAI player, int stone, List<float> evaluations)
+                ParamBeg = new SearchParameters(depth: 1 + i * 2, stage: 0, new CutoffParameters(true, true, false)),
+                ParamMid = new SearchParameters(depth: 1 + i * 2, stage: 16, new CutoffParameters(true, true, false)),
+                ParamEnd = new SearchParameters(depth: 64, stage: 54 - i, new CutoffParameters(true, true, false)),
+                PrintInfo = false,
+
+            }).ToArray();
+
+            IEnumerable<float>[][] Play()
+            {
+                List<float>[][] evaluations = Enumerable.Range(0, 64).Select(_ => Enumerable.Range(0, players.Length).Select(_ => new List<float>()).ToArray()).ToArray();
+
+                bool Step(ref Board board, int stone)
                 {
-                    (int x, int y, ulong move, float e) = player.DecideMoveWithEvaluation(board, stone);
+                    ulong move = 0;
+
+                    if (20 < board.n_stone && board.n_stone < 50)
+                    {
+                        for (int i = 0; i < players.Length; i++)
+                        {
+                            (_, _, move, float e) = players[i].DecideMoveWithEvaluation(board, stone);
+                            evaluations[board.n_stone][i].Add(e * stone);
+                        }
+                    }
+                    else
+                    {
+                        (_, _, move) = players[^1].DecideMove(board, stone);
+                    }
 
                     if (move != 0)
                     {
                         board = board.Reversed(move, stone);
-                        evaluations.Add(e);
                         return true;
                     }
                     return false;
                 }
 
                 Board board = Board.Init;
-                List<float> e1 = new List<float>();
-                List<float> e2 = new List<float>();
 
-                while (e1.Count < 10 || e2.Count < 10)
+                while (board.n_stone < 60)
                 {
-                    e1 = new List<float>();
-                    e2 = new List<float>();
-
                     board = Tester.CreateRnadomGame(GA.GATest.Random, 8);
-                    while (Step(ref board, p1, 1, e1) | Step(ref board, p2, -1, e2))
+                    while (Step(ref board, 1) | Step(ref board, -1))
                     {
                     }
                 }
 
                 int result = board.GetStoneCountGap();
-                var error1 = e1.Select(e => (e - result) * (e - result));
-                var error2 = e2.Select(e => (e - result) * (e - result));
+                float Error(float x) => (x - result) * (x - result);
 
-                return (error1, error2);
+                return evaluations.Select(l1 => l1.Select(l2 => l2.Select(Error)).ToArray()).ToArray();
             }
 
-            for (int i = 1; i < 10; i++)
+            var e = Enumerable.Range(0, 1000).AsParallel().Select(i => Play()).ToArray();
+
+            var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw = File.AppendText(log);
+
+            for (int i = 0; i < 64; i++)
             {
-                PlayerAI player = new PlayerAI(new EvaluatorPatternBased(patterns))
+                if (20 < i && i < 50)
                 {
-                    ParamBeg = new SearchParameters(depth: i, stage: 0, new CutoffParameters(true, true, false)),
-                    ParamMid = new SearchParameters(depth: i, stage: 16, new CutoffParameters(true, true, false)),
-                    ParamEnd = new SearchParameters(depth: 64, stage: 54 - i, new CutoffParameters(true, true, false)),
-                    PrintInfo = false,
-                };
-
-                var e = Enumerable.Range(0, 100).AsParallel().Select(i => Play(player, player)).ToArray();
-                (float a1, float v1) = e.SelectMany(t => t.Item1).OrderByDescending(a => a).Skip(200).AverageAndVariance();
-                (float a2, float v2) = e.SelectMany(t => t.Item2).OrderByDescending(a => a).Skip(200).AverageAndVariance();
-
-                Console.WriteLine($"{i}, {a1}, {a2}");
+                    var error = Enumerable.Range(0, players.Length).Select(j => e.SelectMany(l => l[i][j]).Where(f => f < 1000).Average()).ToArray();
+                    sw.WriteLine(string.Join(",", error));
+                }
             }
         }
 
@@ -266,102 +281,5 @@ namespace OthelloAI
                 Console.WriteLine($"{size}, {time_nano}");
             }
         }
-
-        //public static void Test1()
-        //{
-        //    var rand = new Random();
-
-        //    static ulong Decode(float[] keys)
-        //    {
-        //        var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(6);
-
-        //        ulong g = 0;
-        //        foreach (var i in indices)
-        //            g |= 1UL << i;
-        //        return g;
-        //    }
-
-        //    var io = new IndividualIO<float[]>()
-        //    {
-        //        Decoder = Decode,
-        //        ReadGenome = reader =>
-        //        {
-        //            var gene = new float[reader.ReadInt32()];
-        //            for (int i = 0; i < gene.Length; i++)
-        //                gene[i] = reader.ReadSingle();
-        //            return gene;
-        //        },
-        //        WriteGenome = (gene, writer) =>
-        //        {
-        //            writer.Write(gene.Length);
-        //            Array.ForEach(gene, writer.Write);
-        //        }
-        //    };
-
-        //    var generator = new GenomeInfo<float[]>()
-        //    {
-        //        NumTuple = 4,
-        //        SizeTuple = 6,
-        //        GenomeGenerator = i => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
-        //        Decoder = Decode,
-        //    };
-
-        //    // var pop = Enumerable.Range(0, 50).Select(_ => generator.Generate()).ToList();
-        //    // io.Save("test/pop.dat", pop);
-
-        //    var pop = io.Load("test/pop.dat");
-
-        //    var file = $"test/selfplay_(100)_tournament_1ply_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-        //    using StreamWriter sw = File.AppendText(file);
-
-        //    var rankingLog = new List<List<int>>();
-
-        //    for (int i = 0; i < 25; i++)
-        //    {
-        //        foreach (var ind in pop)
-        //        {
-        //            ind.Log.Clear();
-
-        //            foreach (var p in ind.Patterns)
-        //                p.Reset();
-        //        }
-
-        //        // var trainer = new PopulationTrainerCoLearning(1, 54, 1000, true);
-        //        var trainer = new PopulationTrainerSelfPlay(1, 54, 100, true);
-
-        //        // var popEvaluator = new PopulationEvaluatorRandomTournament<float[]>(trainer, 1, 54, 6500);
-        //        var popEvaluator = new PopulationEvaluatorTournament<float[]>(trainer, 1, 54);
-        //        var scores = popEvaluator.Evaluate(pop).Select(s => s.score);
-
-        //        var ranking = scores.Ranking().ToList();
-        //        rankingLog.Add(ranking);
-
-        //        sw.WriteLine(string.Join(", ", scores) + ",," + string.Join(", ", ranking));
-
-        //        Console.WriteLine(i);
-        //    }
-
-        //    var avg = Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).Average());
-        //    var var = Enumerable.Range(0, pop.Count).Select(i => rankingLog.Select(rank => rank[i]).AverageAndVariance().var);
-
-        //    sw.WriteLine();
-        //    sw.WriteLine(string.Join(", ", avg));
-        //    sw.WriteLine(string.Join(", ", var));
-        //    sw.WriteLine();
-        //    sw.WriteLine(var.Average());
-
-        //    // var popEvaluator = new PopulationEvaluatorTournament(new PopulationEvaluatorSelfPlay(1, 54, n_games, true), 1, 54);
-        //    // var popEvaluator = new PopulationEvaluatorCoLearning(7, 52, n_games);
-        //    // var popEvaluator = new PopulationEvaluatorSelfPlay(1, 52, n_games, true);
-        //    // popEvaluator.Evaluate(pop);
-
-        //    // Console.WriteLine(string.Join(", ", pop.Select(ind => ind.Score)));
-        //    //using StreamWriter sw = File.AppendText(file);
-
-        //    //for (int i = 0; i < pop[0].Log.Count - n_mov; i++)
-        //    //{
-        //    //    sw.WriteLine(string.Join(", ", pop.Select(ind => ind.Log.Skip(i).Take(n_mov).Average())));
-        //    //}
-        //}
     }
 }

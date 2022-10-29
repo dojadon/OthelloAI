@@ -260,8 +260,13 @@ namespace OthelloAI
         public int Eval(Board board)
         {
             SearchedNodeCount++;
-            return Evaluator.Eval(board);
+            if(board.n_stone % 2 == 0 ^ color == 1)
+                return Evaluator.Eval(board);
+            else
+                return -Evaluator.Eval(board.ColorFliped());
         }
+
+        int color;
 
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
@@ -275,6 +280,7 @@ namespace OthelloAI
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
+            color = stone;
             if (stone == -1)
                 board = board.ColorFliped();
 
@@ -345,6 +351,7 @@ namespace OthelloAI
 
             Search search = new Search();
 
+            color = stone;
             if (stone == -1)
                 board = board.ColorFliped();
 
