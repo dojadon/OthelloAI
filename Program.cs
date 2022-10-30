@@ -22,12 +22,12 @@ namespace OthelloAI
         public static readonly Pattern PATTERN_DIAGONAL6 = Pattern.Create(new BoardHasherMask(0x10204081020UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag6.dat");
         public static readonly Pattern PATTERN_DIAGONAL5 = Pattern.Create(new BoardHasherMask(0x102040810UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag5.dat");
 
-        public static readonly Pattern[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER,
-            PATTERN_LINE1, PATTERN_LINE2, PATTERN_LINE3, PATTERN_DIAGONAL8, PATTERN_DIAGONAL7, PATTERN_DIAGONAL6, PATTERN_DIAGONAL5 };
+        public static readonly Pattern[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER, PATTERN_LINE1, PATTERN_LINE2 };
 
         static void Main()
         {
-            Tester.TestA();
+            Test();
+            // Tester.TestD();
             // Tester.TestE();
             // GA.GATest.TestBRKGA();
             //Train();
@@ -136,32 +136,25 @@ namespace OthelloAI
 
         static void Test()
         {
-            string[] s = "330697	344967	116611	14447	70585	395203	329487	276724	262399	132703	312259	156047".Split();
+            static Pattern CreatePattern(ulong mask)
+            {
+                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 1, PatternType.ASYMMETRIC, mask.ToString());
+            }
 
-            Pattern[] p1 = s.Select(t => Pattern.Create(new BoardHasherMask(ulong.Parse(t)), 10, PatternType.ASYMMETRIC, $"p{t}.dat")).ToArray();
+            var s1 = "148451\r\n18403\r\n25571\r\n50887\r\n213955\r\n18375\r\n58083\r\n91075\r\n148423\r\n83907";
+            var s2 = "10485\t312003\t395015\r\n10485\t312003\t460547\r\n10485\t279491\t460547\r\n10485\t279491\t395015\r\n12537\t279491\t460547\r\n10485\t312257\t460547\r\n12533\t312003\t395015\r\n12533\t312003\t460547\r\n12537\t312195\t460547\r\n10485\t312195\t460547";
 
-            //Pattern[] p1 = { new Pattern("p11.dat", 10, new BoardHasherMask(0b01110000_11111011UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p12.dat", 10, new BoardHasherMask(0b10100000_11000011_11000011UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p13.dat", 10, new BoardHasherMask(0b01100000_11100010_11000011UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p14.dat", 10, new BoardHasherMask(0b11100000_11100000_11100001UL), PatternType.ASYMMETRIC),
-            //};
+            Pattern[][] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreatePattern).Select(p => new[] {p}).ToArray();
+            Pattern[][] p2 = s2.Split("\r\n").Select(t => t.Split("\t").Select(ulong.Parse).Select(CreatePattern).ToArray()).ToArray();
 
-            //Pattern[] p2 = { new Pattern("p21.dat", 10, new BoardHasherMask(0b11111111UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p22.dat", 10, new BoardHasherMask(0b11000000_11100000_11100000UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p23.dat", 10, new BoardHasherMask(0b10000000_11100000_11110000UL), PatternType.ASYMMETRIC),
-            //};
+            PatternTrainer[] trainers = p1.Concat(p2).Select(p => new PatternTrainer(p, 0.005F)).ToArray();
 
-            Pattern[] p2 = PATTERNS;
-
-            PatternTrainer[] trainers = { new PatternTrainer(p1, 0.0025F), new PatternTrainer(p2, 0.0025F) };
-            (Evaluator, float)[] evaluators = { (new EvaluatorPatternBased(p1), 0.5F), (new EvaluatorPatternBased(p2), 0.5F) };
-
-            var evaluator = new EvaluatorBiasedRandomChoice(evaluators);
+            var evaluator = new EvaluatorRandomChoice(p1.Concat(p2).Select(p => new EvaluatorPatternBased(p)).ToArray());
 
             PlayerAI player = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(depth: 3, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 52, SearchType.Normal, new CutoffParameters(true, true, false))},
+                Params = new[] { new SearchParameters(depth: 5, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 50, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
             };
 
@@ -181,10 +174,7 @@ namespace OthelloAI
 
                 if (i % 50 == 0)
                 {
-                    foreach (var p in p1)
-                        p.Save();
-
-                    foreach (var p in p2)
+                    foreach (var p in p1.Concat(p2).SelectMany(p => p))
                         p.Save();
                 }
             }

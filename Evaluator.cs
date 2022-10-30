@@ -10,6 +10,8 @@ namespace OthelloAI
     {
         public abstract int Eval(Board board);
 
+        public abstract float EvalTraining(Board board);
+
         public virtual void StartSearch(int stone)
         {
         }
@@ -26,24 +28,20 @@ namespace OthelloAI
 
         public override int Eval(Board board)
         {
-            return EvalByPEXTHashing(board);
-        }
-
-        protected int EvalByPEXTHashing(Board board)
-        {
             var boards = new RotatedAndMirroredBoards(board);
             return Patterns.Sum(p => p.Eval(boards));
+        }
+
+        public override float EvalTraining(Board board)
+        {
+            var boards = new RotatedAndMirroredBoards(board);
+            return Patterns.Sum(p => p.EvalTraining(boards));
         }
     }
 
     public class EvaluatorPatternBased_Release : Evaluator
     {
         public override int Eval(Board board)
-        {
-            return EvalByPEXTHashing(board);
-        }
-
-        protected int EvalByPEXTHashing(Board board)
         {
             var boards = new RotatedAndMirroredBoards(board);
 
@@ -56,6 +54,21 @@ namespace OthelloAI
                     + Program.PATTERN_LINE3.Eval(boards)
                     + Program.PATTERN_DIAGONAL8.Eval(boards)
                     + Program.PATTERN_DIAGONAL7.Eval(boards);
+        }
+
+        public override float EvalTraining(Board board)
+        {
+            var boards = new RotatedAndMirroredBoards(board);
+
+            return Program.PATTERN_EDGE2X.EvalTraining(boards)
+                    + Program.PATTERN_EDGE_BLOCK.EvalTraining(boards)
+                    + Program.PATTERN_CORNER_BLOCK.EvalTraining(boards)
+                    + Program.PATTERN_CORNER.EvalTraining(boards)
+                    + Program.PATTERN_LINE1.EvalTraining(boards)
+                    + Program.PATTERN_LINE2.EvalTraining(boards)
+                    + Program.PATTERN_LINE3.EvalTraining(boards)
+                    + Program.PATTERN_DIAGONAL8.EvalTraining(boards)
+                    + Program.PATTERN_DIAGONAL7.EvalTraining(boards);
         }
     }
 
@@ -90,6 +103,11 @@ namespace OthelloAI
             return Current.Eval(board);
         }
 
+        public override float EvalTraining(Board board)
+        {
+            return Current.Eval(board);
+        }
+
         public override void StartSearch(int stone)
         {
             Current = Choice();
@@ -118,28 +136,14 @@ namespace OthelloAI
             return Current.Eval(board);
         }
 
+        public override float EvalTraining(Board board)
+        {
+            return Current.Eval(board);
+        }
+
         public override void StartSearch(int stone)
         {
             Current = Choice();
         }
     }
-
-    public class EvaluatorRandomize : Evaluator
-    {
-        Random Rand { get; } = new Random(DateTime.Now.Millisecond);
-        Evaluator Evaluator { get; }
-        int Randomness { get; }
-
-        public EvaluatorRandomize(Evaluator evaluator, int randomness)
-        {
-            Evaluator = evaluator;
-            Randomness = randomness;
-        }
-
-        public override int Eval(Board board)
-        {
-            return Evaluator.Eval(board) + (Rand.Next(Randomness) - Randomness / 2);
-        }
-    }
-
 }

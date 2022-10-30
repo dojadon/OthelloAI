@@ -244,6 +244,91 @@ namespace OthelloAI
             }
         }
 
+        public static void TestD()
+        {
+            static Pattern CreatePattern(ulong mask)
+            {
+                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 1, PatternType.ASYMMETRIC, mask.ToString());
+            }
+
+            static PlayerAI CreatePlayer(Pattern[] patterns)
+            {
+                return new PlayerAI(new EvaluatorPatternBased(patterns))
+                {
+                    Params = new[] { new SearchParameters(depth: 8, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                    PrintInfo = false,
+                };
+            }
+
+            Random rand = new();
+
+            var s1 = "148451\r\n18403\r\n25571\r\n50887\r\n213955\r\n18375\r\n58083\r\n91075\r\n148423\r\n83907";
+            var s2 = "10485\t312003\t395015\r\n10485\t312003\t460547\r\n10485\t279491\t460547\r\n10485\t279491\t395015\r\n12537\t279491\t460547\r\n10485\t312257\t460547\r\n12533\t312003\t395015\r\n12533\t312003\t460547\r\n12537\t312195\t460547\r\n10485\t312195\t460547";
+
+            PlayerAI[] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreatePattern).Select(p => CreatePlayer(new[] { p })).ToArray();
+            PlayerAI[] p2 = s2.Split("\r\n").Select(t => t.Split("\t").Select(ulong.Parse).Select(CreatePattern).ToArray()).Select(CreatePlayer).ToArray();
+            PlayerAI[][] p12 = new[] { p1, p2 };
+
+            PlayerAI player = new PlayerAI(new EvaluatorPatternBased(Program.PATTERNS))
+            {
+                Params = new[] { new SearchParameters(depth: 5, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                PrintInfo = false,
+            };
+            foreach (var p in Program.PATTERNS)
+                p.Load();
+
+            float[][] Play()
+            {
+                var boards = new Board[64];
+
+                bool Step(ref Board board, int stone)
+                {
+                    (_, _, ulong move) = player.DecideMove(board, stone);
+
+                    if (move != 0)
+                    {
+                        boards[board.n_stone] = board;
+                        board = board.Reversed(move, stone);
+                        return true;
+                    }
+                    return false;
+                }
+
+                Board board = Board.Init;
+
+                while (board.n_stone < 60)
+                {
+                    board = Tester.CreateRnadomGame(GA.GATest.Random, 6);
+                    while (Step(ref board, 1) | Step(ref board, -1))
+                    {
+                    }
+                }
+
+                int result = board.GetStoneCountGap();
+                float Error(float x) => (x - result) * (x - result);
+
+                float[] Calc(IEnumerable<PlayerAI> ps)
+                {
+                    return boards.Select(b => ps.Select(p => p.Evaluator.EvalTraining(b)).Select(Error).Average()).ToArray();
+                }
+                return p12.Select(Calc).ToArray();
+            }
+
+            var e = Enumerable.Range(0, 50).AsParallel().Select(i => Play()).ToArray();
+
+            var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw = File.AppendText(log);
+
+            for (int i = 20; i < 50; i++)
+            {
+                var error = Enumerable.Range(0, 2).Select(j => e.Select(l => l[j][i]).Where(f => f < 1000).Average()).ToArray();
+                sw.WriteLine(string.Join(",", error));
+                Console.WriteLine(string.Join(",", error));
+            }
+        }
+
         public static void TestE()
         {
             var rand = new Random();

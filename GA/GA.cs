@@ -280,9 +280,9 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumTuple = 3,
-                SizeMin = 8,
-                SizeMax = 8,
+                NumTuple = 1,
+                SizeMin = 9,
+                SizeMax = 9,
                 MaxNumWeights = (int)Math.Pow(3, 9),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,

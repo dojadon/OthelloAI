@@ -268,6 +268,14 @@ namespace OthelloAI
             return Evaluator.Eval(board);
         }
 
+        public float CorrectEvaluation(float e)
+        {
+            if (Math.Abs(e) >= 10000)
+                return e / 10000;
+            else
+                return e * 10 / 127.0F;
+        }
+
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
             (int x, int y, ulong move, _) = DecideMoveWithEvaluation(board, stone);
@@ -295,14 +303,9 @@ namespace OthelloAI
                 break;
             }
 
-            if (Math.Abs(e) >= 10000)
-                e /= 10000;
-            else
-                e = e * 10 / 127.0F;
-
             (int x, int y) = Board.ToPos(result);
 
-            return (x, y, result, e);
+            return (x, y, result, CorrectEvaluation(e));
         }
 
         public (ulong, float) SolveRoot(Board board, SearchParameters param) => param.type switch
