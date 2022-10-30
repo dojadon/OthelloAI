@@ -26,8 +26,7 @@ namespace OthelloAI
 
         static void Main()
         {
-            Test();
-            // Tester.TestD();
+            Tester.TestD();
             // Tester.TestE();
             // GA.GATest.TestBRKGA();
             //Train();
@@ -59,79 +58,6 @@ namespace OthelloAI
             // StartManualGame();
             // UpdataEvaluationWithWthorDatabase();
             // UpdataEvaluationWithMyDatabase();
-        }
-
-        static void Test2()
-        {
-            string[] s = "330697	344967	116611	14447	70585	395203	329487	276724	262399	132703	312259	156047".Split();
-
-            Pattern[] p1 = s.Select(t => Pattern.Create(new BoardHasherMask(ulong.Parse(t)), 10, PatternType.ASYMMETRIC, $"p{t}.dat")).ToArray();
-
-            //Pattern[] p1 =  { new Pattern("p11.dat", 10, new BoardHasherMask(0b01110000_11111011UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p12.dat", 10, new BoardHasherMask(0b10100000_11000011_11000011UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p13.dat", 10, new BoardHasherMask(0b01100000_11100010_11000011UL), PatternType.ASYMMETRIC),
-            //                        new Pattern("p14.dat", 10, new BoardHasherMask(0b11100000_11100000_11100001UL), PatternType.ASYMMETRIC),
-            //};
-
-            Pattern[] p2 = PATTERNS;
-
-            foreach (var p in p1)
-                p.Load();
-
-            foreach (var p in p2)
-                p.Load();
-
-            PlayerAI Create(Evaluator e)
-            {
-                return new PlayerAI(e)
-                {
-                    Params = new[] { new SearchParameters(depth: 3, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
-                    PrintInfo = false,
-                };
-            }
-
-            Random rand = new();
-
-            int Play(PlayerAI p1, PlayerAI p2)
-            {
-                static bool Step(ref Board board, Player player, int stone)
-                {
-                    (int x, int y, ulong move) = player.DecideMove(board, stone);
-                    if (move != 0)
-                    {
-                        board = board.Reversed(move, stone);
-                        // Console.WriteLine(board);
-                        return true;
-                    }
-                    return false;
-                }
-
-                Board board = Tester.CreateRnadomGame(rand, 8);
-                while (Step(ref board, p1, 1) | Step(ref board, p2, -1))
-                {
-                }
-
-                return board.GetStoneCountGap();
-            }
-
-            PlayerAI player1 = Create(new EvaluatorPatternBased(p1));
-            PlayerAI player2 = Create(new EvaluatorPatternBased(p2));
-
-            int w1 = 0;
-            int w2 = 0;
-
-            for (int i = 0; i < 1000; i++)
-            {
-                int result = Play(player1, player2);
-
-                if (result > 0)
-                    w1++;
-                else if (result < 0)
-                    w2++;
-
-                Console.WriteLine($"{w1}, {w2}");
-            }
         }
 
         static void Test()

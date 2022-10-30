@@ -248,7 +248,7 @@ namespace OthelloAI
         {
             static Pattern CreatePattern(ulong mask)
             {
-                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 1, PatternType.ASYMMETRIC, mask.ToString());
+                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, mask.ToString(), true);
             }
 
             static PlayerAI CreatePlayer(Pattern[] patterns)
@@ -272,7 +272,7 @@ namespace OthelloAI
 
             PlayerAI player = new PlayerAI(new EvaluatorPatternBased(Program.PATTERNS))
             {
-                Params = new[] { new SearchParameters(depth: 5, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                Params = new[] { new SearchParameters(depth: 8, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
                                               new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
             };
@@ -289,7 +289,7 @@ namespace OthelloAI
 
                     if (move != 0)
                     {
-                        boards[board.n_stone] = board;
+                        boards[board.n_stone - 4] = board;
                         board = board.Reversed(move, stone);
                         return true;
                     }
@@ -311,12 +311,12 @@ namespace OthelloAI
 
                 float[] Calc(IEnumerable<PlayerAI> ps)
                 {
-                    return boards.Select(b => ps.Select(p => p.Evaluator.EvalTraining(b)).Select(Error).Average()).ToArray();
+                    return boards.Select(b => b.n_stone < 10 ? 0 : ps.Select(p => p.Evaluator.EvalTraining(b)).Select(Error).Average()).ToArray();
                 }
                 return p12.Select(Calc).ToArray();
             }
 
-            var e = Enumerable.Range(0, 50).AsParallel().Select(i => Play()).ToArray();
+            var e = Enumerable.Range(0, 1000).AsParallel().Select(i => Play()).ToArray();
 
             var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);

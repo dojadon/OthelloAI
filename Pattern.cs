@@ -14,24 +14,16 @@ namespace OthelloAI
 
     public class Pattern
     {
-        public static Pattern Create(BoardHasher hasher, int n_stages, PatternType type, string file = "")
+        public static Pattern Create(BoardHasher hasher, int n_stages, PatternType type, string file = "", bool load = false)
         {
-            PatternWeights[] weights_stage;
-
-            if (hasher.Positions.Length > 1)
-            {
-                weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeightsArray(hasher)).ToArray();
-            }
-            else
-            {
-                ulong mask1 = 1UL << hasher.Positions[0];
-                ulong mask2 = 1UL << hasher.Positions[1];
-
-                weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeights2Disc(mask1, mask2)).ToArray();
-            }
-
+            PatternWeights[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeightsArray(hasher)).ToArray();
             var weights = new PatternWeightsStagebased(weights_stage);
-            return new Pattern(weights, type) { FilePath = file };
+            var pattern = new Pattern(weights, type) { FilePath = file };
+
+            if (load)
+                pattern.Load();
+
+            return pattern;
         }
 
         public string FilePath { get; set; }
