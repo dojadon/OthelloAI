@@ -62,9 +62,10 @@ namespace OthelloAI
 
         static void Test()
         {
-            static Pattern CreatePattern(ulong mask)
+            int count = 0;
+            Pattern CreatePattern(ulong mask)
             {
-                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 1, PatternType.ASYMMETRIC, mask.ToString());
+                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
             }
 
             var s1 = "148451\r\n18403\r\n25571\r\n50887\r\n213955\r\n18375\r\n58083\r\n91075\r\n148423\r\n83907";

@@ -246,9 +246,10 @@ namespace OthelloAI
 
         public static void TestD()
         {
-            static Pattern CreatePattern(ulong mask)
+            int count = 0;
+            Pattern CreatePattern(ulong mask)
             {
-                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, mask.ToString(), true);
+                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
             }
 
             static PlayerAI CreatePlayer(Pattern[] patterns)
