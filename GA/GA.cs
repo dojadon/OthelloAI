@@ -280,10 +280,10 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumTuple = 9,
-                SizeMin = 6,
+                NumTuple = 3,
+                SizeMin = 8,
                 SizeMax = 8,
-                MaxNumWeights = (int)Math.Pow(3, 8),
+                MaxNumWeights = (int)Math.Pow(3, 9),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
@@ -291,10 +291,11 @@ namespace OthelloAI.GA
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 2, 54, 100 * 50)
-                {
-                    GetDepthFraction = GetDepthFraction
-                },
+                //Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 2, 54, 100 * 50)
+                //{
+                //    GetDepthFraction = GetDepthFraction
+                //},
+                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
                 Variator = new VariatorEliteArchive<float[]>()
                 {
                     NumElites = 20,
