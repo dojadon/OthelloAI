@@ -4,14 +4,6 @@ using System.Linq;
 
 namespace OthelloAI
 {
-    public enum PatternType
-    {
-        X_SYMMETRIC,
-        XY_SYMMETRIC,
-        DIAGONAL,
-        ASYMMETRIC
-    }
-
     public class Pattern
     {
         public static Pattern Create(BoardHasher hasher, int n_stages, PatternType type, string file = "", bool load = false)

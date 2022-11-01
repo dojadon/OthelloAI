@@ -17,25 +17,25 @@ namespace OthelloAI
         }
     }
 
-    public class EvaluatorPatternBased : Evaluator
+    public class EvaluatorWeightsBased : Evaluator
     {
-        public Pattern[] Patterns { get; }
+        public PatternWeights Weights { get; }
 
-        public EvaluatorPatternBased(Pattern[] patterns)
+        public EvaluatorWeightsBased(PatternWeights weights)
         {
-            Patterns = patterns;
+            Weights = weights;
         }
 
         public override int Eval(Board board)
         {
             var boards = new RotatedAndMirroredBoards(board);
-            return Patterns.Sum(p => p.Eval(boards));
+            return Weights.Eval(boards);
         }
 
         public override float EvalTraining(Board board)
         {
             var boards = new RotatedAndMirroredBoards(board);
-            return Patterns.Sum(p => p.EvalTraining(boards));
+            return Weights.EvalTraining(boards);
         }
     }
 

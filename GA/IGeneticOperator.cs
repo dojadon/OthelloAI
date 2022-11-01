@@ -56,7 +56,7 @@ namespace OthelloAI.GA
             return g1.Zip(g2, (a1, a2) => Cx(a1, a2, rand)).ToArray();
         }
 
-        public GenomeGroup<float[]> Cx(GenomeGroup<float[]> g1, GenomeGroup<float[]> g2, Random rand)
+        public GenomeGroup<float[]> Cx2(GenomeGroup<float[]> g1, GenomeGroup<float[]> g2, Random rand)
         {
             var gene = CxArray(g1.Genome, g2.Genome, rand);
             int size = Cx(g1.Size, g2.Size, rand);
@@ -64,9 +64,14 @@ namespace OthelloAI.GA
             return new GenomeGroup<float[]>(gene, size);
         }
 
+        public GenomeGroup<float[]>[] Cx1(GenomeGroup<float[]>[] g1, GenomeGroup<float[]>[] g2, Random rand)
+        {
+            return g1.Zip(g2, (g11, g22) => Cx2(g11, g22, rand)).ToArray();
+        }
+
         public Individual<float[]> Operate(Individual<float[]> ind1, Individual<float[]> ind2, Random rand)
         {
-            var gene = ind1.Genome.Zip(ind2.Genome, (g1, g2) => Cx(g1, g2, rand)).ToArray();
+            var gene = ind1.Genome.Zip(ind2.Genome, (g1, g2) => Cx1(g1, g2, rand)).ToArray();
 
             return new Individual<float[]>(gene, ind1.Info);
         }

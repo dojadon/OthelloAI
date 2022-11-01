@@ -4,12 +4,49 @@ using System.Linq;
 
 namespace OthelloAI
 {
+    public enum PatternType
+    {
+        X_SYMMETRIC,
+        XY_SYMMETRIC,
+        DIAGONAL,
+        ASYMMETRIC
+    }
+
     public abstract class PatternWeights
     {
         public abstract void Reset();
 
+        public PatternType type;
+
         public abstract int Eval(Board b);
         public abstract float EvalTraining(Board b);
+
+        public int Eval(RotatedAndMirroredBoards b)
+        {
+            return type switch
+            {
+                PatternType.X_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot270) - 128 * 4,
+                PatternType.XY_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot90) - 128 * 4,
+                PatternType.DIAGONAL => Eval(b.rot0) + Eval(b.inv_rot0) - 128 * 2,
+                PatternType.ASYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.rot90) + Eval(b.inv_rot90) +
+                                                            Eval(b.rot180) + Eval(b.inv_rot180) + Eval(b.rot270) + Eval(b.inv_rot270) - 128 * 8,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        public float EvalTraining(RotatedAndMirroredBoards b)
+        {
+            return type switch
+            {
+                PatternType.X_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot270),
+                PatternType.XY_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot90),
+                PatternType.DIAGONAL => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0),
+                PatternType.ASYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.rot90) + EvalTraining(b.inv_rot90) +
+                                                            EvalTraining(b.rot180) + EvalTraining(b.inv_rot180) + EvalTraining(b.rot270) + EvalTraining(b.inv_rot270),
+                _ => throw new NotImplementedException(),
+            };
+        }
+
         public abstract void UpdataEvaluation(Board board, float add, float range);
         public abstract void ApplyTrainedEvaluation(float range);
 
@@ -23,6 +60,62 @@ namespace OthelloAI
             return (byte)Math.Clamp(x / range * 127 + 128, 0, 255);
         }
     }
+
+    public class PatternWeightsSum : PatternWeights
+    {
+        PatternWeights[] Weights { get; }
+
+        public PatternWeightsSum(PatternWeights[] weights)
+        {
+            Weights = weights;
+        }
+
+        public override float[] GetWeights()
+        {
+            return Weights.SelectMany(w => w.GetWeights()).ToArray();
+        }
+
+        public override void Reset()
+        {
+            foreach (var w in Weights)
+                w.Reset();
+        }
+
+        public override void UpdataEvaluation(Board board, float add, float range)
+        {
+            foreach (var w in Weights)
+                w.UpdataEvaluation(board, add, range);
+        }
+
+        public override int Eval(Board b)
+        {
+            return Weights.Sum(w => w.Eval(b));
+        }
+
+        public override float EvalTraining(Board b)
+        {
+            return Weights.Sum(w => w.EvalTraining(b));
+        }
+
+        public override void ApplyTrainedEvaluation(float range)
+        {
+            foreach (var w in Weights)
+                w.ApplyTrainedEvaluation(range);
+        }
+
+        public override void Read(BinaryReader reader)
+        {
+            foreach (var w in Weights)
+                w.Read(reader);
+        }
+
+        public override void Write(BinaryWriter writer)
+        {
+            foreach (var w in Weights)
+                w.Write(writer);
+        }
+    }
+
 
     public class PatternWeightsStagebased : PatternWeights
     {

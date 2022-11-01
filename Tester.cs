@@ -48,10 +48,9 @@ namespace OthelloAI
 
         public static void TestB()
         {
-            Pattern[] patterns = Program.PATTERNS;
+            PatternWeights weight = null;
 
-            foreach (var p in patterns)
-                p.Load();
+            // weight.Load();
 
             int Play(PlayerAI p1, PlayerAI p2)
             {
@@ -81,7 +80,7 @@ namespace OthelloAI
             {
                 for (int j = i + 1; j < n; j++)
                 {
-                    PlayerAI p1 = new PlayerAI(new EvaluatorPatternBased(patterns))
+                    PlayerAI p1 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
                         Params = new[] { new SearchParameters(depth: i, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
                                               new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
@@ -90,7 +89,7 @@ namespace OthelloAI
 
                     // p1.Depth_Prob = i * 0.2F;
 
-                    PlayerAI p2 = new PlayerAI(new EvaluatorPatternBased(patterns))
+                    PlayerAI p2 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
                         Params = new[] { new SearchParameters(depth: j, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
                                               new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
@@ -116,10 +115,9 @@ namespace OthelloAI
 
         public static void TestA()
         {
-            Pattern[] patterns = Program.PATTERNS;
+            PatternWeights weight = null;
 
-            foreach (var p in patterns)
-                p.Load();
+            // weight.Load();
 
             int Play(PlayerAI p1, PlayerAI p2, List<long> count)
             {
@@ -149,7 +147,7 @@ namespace OthelloAI
 
             for (int i = 1; i < 9; i++)
             {
-                PlayerAI player = new PlayerAI(new EvaluatorPatternBased(patterns))
+                PlayerAI player = new PlayerAI(new EvaluatorWeightsBased(weight))
                 {
                     Params = new[] { new SearchParameters(depth: i, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
                                               new SearchParameters(depth: 64, stage: 50, SearchType.Normal, new CutoffParameters(true, true, false))},
@@ -171,15 +169,19 @@ namespace OthelloAI
 
         public static void TestC()
         {
-            var rand = new Random();
-            Pattern[] patterns = Program.PATTERNS;
-
-            foreach (var p in patterns)
-                p.Load();
-
-            PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorPatternBased(patterns))
+            int count = 10;
+            Pattern CreatePattern(ulong mask)
             {
-                Params = new[] { new SearchParameters(depth: 1 + i * 2, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
+                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
+            }
+            var rand = new Random();
+            // Pattern[] patterns = Program.PATTERNS;
+            // Pattern[] patterns = new[] { CreatePattern(10485), CreatePattern(312003), CreatePattern(395015) };
+            PatternWeights weight = null;
+
+            PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorWeightsBased(weight))
+            {
+                Params = new[] { new SearchParameters(depth: i * 2, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
                                               new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                 PrintInfo = false,
             }).ToArray();
@@ -229,64 +231,58 @@ namespace OthelloAI
                 return evaluations.Select(l1 => l1.Select(l2 => l2.Select(Error)).ToArray()).ToArray();
             }
 
-            var e = Enumerable.Range(0, 1000).AsParallel().Select(i => Play()).ToArray();
+            var e = Enumerable.Range(0, 10000).AsParallel().Select(i => Play()).ToArray();
 
             var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
-            for (int i = 0; i < 64; i++)
+            for (int i = 20; i < 50; i++)
             {
-                if (20 < i && i < 50)
-                {
-                    var error = Enumerable.Range(0, players.Length).Select(j => e.SelectMany(l => l[i][j]).Where(f => f < 1000).Average()).ToArray();
-                    sw.WriteLine(string.Join(",", error));
-                }
+                var error = Enumerable.Range(0, players.Length).Select(j => e.SelectMany(l => l[i][j]).Where(f => f < 1000).Average()).ToArray();
+                sw.WriteLine(string.Join(",", error));
             }
         }
 
         public static void TestD()
         {
             int count = 0;
-            Pattern CreatePattern(ulong mask)
+            PatternWeights CreatePattern(ulong mask)
             {
-                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
+                // return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
+                return null;
             }
 
-            static PlayerAI CreatePlayer(Pattern[] patterns)
+            static PlayerAI CreatePlayer(PatternWeights weights)
             {
-                return new PlayerAI(new EvaluatorPatternBased(patterns))
+                return new PlayerAI(new EvaluatorWeightsBased(weights))
                 {
-                    Params = new[] { new SearchParameters(depth: 8, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
+                    Params = new[] { new SearchParameters(depth: 7, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
                                               new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
                     PrintInfo = false,
                 };
             }
 
-            Random rand = new();
-
             var s1 = "148451\r\n18403\r\n25571\r\n50887\r\n213955\r\n18375\r\n58083\r\n91075\r\n148423\r\n83907";
             var s2 = "10485\t312003\t395015\r\n10485\t312003\t460547\r\n10485\t279491\t460547\r\n10485\t279491\t395015\r\n12537\t279491\t460547\r\n10485\t312257\t460547\r\n12533\t312003\t395015\r\n12533\t312003\t460547\r\n12537\t312195\t460547\r\n10485\t312195\t460547";
 
-            PlayerAI[] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreatePattern).Select(p => CreatePlayer(new[] { p })).ToArray();
-            PlayerAI[] p2 = s2.Split("\r\n").Select(t => t.Split("\t").Select(ulong.Parse).Select(CreatePattern).ToArray()).Select(CreatePlayer).ToArray();
-            PlayerAI[][] p12 = new[] { p1, p2 };
+            PlayerAI[] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreatePattern).Select(CreatePlayer).ToArray();
+            // PlayerAI[] p2 = s2.Split("\r\n").Select(t => t.Split("\t").Select(ulong.Parse).Select(CreatePattern).ToArray()).Select(CreatePlayer).ToArray();
+            // PlayerAI[] p3 = new[] { CreatePlayer( Program.PATTERNS) };
+            PlayerAI[][] p12 = new[] { p1 };
 
-            PlayerAI player = new PlayerAI(new EvaluatorPatternBased(Program.PATTERNS))
-            {
-                Params = new[] { new SearchParameters(depth: 8, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
-                PrintInfo = false,
-            };
+            PlayerAI[] players = p1;
+
             foreach (var p in Program.PATTERNS)
                 p.Load();
 
             float[][] Play()
             {
+                Random rand = new();
                 var boards = new Board[64];
 
                 bool Step(ref Board board, int stone)
                 {
-                    (_, _, ulong move) = player.DecideMove(board, stone);
+                    (_, _, ulong move) = rand.Choice(players).DecideMove(board, stone);
 
                     if (move != 0)
                     {
@@ -317,14 +313,14 @@ namespace OthelloAI
                 return p12.Select(Calc).ToArray();
             }
 
-            var e = Enumerable.Range(0, 1000).AsParallel().Select(i => Play()).ToArray();
+            var e = Enumerable.Range(0, 4000).AsParallel().Select(i => Play()).ToArray();
 
             var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
-            for (int i = 20; i < 50; i++)
+            for (int i = 10; i < 50; i++)
             {
-                var error = Enumerable.Range(0, 2).Select(j => e.Select(l => l[j][i]).Where(f => f < 1000).Average()).ToArray();
+                var error = Enumerable.Range(0, 3).Select(j => e.Select(l => l[j][i]).Where(f => f < 1000).Average()).ToArray();
                 sw.WriteLine(string.Join(",", error));
                 Console.WriteLine(string.Join(",", error));
             }

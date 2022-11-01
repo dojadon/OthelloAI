@@ -265,7 +265,15 @@ namespace OthelloAI
         public float Eval(Board board)
         {
             SearchedNodeCount++;
-            return Evaluator.Eval(board);
+
+            if (color == 0 ^ board.n_stone % 2 == 0)
+            {
+                return -Evaluator.Eval(board.ColorFliped());
+            }
+            else
+            {
+                return Evaluator.Eval(board);
+            }
         }
 
         public float CorrectEvaluation(float e)
@@ -275,6 +283,8 @@ namespace OthelloAI
             else
                 return e * 10 / 127.0F;
         }
+
+        int color = 0;
 
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
@@ -286,6 +296,7 @@ namespace OthelloAI
         {
             SearchedNodeCount = 0;
 
+            color = stone;
             if (stone == -1)
                 board = board.ColorFliped();
 
@@ -298,6 +309,9 @@ namespace OthelloAI
             {
                 if (board.n_stone < param.stage)
                     continue;
+
+                if (param.depth == 0)
+                    e = Eval(board);
 
                 (result, e) = SolveRoot(board, param);
                 break;

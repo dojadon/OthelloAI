@@ -39,7 +39,7 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            Trainer.Train(pop.Select(ind => ind.GetPatterns()).ToList());
+            Trainer.Train(pop.Select(ind => ind.Weights).ToList());
 
             foreach (var ind in pop)
             {
@@ -108,7 +108,7 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            Trainer.Train(pop.Select(ind => ind.GetPatterns()).ToList());
+            Trainer.Train(pop.Select(ind => ind.Weights).ToList());
 
             foreach (var ind in pop)
             {
@@ -167,7 +167,7 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            var scores = Trainer.Train(pop.Select(ind => ind.GetPatterns()).ToList());
+            var scores = Trainer.Train(pop.Select(ind => ind.Weights).ToList());
             return pop.Zip(scores, (ind, s) => new Score<T>(ind, s)).ToList();
         }
     }
@@ -243,26 +243,6 @@ namespace OthelloAI.GA
         }
     }
 
-    public class PopulationEvaluatorExeCost<T> : IPopulationEvaluator<T, Score<T>>
-    {
-        public static readonly float[] TIME = { 0, 0, 403.9F, 426.06F, 454.05F, 479.2F, 506.6F, 534.2F, 568.2F, 728.4F, 837.2F };
-
-        public PopulationEvaluatorExeCost()
-        {
-        }
-
-        public List<Score<T>> Evaluate(List<Individual<T>> pop)
-        {
-            return pop.Select(i => new Score<T>(i, Evaluate(i))).ToList();
-        }
-
-        public float Evaluate(Individual<T> ind)
-        {
-            return ind.Tuples.Sum(t => TIME[t.Size]) * 8 * 1E-3F + (float)GATest.Random.NextDouble() * 5E-3F;
-        }
-    }
-
-
     public class PopulationEvaluatorElite<T> : IPopulationEvaluator<T, ScoreElite<T>>
     {
         public IPopulationEvaluator<T, Score<T>> Evaluator { get; set; }
@@ -301,12 +281,12 @@ namespace OthelloAI.GA
             };
         }
 
-        public PlayerAI CreatePlayer(Pattern[] p)
+        public PlayerAI CreatePlayer(PatternWeights p)
         {
-            return CreatePlayer(new EvaluatorPatternBased(p));
+            return CreatePlayer(new EvaluatorWeightsBased(p));
         }
 
-        public abstract List<float> Train(List<Pattern[]> pop);
+        public abstract List<float> Train(List<PatternWeights> pop);
     }
 
     public class PopulationTrainerCoLearning : PopulationTrainer
@@ -315,13 +295,13 @@ namespace OthelloAI.GA
         {
         }
 
-        public override List<float> Train(List<Pattern[]> pop)
+        public override List<float> Train(List<PatternWeights> pop)
         {
-            var evaluator = new EvaluatorRandomChoice(pop.Select(p => new EvaluatorPatternBased(p)).ToArray());
+            var evaluator = new EvaluatorRandomChoice(pop.Select(p => new EvaluatorWeightsBased(p)).ToArray());
             Player player = CreatePlayer(evaluator);
 
-            foreach (var p in pop.SelectMany(a => a))
-                p.Reset();
+            foreach (var w in pop)
+                w.Reset();
 
             var trainers = pop.Select(p => new PatternTrainer(p, 0.001F)).ToArray();
 
@@ -344,7 +324,7 @@ namespace OthelloAI.GA
         {
         }
 
-        public override List<float> Train(List<Pattern[]> pop)
+        public override List<float> Train(List<PatternWeights> pop)
         {
             if (IsParallel)
             {
@@ -357,11 +337,11 @@ namespace OthelloAI.GA
             }
         }
 
-        public float Train(Pattern[] p)
+        public float Train(PatternWeights w)
         {
             var rand = new Random();
-            var player = CreatePlayer(new EvaluatorPatternBased(p));
-            var trainer = new PatternTrainer(p, 0.002F);
+            var player = CreatePlayer(new EvaluatorWeightsBased(w));
+            var trainer = new PatternTrainer(w, 0.002F);
 
             for (int i = 0; i < NumGames / 16; i++)
             {
