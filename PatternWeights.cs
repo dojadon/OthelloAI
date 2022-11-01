@@ -14,16 +14,32 @@ namespace OthelloAI
 
     public abstract class PatternWeights
     {
+        public static PatternWeights Create(BoardHasher hasher, int n_stages, PatternType type, string file = "", bool load = false)
+        {
+            PatternWeights[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeightsArray(hasher)).ToArray();
+            var weights = new PatternWeightsStagebased(weights_stage)
+            {
+                FilePath = file,
+                Type = type
+            };
+
+            if (load)
+                weights.Load();
+
+            return weights;
+        }
+
+        public string FilePath { get; set; }
+
+        public PatternType Type { get; set; }
+
         public abstract void Reset();
-
-        public PatternType type;
-
         public abstract int Eval(Board b);
         public abstract float EvalTraining(Board b);
 
         public int Eval(RotatedAndMirroredBoards b)
         {
-            return type switch
+            return Type switch
             {
                 PatternType.X_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot270) - 128 * 4,
                 PatternType.XY_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot90) - 128 * 4,
@@ -36,7 +52,7 @@ namespace OthelloAI
 
         public float EvalTraining(RotatedAndMirroredBoards b)
         {
-            return type switch
+            return Type switch
             {
                 PatternType.X_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot270),
                 PatternType.XY_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot90),
@@ -55,9 +71,21 @@ namespace OthelloAI
         public abstract void Read(BinaryReader reader);
         public abstract void Write(BinaryWriter writer);
 
-        public byte ConvertToInt8(float x, float range)
+        public static byte ConvertToInt8(float x, float range)
         {
             return (byte)Math.Clamp(x / range * 127 + 128, 0, 255);
+        }
+
+        public void Load()
+        {
+            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
+            Read(reader);
+        }
+
+        public void Save()
+        {
+            using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
+            Write(writer);
         }
     }
 
@@ -126,14 +154,14 @@ namespace OthelloAI
             Weights = weights;
         }
 
-        protected int GetStage(Board board)
+        public static int GetStage(int n_stone, int n_div)
         {
-            return (board.n_stone - 5) / (60 / Weights.Length);
+            return (n_stone - 5) / (60 / n_div);
         }
 
         protected PatternWeights GetCurrentWeights(Board board)
         {
-            return Weights[GetStage(board)];
+            return Weights[GetStage(board.n_stone, Weights.Length)];
         }
 
         public override float[] GetWeights()

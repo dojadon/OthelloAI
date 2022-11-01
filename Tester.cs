@@ -82,8 +82,8 @@ namespace OthelloAI
                 {
                     PlayerAI p1 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
-                        Params = new[] { new SearchParameters(depth: i, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                        Params = new[] { new SearchParameters(depth: i, stage: 0, type: SearchType.Normal),
+                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
                         PrintInfo = false,
                     };
 
@@ -91,8 +91,8 @@ namespace OthelloAI
 
                     PlayerAI p2 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
-                        Params = new[] { new SearchParameters(depth: j, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                        Params = new[] { new SearchParameters(depth: j, stage: 0, type: SearchType.Normal),
+                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
                         PrintInfo = false,
                     };
 
@@ -149,8 +149,8 @@ namespace OthelloAI
             {
                 PlayerAI player = new PlayerAI(new EvaluatorWeightsBased(weight))
                 {
-                    Params = new[] { new SearchParameters(depth: i, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 50, SearchType.Normal, new CutoffParameters(true, true, false))},
+                    Params = new[] { new SearchParameters(depth: i, stage: 0, type: SearchType.IterativeDeepening),
+                                              new SearchParameters(depth: 64, stage: 50, type: SearchType.Normal)},
                     PrintInfo = false,
                 };
 
@@ -170,9 +170,9 @@ namespace OthelloAI
         public static void TestC()
         {
             int count = 10;
-            Pattern CreatePattern(ulong mask)
+            PatternWeights CreatePattern(ulong mask)
             {
-                return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
+                return PatternWeights.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
             }
             var rand = new Random();
             // Pattern[] patterns = Program.PATTERNS;
@@ -181,8 +181,8 @@ namespace OthelloAI
 
             PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(depth: i * 2, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                Params = new[] { new SearchParameters(depth: i * 2, stage: 0, type: SearchType.Normal),
+                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
                 PrintInfo = false,
             }).ToArray();
 
@@ -256,8 +256,8 @@ namespace OthelloAI
             {
                 return new PlayerAI(new EvaluatorWeightsBased(weights))
                 {
-                    Params = new[] { new SearchParameters(depth: 7, stage: 0, SearchType.IterativeDeepening, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: 48, SearchType.Normal, new CutoffParameters(true, true, false))},
+                    Params = new[] { new SearchParameters(depth: 7, stage: 0, type: SearchType.IterativeDeepening),
+                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
                     PrintInfo = false,
                 };
             }
@@ -340,7 +340,7 @@ namespace OthelloAI
 
             for (int size = 2; size < 11; size++)
             {
-                var patterns = Enumerable.Range(0, 100).Select(_ => Pattern.Create(CreateRandomHasher(size), 1, PatternType.ASYMMETRIC)).ToArray();
+                var patterns = Enumerable.Range(0, 100).Select(_ => PatternWeights.Create(CreateRandomHasher(size), 1, PatternType.ASYMMETRIC)).ToArray();
                 timer.Reset();
 
                 for (int i = 0; i < n; i++)

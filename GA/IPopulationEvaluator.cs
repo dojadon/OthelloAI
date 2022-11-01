@@ -17,7 +17,7 @@ namespace OthelloAI.GA
         public int EndStage { get; }
         public int NumGames { get; }
 
-        public Func<Individual<T>, Individual<T>, (float, float)> GetDepthFraction { get; set; } = (_, _) => (0, 0);
+        public Func<Individual<T>, Individual<T>, int, (float, float)> GetDepthFraction { get; set; } = (_, _, _) => (0, 0);
 
         public PopulationEvaluatorRandomTournament(PopulationTrainer trainer, int depth, int endStage, int n_games)
         {
@@ -27,12 +27,12 @@ namespace OthelloAI.GA
             NumGames = n_games;
         }
 
-        public PlayerAI CreatePlayer(Individual<T> ind)
+        public PlayerAI CreatePlayer(Individual<T> ind1, Individual<T> ind2)
         {
-            return new PlayerAI(ind.CreateEvaluator())
+            return new PlayerAI(ind1.CreateEvaluator())
             {
-                Params = new[] { new SearchParameters(depth: Depth, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: EndStage, SearchType.Normal, new CutoffParameters(true, true, false))},
+                Params = new[] { new SearchParameters(depth: Depth, stage: 0, type: SearchType.Normal) { DepthFraction = i => GetDepthFraction(ind1, ind2, i).Item1 },
+                                              new SearchParameters(depth: 64, stage: EndStage, type: SearchType.Normal)},
                 PrintInfo = false,
             };
         }
@@ -54,10 +54,8 @@ namespace OthelloAI.GA
                 var ind1 = pop[pair.Item1];
                 var ind2 = pop[pair.Item2];
 
-                PlayerAI p1 = CreatePlayer(ind1);
-                PlayerAI p2 = CreatePlayer(ind2);
-
-                (p1.Depth_Prob, p2.Depth_Prob) = GetDepthFraction(ind1, ind2);
+                PlayerAI p1 = CreatePlayer(ind1, ind2);
+                PlayerAI p2 = CreatePlayer(ind2, ind1);
 
                 Board b = Tester.PlayGame(Tester.CreateRnadomGame(rand, 6), p1, p2);
                 int result = b.GetStoneCountGap();
@@ -95,8 +93,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
-                Params = new[] { new SearchParameters(depth: Depth, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: EndStage, SearchType.Normal, new CutoffParameters(true, true, false))},
+                Params = new[] { new SearchParameters(depth: Depth, stage: 0, type: SearchType.Normal),
+                                              new SearchParameters(depth: 64, stage: EndStage, type: SearchType.Normal)},
                 PrintInfo = false,
             };
         }
@@ -275,8 +273,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(e)
             {
-                Params = new[] { new SearchParameters(depth: Depth, stage: 0, SearchType.Normal, new CutoffParameters(true, true, false)),
-                                              new SearchParameters(depth: 64, stage: EndStage, SearchType.Normal, new CutoffParameters(true, true, false))},
+                Params = new[] { new SearchParameters(depth: Depth, stage: 0, type: SearchType.Normal),
+                                              new SearchParameters(depth: 64, stage: EndStage, type: SearchType.Normal)},
                 PrintInfo = false,
             };
         }

@@ -150,7 +150,7 @@ namespace OthelloAI.GA
 
             static float CalcExeCost(Individual<float[]> ind, int stage)
             {
-                return ind.Tuples[stage].Length;
+                return ind.Tuples[PatternWeightsStagebased.GetStage(stage, ind.Tuples.Length)].Length;
             }
 
             static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2, int stage)
@@ -158,10 +158,10 @@ namespace OthelloAI.GA
                 float t1 = CalcExeCost(ind1, stage);
                 float t2 = CalcExeCost(ind2, stage);
 
-                int n1 = 34;
-                int n2 = 70;
+                int n1 = 12;
+                int n2 = 54;
 
-                if (Math.Abs(t1 - t2) < 20)
+                if (Math.Abs(t1 - t2) < 1E-3)
                     return (0, 0);
 
                 else if (t1 > t2)
@@ -179,10 +179,10 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 5,
-                NumTuples = 1,
-                SizeMin = 9,
+                NumTuples = 3,
+                SizeMin = 8,
                 SizeMax = 9,
-                MaxNumWeights = (int)Math.Pow(3, 9),
+                MaxNumWeights = (int) Math.Pow(3, 9),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
@@ -190,11 +190,11 @@ namespace OthelloAI.GA
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                //Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 2, 54, 100 * 50)
-                //{
-                //    GetDepthFraction = GetDepthFraction
-                //},
-                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
+                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 2, 54, 100 * 50)
+                {
+                    GetDepthFraction = GetDepthFraction
+                },
+                // Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
                 Variator = new VariatorEliteArchive<float[]>()
                 {
                     NumElites = 20,
@@ -259,6 +259,7 @@ namespace OthelloAI.GA
                             Console.WriteLine(new Board(b1, 0));
                         }
                     }
+                    Console.WriteLine();
                 }
 
                 Console.WriteLine($"Gen : {n_gen}, {time}");
@@ -336,8 +337,6 @@ namespace OthelloAI.GA
     {
         public T Genome { get; }
         public ulong TupleBit { get; }
-        public Pattern Pattern { get; }
-
         public GenomeInfo<T> Info { get; }
 
         public int Size { get; }
@@ -349,7 +348,6 @@ namespace OthelloAI.GA
             Info = info;
 
             TupleBit = info.Decoder(genome, Size);
-            Pattern = Pattern.Create(new BoardHasherMask(TupleBit), 10, PatternType.ASYMMETRIC);
         }
 
         public override bool Equals(object obj)
@@ -391,7 +389,7 @@ namespace OthelloAI.GA
             Info = info;
 
             Tuples = new TupleB<T>[info.NumStages][];
-            var weightsStaged = new PatternWeights[info.NumStages];
+            var weights = new PatternWeights[info.NumStages];
 
             for (int i = 0; i < genome.Length; i++)
             {
@@ -408,10 +406,10 @@ namespace OthelloAI.GA
                     list.Add(new TupleB<T>(g.Genome, g.Size, info));
                 }
                 Tuples[i] = list.OrderBy(t => t.TupleBit).ToArray();
-                weightsStaged[i] = new PatternWeightsSum(Tuples[i].Select(t => new PatternWeightsArray(new BoardHasherMask(t.TupleBit))).ToArray());
+                weights[i] = new PatternWeightsSum(Tuples[i].Select(t => new PatternWeightsArray(new BoardHasherMask(t.TupleBit))).ToArray());
             }
 
-            var weights = new PatternWeightsStagebased(weightsStaged);
+            Weights = new PatternWeightsStagebased(weights);
         }
 
         public Evaluator CreateEvaluator() => new EvaluatorWeightsBased(Weights);

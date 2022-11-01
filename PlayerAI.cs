@@ -207,12 +207,14 @@ namespace OthelloAI
 
     public readonly struct CutoffParameters
     {
+        public readonly float depthFraction;
         public readonly bool shouldTranspositionCut;
         public readonly bool shouldStoreTranspositionTable;
         public readonly bool shouldProbCut;
 
-        public CutoffParameters(bool transposition, bool storeTransposition, bool probcut)
+        public CutoffParameters(float depthFraction, bool transposition, bool storeTransposition, bool probcut)
         {
+            this.depthFraction = depthFraction;
             shouldTranspositionCut = transposition;
             shouldStoreTranspositionTable = storeTransposition;
             shouldProbCut = probcut;
@@ -222,7 +224,7 @@ namespace OthelloAI
     public enum SearchType
     {
         Normal,
-        IterativeDeepening
+        IterativeDeepening,
     }
 
     public class SearchParameters
@@ -230,14 +232,22 @@ namespace OthelloAI
         public readonly int depth;
         public readonly int stage;
         public readonly SearchType type;
-        public readonly CutoffParameters cutoff_param;
 
-        public SearchParameters(int depth, int stage, SearchType type, CutoffParameters cutoff_param)
+        public Func<int, float> DepthFraction { get; set; } = _ => 0;
+        public Func<int, bool> ShouldTranspositionCut { get; set; } = _ => true;
+        public Func<int, bool> ShouldStoreTranspositionTable { get; set; } = _ => true;
+        public Func<int, bool> ShouldProbCut { get; set; } = _ => false;
+
+        public SearchParameters(int depth, int stage, SearchType type)
         {
             this.depth = depth;
             this.stage = stage;
             this.type = type;
-            this.cutoff_param = cutoff_param;
+        }
+
+        public CutoffParameters CreateCutoffParameters(int n)
+        {
+            return new CutoffParameters(DepthFraction(n), ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n), ShouldProbCut(n));
         }
     }
 
@@ -324,8 +334,8 @@ namespace OthelloAI
 
         public (ulong, float) SolveRoot(Board board, SearchParameters param) => param.type switch
         {
-            SearchType.Normal => SolveRoot(new Search(param.cutoff_param), board, param.depth),
-            SearchType.IterativeDeepening => SolveIterativeDeepening(board, param.cutoff_param, param.depth, 2, 3),
+            SearchType.Normal => SolveRoot(new Search(param.CreateCutoffParameters(board.n_stone)), board, param.depth),
+            SearchType.IterativeDeepening => SolveIterativeDeepening(board, param.CreateCutoffParameters(board.n_stone), param.depth, 2, 3),
             _ => (0, 0)
         };
 
@@ -546,8 +556,6 @@ namespace OthelloAI
             return max;
         }
 
-        public float Depth_Prob { get; set; } = 0;
-
         public float Negamax(Search search, Board board, ulong moves, int depth, float alpha, float beta)
         {
             float max = -1000000;
@@ -576,7 +584,7 @@ namespace OthelloAI
             if (search.IsCanceled)
                 return -1000000;
 
-            if(depth == 1 && Depth_Prob > 0 && GA.GATest.Random.NextDouble() < Depth_Prob)
+            if(depth == 1 && 0 < search.CutoffParameters.depthFraction && GA.GATest.Random.NextDouble() < search.CutoffParameters.depthFraction)
                 depth = 0;
 
             if (depth <= 0)
