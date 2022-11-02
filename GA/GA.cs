@@ -153,10 +153,10 @@ namespace OthelloAI.GA
                 return ind.Weights.NumOfEvaluation(n_dsics);
             }
 
-            static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2, int stage)
+            static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2, int n_dsics)
             {
-                float t1 = CalcExeCost(ind1, stage);
-                float t2 = CalcExeCost(ind2, stage);
+                float t1 = CalcExeCost(ind1, n_dsics);
+                float t2 = CalcExeCost(ind2, n_dsics);
 
                 int n1 = 12;
                 int n2 = 54;
@@ -164,15 +164,15 @@ namespace OthelloAI.GA
                 if (Math.Abs(t1 - t2) < 1E-3)
                     return (0, 0);
 
-                else if (t1 > t2)
+                if (t1 > t2)
                 {
-                    float f = n1 * (t1 - t2) / (t1 * (n2 - n1));
-                    return (0, f);
+                    float f = n1 * (t1 - t2) / (t2 * (n2 - n1));
+                    return (1, 1 + f);
                 }
                 else
                 {
-                    float f = n2 * (t2 - t1) / (t2 * (n2 - n1));
-                    return (0, f);
+                    float f = n1 * (t2 - t1) / (t1 * (n2 - n1));
+                    return (1 + f, 1);
                 }
             }
 

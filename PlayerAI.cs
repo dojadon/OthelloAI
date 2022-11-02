@@ -20,7 +20,7 @@ namespace OthelloAI
             CutoffParameters = cutoffParameters;
         }
 
-        public virtual Move[] OrderMoves(Move[] moves, int depth)
+        public virtual Move[] OrderMoves(Move[] moves, float depth)
         {
             Array.Sort(moves);
             return moves;
@@ -36,7 +36,7 @@ namespace OthelloAI
                 Table[move.reversed] = (value, value);
         }
 
-        public bool TryTranspositionCutoff(Move move, int depth, ref float alpha, ref float beta, out float lower, out float upper, ref float value)
+        public bool TryTranspositionCutoff(Move move, float depth, ref float alpha, ref float beta, out float lower, out float upper, ref float value)
         {
             if (depth <= PlayerAI.transposition || move.reversed.n_stone > PlayerAI.ordering_depth || !CutoffParameters.shouldTranspositionCut || !Table.ContainsKey(move.reversed))
             {
@@ -65,7 +65,7 @@ namespace OthelloAI
             return false;
         }
 
-        public virtual bool TryProbCutoff(PlayerAI player, Move move, int depth, int depthShallow, int alpha, int beta, int lower, int upper, ref int value)
+        public virtual bool TryProbCutoff(PlayerAI player, Move move, float depth, int depthShallow, int alpha, int beta, int lower, int upper, ref int value)
         {
             if (player.Solve(this, move, depthShallow, lower - 1, lower) < lower)
             {
@@ -110,7 +110,7 @@ namespace OthelloAI
             Comparer = new MoveComparer(prev);
         }
 
-        public override Move[] OrderMoves(Move[] moves, int depth)
+        public override Move[] OrderMoves(Move[] moves, float depth)
         {
             if (depth >= 4)
                 Array.Sort(moves, Comparer);
@@ -120,7 +120,7 @@ namespace OthelloAI
             return moves;
         }
 
-        public override bool TryProbCutoff(PlayerAI player, Move move, int depth, int depthShallow, int alpha, int beta, int lower, int upper, ref int value)
+        public override bool TryProbCutoff(PlayerAI player, Move move, float depth, int depthShallow, int alpha, int beta, int lower, int upper, ref int value)
         {
             if (depth - depthShallow == DepthInterval && TablePrev.ContainsKey(move.reversed))
             {
@@ -207,14 +207,12 @@ namespace OthelloAI
 
     public readonly struct CutoffParameters
     {
-        public readonly float probFactionCut;
         public readonly bool shouldTranspositionCut;
         public readonly bool shouldStoreTranspositionTable;
         public readonly bool shouldProbCut;
 
-        public CutoffParameters(float depthFraction, bool transposition, bool storeTransposition, bool probcut)
+        public CutoffParameters(bool transposition, bool storeTransposition, bool probcut)
         {
-            probFactionCut = depthFraction;
             shouldTranspositionCut = transposition;
             shouldStoreTranspositionTable = storeTransposition;
             shouldProbCut = probcut;
@@ -229,28 +227,28 @@ namespace OthelloAI
 
     public class SearchParameters
     {
-        public readonly int depth;
         public readonly int stage;
         public readonly SearchType type;
 
-        public Func<int, float> DepthFraction { get; set; } = _ => 0;
+        public Func<int, float> Depth { get; set; } = _ => 0;
         public Func<int, bool> ShouldTranspositionCut { get; set; } = _ => true;
         public Func<int, bool> ShouldStoreTranspositionTable { get; set; } = _ => true;
         public Func<int, bool> ShouldProbCut { get; set; } = _ => false;
 
-        public SearchParameters(int depth, int stage, SearchType type)
+        public SearchParameters(int stage, SearchType type, Func<int, float> depth)
         {
-            this.depth = depth;
             this.stage = stage;
             this.type = type;
+            Depth = depth;
+        }
+
+        public SearchParameters(int stage, SearchType type, float depth) : this(stage, type, _ => depth)
+        {
         }
 
         public CutoffParameters CreateCutoffParameters(int n)
         {
-            float depth_f = DepthFraction(n);
-            float cutoff_prob = (float) Math.Ceiling(depth_f) - depth_f;
-
-            return new CutoffParameters(cutoff_prob, ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n), ShouldProbCut(n));
+            return new CutoffParameters(ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n), ShouldProbCut(n));
         }
     }
 
@@ -323,7 +321,7 @@ namespace OthelloAI
                 if (board.n_stone < param.stage)
                     continue;
 
-                if (param.depth == 0)
+                if (param.Depth(board.n_stone) <= 0)
                     e = Eval(board);
 
                 (result, e) = SolveRoot(board, param);
@@ -337,15 +335,15 @@ namespace OthelloAI
 
         public (ulong, float) SolveRoot(Board board, SearchParameters param) => param.type switch
         {
-            SearchType.Normal => SolveRoot(new Search(param.CreateCutoffParameters(board.n_stone)), board, param.depth),
-            SearchType.IterativeDeepening => SolveIterativeDeepening(board, param.CreateCutoffParameters(board.n_stone), param.depth, 2, 3),
+            SearchType.Normal => SolveRoot(new Search(param.CreateCutoffParameters(board.n_stone)), board, param.Depth(board.n_stone)),
+            SearchType.IterativeDeepening => SolveIterativeDeepening(board, param.CreateCutoffParameters(board.n_stone), param.Depth(board.n_stone), 2, 3),
             _ => (0, 0)
         };
 
-        public (ulong , float) SolveIterativeDeepening(Board board, CutoffParameters param, int depth, int interval, int times)
+        public (ulong , float) SolveIterativeDeepening(Board board, CutoffParameters param, float depth, int interval, int times)
         {
             var search = new Search(param);
-            int d = depth - interval * Math.Min(times - 1, (int) Math.Ceiling((double) depth / interval) - 1);
+            float d = depth - interval * Math.Min(times - 1, (int) Math.Ceiling((double) depth / interval) - 1);
 
             while (true)
             {
@@ -411,7 +409,7 @@ namespace OthelloAI
             return value;
         }
 
-        public (ulong, float) SolveRoot(Search search, Board board, int depth)
+        public (ulong, float) SolveRoot(Search search, Board board, float depth)
         {
             Move root = new Move(board);
 
@@ -459,12 +457,12 @@ namespace OthelloAI
             return (result.move, max);
         }
 
-        public float NullWindowSearch(Search search, Move move, int depth, float border)
+        public float NullWindowSearch(Search search, Move move, float depth, float border)
         {
             return -Solve(search, move, depth - 1, -border - 1, -border);
         }
 
-        public float Negascout(Search search, Board board, ulong moves, int depth, float alpha, float beta)
+        public float Negascout(Search search, Board board, ulong moves, float depth, float alpha, float beta)
         {
             ulong move = Board.NextMove(moves);
             moves = Board.RemoveMove(moves, move);
@@ -506,7 +504,7 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negascout(Search search, Move[] moves, int depth, float alpha, float beta)
+        public float Negascout(Search search, Move[] moves, float depth, float alpha, float beta)
         {
             float max = -Solve(search, moves[0], depth - 1, -beta, -alpha);
 
@@ -543,7 +541,7 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negamax(Search search, Move[] moves, int depth, float alpha, float beta)
+        public float Negamax(Search search, Move[] moves, float depth, float alpha, float beta)
         {
             float max = -1000000;
 
@@ -559,7 +557,7 @@ namespace OthelloAI
             return max;
         }
 
-        public float Negamax(Search search, Board board, ulong moves, int depth, float alpha, float beta)
+        public float Negamax(Search search, Board board, ulong moves, float depth, float alpha, float beta)
         {
             float max = -1000000;
             ulong move;
@@ -582,13 +580,18 @@ namespace OthelloAI
         public static int ordering_depth = 57;
         public static int transposition = 1;
 
-        public virtual float Solve(Search search, Move move, int depth, float alpha, float beta)
+        public virtual float Solve(Search search, Move move, float depth, float alpha, float beta)
         {
             if (search.IsCanceled)
                 return -1000000;
 
-            if(depth == 1 && 0 < search.CutoffParameters.probFactionCut && GA.GATest.Random.NextDouble() < search.CutoffParameters.probFactionCut)
-                depth = 0;
+            if(0 < depth && depth < 1)
+            {
+                if (depth > GA.GATest.Random.NextDouble())
+                    depth = 1;
+                else
+                    depth = 0;
+            }
 
             if (depth <= 0)
                 return Eval(move.reversed);

@@ -10,24 +10,19 @@ namespace OthelloAI
     {
         public const int NUM_STAGES = 60;
 
-        public static readonly Weights PATTERN_EDGE2X = Weights.Create(new BoardHasherMask(0b01000010_11111111UL), NUM_STAGES, "e_edge_x.dat");
-        public static readonly Weights PATTERN_EDGE_BLOCK = Weights.Create(new BoardHasherMask(0b00111100_10111101UL), NUM_STAGES, "e_edge_block.dat");
-        public static readonly Weights PATTERN_CORNER_BLOCK = Weights.Create(new BoardHasherMask(0b00000111_00000111_00000111UL), NUM_STAGES, "e_corner_block.dat");
-        public static readonly Weights PATTERN_CORNER = Weights.Create(new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), NUM_STAGES, "e_corner.dat");
-        public static readonly Weights PATTERN_LINE1 = Weights.Create(new BoardHasherLine1(1), NUM_STAGES, "e_line1.dat");
-        public static readonly Weights PATTERN_LINE2 = Weights.Create(new BoardHasherLine1(2), NUM_STAGES, "e_line2.dat");
-        public static readonly Weights PATTERN_LINE3 = Weights.Create(new BoardHasherLine1(3), NUM_STAGES, "e_line3.dat");
-        public static readonly Weights PATTERN_DIAGONAL8 = Weights.Create(new BoardHasherMask(0x8040201008040201UL), NUM_STAGES, "e_diag8.dat");
-        public static readonly Weights PATTERN_DIAGONAL7 = Weights.Create(new BoardHasherMask(0x1020408102040UL), NUM_STAGES, "e_diag7.dat");
-        public static readonly Weights PATTERN_DIAGONAL6 = Weights.Create(new BoardHasherMask(0x10204081020UL), NUM_STAGES, "e_diag6.dat");
-        public static readonly Weights PATTERN_DIAGONAL5 = Weights.Create(new BoardHasherMask(0x102040810UL), NUM_STAGES, "e_diag5.dat");
+        public static readonly Weights PATTERN_EDGE2X = Weights.Create(new BoardHasherMask(0b01000010_11111111UL), NUM_STAGES, "e_edge_x.dat", true);
+        public static readonly Weights PATTERN_EDGE_BLOCK = Weights.Create(new BoardHasherMask(0b00111100_10111101UL), NUM_STAGES, "e_edge_block.dat", true);
+        public static readonly Weights PATTERN_CORNER_BLOCK = Weights.Create(new BoardHasherMask(0b00000111_00000111_00000111UL), NUM_STAGES, "e_corner_block.dat", true);
+        public static readonly Weights PATTERN_CORNER = Weights.Create(new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), NUM_STAGES, "e_corner.dat", true);
+        public static readonly Weights PATTERN_LINE1 = Weights.Create(new BoardHasherLine1(1), NUM_STAGES, "e_line1.dat", true);
+        public static readonly Weights PATTERN_LINE2 = Weights.Create(new BoardHasherLine1(2), NUM_STAGES, "e_line2.dat", true);
 
-        public static readonly Weights[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER, PATTERN_LINE1, PATTERN_LINE2 };
+        public static readonly Weights WEIGHT = new WeightsSum(new[] { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER, PATTERN_LINE1, PATTERN_LINE2 });
 
         static void Main()
         {
             // Test();
-            // Tester.TestC();
+            // Tester.TestF();
             // Tester.TestE();
             GA.GATest.TestBRKGA();
             //Train();
@@ -106,8 +101,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(depth: 9, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: 44, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 9),
+                                              new SearchParameters(stage: 44, type: SearchType.Normal, depth: 64)},
             };
 
             Client client = new Client(p);
@@ -147,8 +142,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(depth: 9, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: 40, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 9),
+                                              new SearchParameters(stage: 40, type: SearchType.Normal, depth: 64)},
             };
 
             string export = "No, Empty, Time, Nodes\r\n";
@@ -185,8 +180,8 @@ namespace OthelloAI
             Evaluator evaluator = new EvaluatorPatternBased_Release();
             PlayerAI p = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(depth: 9, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: 44, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 9),
+                                              new SearchParameters(stage: 44, type: SearchType.Normal, depth: 64)},
             };
 
             for (int i = 0; i < 1; i++)

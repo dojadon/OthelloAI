@@ -152,7 +152,7 @@ namespace OthelloAI
         {
             var boards = new RotatedAndMirroredBoards(board);
 
-            float e = result - Weights.EvalTraining(board);
+            float e = result - Weights.EvalTraining(boards);
 
             foreach (var b in boards)
             {

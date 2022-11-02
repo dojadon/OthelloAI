@@ -1,7 +1,9 @@
-﻿using System;
+﻿using OthelloAI.GA;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 
 namespace OthelloAI
 {
@@ -82,8 +84,8 @@ namespace OthelloAI
                 {
                     PlayerAI p1 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
-                        Params = new[] { new SearchParameters(depth: i, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
+                        Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: i),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                         PrintInfo = false,
                     };
 
@@ -91,8 +93,8 @@ namespace OthelloAI
 
                     PlayerAI p2 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
-                        Params = new[] { new SearchParameters(depth: j, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
+                        Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: j),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                         PrintInfo = false,
                     };
 
@@ -115,9 +117,7 @@ namespace OthelloAI
 
         public static void TestA()
         {
-            Weights weight = null;
-
-            // weight.Load();
+            Weights weight = Program.WEIGHT;
 
             int Play(PlayerAI p1, PlayerAI p2, List<long> count)
             {
@@ -145,25 +145,23 @@ namespace OthelloAI
                 return board.GetStoneCountGap();
             }
 
-            for (int i = 1; i < 9; i++)
+            for (int i = 0; i < 2; i++)
             {
                 PlayerAI player = new PlayerAI(new EvaluatorWeightsBased(weight))
                 {
-                    Params = new[] { new SearchParameters(depth: i, stage: 0, type: SearchType.IterativeDeepening),
-                                              new SearchParameters(depth: 64, stage: 50, type: SearchType.Normal)},
+                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 1 + i * 0.1F),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
                     PrintInfo = false,
                 };
 
-                // player.Depth_Prob = i * 0.1F;
-
-                double avg = Enumerable.Range(0, 100).AsParallel().SelectMany(i =>
+                double avg = Enumerable.Range(0, 2000).AsParallel().SelectMany(i =>
                 {
                     List<long> c = new();
                     Play(player, player, c);
                     return c;
                 }).Average();
 
-                Console.WriteLine($"{i}, {avg}");
+                Console.WriteLine($"{1 + i * 0.1F}, {avg}");
             }
         }
 
@@ -181,8 +179,8 @@ namespace OthelloAI
 
             PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(depth: i * 2, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: i * 2),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             }).ToArray();
 
@@ -246,18 +244,17 @@ namespace OthelloAI
         public static void TestD()
         {
             int count = 0;
-            Weights CreatePattern(ulong mask)
+            Weights CreateWeight(ulong mask)
             {
-                // return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
-                return null;
+                return Weights.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, $"{mask}_{count++}", true);
             }
 
             static PlayerAI CreatePlayer(Weights weights)
             {
                 return new PlayerAI(new EvaluatorWeightsBased(weights))
                 {
-                    Params = new[] { new SearchParameters(depth: 7, stage: 0, type: SearchType.IterativeDeepening),
-                                              new SearchParameters(depth: 64, stage: 48, type: SearchType.Normal)},
+                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 7),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                     PrintInfo = false,
                 };
             }
@@ -265,15 +262,14 @@ namespace OthelloAI
             var s1 = "148451\r\n18403\r\n25571\r\n50887\r\n213955\r\n18375\r\n58083\r\n91075\r\n148423\r\n83907";
             var s2 = "10485\t312003\t395015\r\n10485\t312003\t460547\r\n10485\t279491\t460547\r\n10485\t279491\t395015\r\n12537\t279491\t460547\r\n10485\t312257\t460547\r\n12533\t312003\t395015\r\n12533\t312003\t460547\r\n12537\t312195\t460547\r\n10485\t312195\t460547";
 
-            PlayerAI[] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreatePattern).Select(CreatePlayer).ToArray();
-            // PlayerAI[] p2 = s2.Split("\r\n").Select(t => t.Split("\t").Select(ulong.Parse).Select(CreatePattern).ToArray()).Select(CreatePlayer).ToArray();
-            // PlayerAI[] p3 = new[] { CreatePlayer( Program.PATTERNS) };
+            PlayerAI[] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreateWeight).Select(CreatePlayer).ToArray();
+            PlayerAI[] p2 = s2.Split("\r\n").Select(t => new WeightsSum(t.Split("\t").Select(ulong.Parse).Select(CreateWeight).ToArray())).Select(CreatePlayer).ToArray();
+            PlayerAI[] p3 = new[] { CreatePlayer( Program.WEIGHT) };
             PlayerAI[][] p12 = new[] { p1 };
 
             PlayerAI[] players = p1;
 
-            foreach (var p in Program.PATTERNS)
-                p.Load();
+            Program.WEIGHT.Load();
 
             float[][] Play()
             {
@@ -357,6 +353,31 @@ namespace OthelloAI
                 var time_nano = time_s * 1E+9;
                 Console.WriteLine($"{size}, {time_nano}");
             }
+        }
+
+        public static void TestF()
+        {
+            static (float, float) GetDepthFraction(float t1, float t2)
+            {
+                int n1 = 12;
+                int n2 = 54;
+
+                if (Math.Abs(t1 - t2) < 1E-3)
+                    return (0, 0);
+
+                if (t1 > t2)
+                {
+                    float f = n1 * (t1 - t2) / (t2 * (n2 - n1));
+                    return (1, 1 + f);
+                }
+                else
+                {
+                    float f = n1 * (t2 - t1) / (t1 * (n2 - n1));
+                    return (1 + f, 1);
+                }
+            }
+
+            Console.WriteLine(GetDepthFraction(1, 3));
         }
     }
 }

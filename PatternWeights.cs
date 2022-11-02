@@ -205,6 +205,8 @@ namespace OthelloAI
             NumOfStates = Hasher.NumOfStates;
 
             Type = Hasher.SymmetricType;
+
+            Reset();
         }
 
         public override void Reset()

@@ -31,8 +31,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind1.CreateEvaluator())
             {
-                Params = new[] { new SearchParameters(depth: Depth, stage: 0, type: SearchType.Normal) { DepthFraction = i => GetDepthFraction(ind1, ind2, i).Item1 },
-                                              new SearchParameters(depth: 64, stage: EndStage, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: i => GetDepthFraction(ind1, ind2, i).Item1),
+                                              new SearchParameters(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
         }
@@ -93,8 +93,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
-                Params = new[] { new SearchParameters(depth: Depth, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: EndStage, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: Depth),
+                                              new SearchParameters(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
         }
@@ -273,8 +273,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(e)
             {
-                Params = new[] { new SearchParameters(depth: Depth, stage: 0, type: SearchType.Normal),
-                                              new SearchParameters(depth: 64, stage: EndStage, type: SearchType.Normal)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: Depth),
+                                              new SearchParameters(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
         }

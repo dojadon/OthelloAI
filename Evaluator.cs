@@ -50,10 +50,7 @@ namespace OthelloAI
                     + Program.PATTERN_CORNER_BLOCK.Eval(boards)
                     + Program.PATTERN_CORNER.Eval(boards)
                     + Program.PATTERN_LINE1.Eval(boards)
-                    + Program.PATTERN_LINE2.Eval(boards)
-                    + Program.PATTERN_LINE3.Eval(boards)
-                    + Program.PATTERN_DIAGONAL8.Eval(boards)
-                    + Program.PATTERN_DIAGONAL7.Eval(boards);
+                    + Program.PATTERN_LINE2.Eval(boards);
         }
 
         public override float EvalTraining(Board board)
@@ -65,10 +62,7 @@ namespace OthelloAI
                     + Program.PATTERN_CORNER_BLOCK.EvalTraining(boards)
                     + Program.PATTERN_CORNER.EvalTraining(boards)
                     + Program.PATTERN_LINE1.EvalTraining(boards)
-                    + Program.PATTERN_LINE2.EvalTraining(boards)
-                    + Program.PATTERN_LINE3.EvalTraining(boards)
-                    + Program.PATTERN_DIAGONAL8.EvalTraining(boards)
-                    + Program.PATTERN_DIAGONAL7.EvalTraining(boards);
+                    + Program.PATTERN_LINE2.EvalTraining(boards);
         }
     }
 
