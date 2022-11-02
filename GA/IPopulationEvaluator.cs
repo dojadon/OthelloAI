@@ -279,12 +279,12 @@ namespace OthelloAI.GA
             };
         }
 
-        public PlayerAI CreatePlayer(PatternWeights p)
+        public PlayerAI CreatePlayer(Weights p)
         {
             return CreatePlayer(new EvaluatorWeightsBased(p));
         }
 
-        public abstract List<float> Train(List<PatternWeights> pop);
+        public abstract List<float> Train(List<Weights> pop);
     }
 
     public class PopulationTrainerCoLearning : PopulationTrainer
@@ -293,7 +293,7 @@ namespace OthelloAI.GA
         {
         }
 
-        public override List<float> Train(List<PatternWeights> pop)
+        public override List<float> Train(List<Weights> pop)
         {
             var evaluator = new EvaluatorRandomChoice(pop.Select(p => new EvaluatorWeightsBased(p)).ToArray());
             Player player = CreatePlayer(evaluator);
@@ -322,7 +322,7 @@ namespace OthelloAI.GA
         {
         }
 
-        public override List<float> Train(List<PatternWeights> pop)
+        public override List<float> Train(List<Weights> pop)
         {
             if (IsParallel)
             {
@@ -335,7 +335,7 @@ namespace OthelloAI.GA
             }
         }
 
-        public float Train(PatternWeights w)
+        public float Train(Weights w)
         {
             var rand = new Random();
             var player = CreatePlayer(new EvaluatorWeightsBased(w));

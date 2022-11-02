@@ -10,19 +10,19 @@ namespace OthelloAI
     {
         public const int NUM_STAGES = 60;
 
-        public static readonly PatternWeights PATTERN_EDGE2X = PatternWeights.Create(new BoardHasherMask(0b01000010_11111111UL), NUM_STAGES, PatternType.X_SYMMETRIC, "e_edge_x.dat");
-        public static readonly PatternWeights PATTERN_EDGE_BLOCK = PatternWeights.Create(new BoardHasherMask(0b00111100_10111101UL), NUM_STAGES, PatternType.X_SYMMETRIC, "e_edge_block.dat");
-        public static readonly PatternWeights PATTERN_CORNER_BLOCK = PatternWeights.Create(new BoardHasherMask(0b00000111_00000111_00000111UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_corner_block.dat");
-        public static readonly PatternWeights PATTERN_CORNER = PatternWeights.Create(new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_corner.dat");
-        public static readonly PatternWeights PATTERN_LINE1 = PatternWeights.Create(new BoardHasherLine1(1), NUM_STAGES, PatternType.X_SYMMETRIC, "e_line1.dat");
-        public static readonly PatternWeights PATTERN_LINE2 = PatternWeights.Create(new BoardHasherLine1(2), NUM_STAGES, PatternType.X_SYMMETRIC, "e_line2.dat");
-        public static readonly PatternWeights PATTERN_LINE3 = PatternWeights.Create(new BoardHasherLine1(3), NUM_STAGES, PatternType.X_SYMMETRIC, "e_line3.dat");
-        public static readonly PatternWeights PATTERN_DIAGONAL8 = PatternWeights.Create(new BoardHasherMask(0x8040201008040201UL), NUM_STAGES, PatternType.DIAGONAL, "e_diag8.dat");
-        public static readonly PatternWeights PATTERN_DIAGONAL7 = PatternWeights.Create(new BoardHasherMask(0x1020408102040UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag7.dat");
-        public static readonly PatternWeights PATTERN_DIAGONAL6 = PatternWeights.Create(new BoardHasherMask(0x10204081020UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag6.dat");
-        public static readonly PatternWeights PATTERN_DIAGONAL5 = PatternWeights.Create(new BoardHasherMask(0x102040810UL), NUM_STAGES, PatternType.XY_SYMMETRIC, "e_diag5.dat");
+        public static readonly Weights PATTERN_EDGE2X = Weights.Create(new BoardHasherMask(0b01000010_11111111UL), NUM_STAGES, "e_edge_x.dat");
+        public static readonly Weights PATTERN_EDGE_BLOCK = Weights.Create(new BoardHasherMask(0b00111100_10111101UL), NUM_STAGES, "e_edge_block.dat");
+        public static readonly Weights PATTERN_CORNER_BLOCK = Weights.Create(new BoardHasherMask(0b00000111_00000111_00000111UL), NUM_STAGES, "e_corner_block.dat");
+        public static readonly Weights PATTERN_CORNER = Weights.Create(new BoardHasherMask(0b00000001_00000001_00000001_00000011_00011111UL), NUM_STAGES, "e_corner.dat");
+        public static readonly Weights PATTERN_LINE1 = Weights.Create(new BoardHasherLine1(1), NUM_STAGES, "e_line1.dat");
+        public static readonly Weights PATTERN_LINE2 = Weights.Create(new BoardHasherLine1(2), NUM_STAGES, "e_line2.dat");
+        public static readonly Weights PATTERN_LINE3 = Weights.Create(new BoardHasherLine1(3), NUM_STAGES, "e_line3.dat");
+        public static readonly Weights PATTERN_DIAGONAL8 = Weights.Create(new BoardHasherMask(0x8040201008040201UL), NUM_STAGES, "e_diag8.dat");
+        public static readonly Weights PATTERN_DIAGONAL7 = Weights.Create(new BoardHasherMask(0x1020408102040UL), NUM_STAGES, "e_diag7.dat");
+        public static readonly Weights PATTERN_DIAGONAL6 = Weights.Create(new BoardHasherMask(0x10204081020UL), NUM_STAGES, "e_diag6.dat");
+        public static readonly Weights PATTERN_DIAGONAL5 = Weights.Create(new BoardHasherMask(0x102040810UL), NUM_STAGES, "e_diag5.dat");
 
-        public static readonly PatternWeights[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER, PATTERN_LINE1, PATTERN_LINE2 };
+        public static readonly Weights[] PATTERNS = { PATTERN_EDGE2X, PATTERN_EDGE_BLOCK, PATTERN_CORNER_BLOCK, PATTERN_CORNER, PATTERN_LINE1, PATTERN_LINE2 };
 
         static void Main()
         {

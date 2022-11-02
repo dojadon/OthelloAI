@@ -19,9 +19,9 @@ namespace OthelloAI
 
     public class EvaluatorWeightsBased : Evaluator
     {
-        public PatternWeights Weights { get; }
+        public Weights Weights { get; }
 
-        public EvaluatorWeightsBased(PatternWeights weights)
+        public EvaluatorWeightsBased(Weights weights)
         {
             Weights = weights;
         }

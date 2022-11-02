@@ -137,12 +137,12 @@ namespace OthelloAI
 
     public class PatternTrainer
     {
-        public PatternWeights Weights { get; }
+        public Weights Weights { get; }
         public float LearningRate { get; }
 
         public List<float> Log { get; } = new List<float>();
 
-        public PatternTrainer(PatternWeights weights, float lr)
+        public PatternTrainer(Weights weights, float lr)
         {
             Weights = weights;
             LearningRate = lr;
@@ -164,7 +164,7 @@ namespace OthelloAI
             return e;
         }
 
-        public static void Train(PatternWeights weights, float lr, RecordReader reader)
+        public static void Train(Weights weights, float lr, RecordReader reader)
         {
             var trainer = new PatternTrainer(weights, lr);
             reader.OnLoadMove += (b, r) => trainer.Update(b, r);

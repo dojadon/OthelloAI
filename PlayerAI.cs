@@ -207,14 +207,14 @@ namespace OthelloAI
 
     public readonly struct CutoffParameters
     {
-        public readonly float depthFraction;
+        public readonly float probFactionCut;
         public readonly bool shouldTranspositionCut;
         public readonly bool shouldStoreTranspositionTable;
         public readonly bool shouldProbCut;
 
         public CutoffParameters(float depthFraction, bool transposition, bool storeTransposition, bool probcut)
         {
-            this.depthFraction = depthFraction;
+            probFactionCut = depthFraction;
             shouldTranspositionCut = transposition;
             shouldStoreTranspositionTable = storeTransposition;
             shouldProbCut = probcut;
@@ -247,7 +247,10 @@ namespace OthelloAI
 
         public CutoffParameters CreateCutoffParameters(int n)
         {
-            return new CutoffParameters(DepthFraction(n), ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n), ShouldProbCut(n));
+            float depth_f = DepthFraction(n);
+            float cutoff_prob = (float) Math.Ceiling(depth_f) - depth_f;
+
+            return new CutoffParameters(cutoff_prob, ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n), ShouldProbCut(n));
         }
     }
 
@@ -584,7 +587,7 @@ namespace OthelloAI
             if (search.IsCanceled)
                 return -1000000;
 
-            if(depth == 1 && 0 < search.CutoffParameters.depthFraction && GA.GATest.Random.NextDouble() < search.CutoffParameters.depthFraction)
+            if(depth == 1 && 0 < search.CutoffParameters.probFactionCut && GA.GATest.Random.NextDouble() < search.CutoffParameters.probFactionCut)
                 depth = 0;
 
             if (depth <= 0)

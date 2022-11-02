@@ -4,23 +4,14 @@ using System.Linq;
 
 namespace OthelloAI
 {
-    public enum PatternType
+    public abstract class Weights
     {
-        X_SYMMETRIC,
-        XY_SYMMETRIC,
-        DIAGONAL,
-        ASYMMETRIC
-    }
-
-    public abstract class PatternWeights
-    {
-        public static PatternWeights Create(BoardHasher hasher, int n_stages, PatternType type, string file = "", bool load = false)
+        public static Weights Create(BoardHasher hasher, int n_stages, string file = "", bool load = false)
         {
-            PatternWeights[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new PatternWeightsArray(hasher)).ToArray();
-            var weights = new PatternWeightsStagebased(weights_stage)
+            Weights[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new WeightsArray(hasher)).ToArray();
+            var weights = new WeightsStagebased(weights_stage)
             {
                 FilePath = file,
-                Type = type
             };
 
             if (load)
@@ -31,37 +22,10 @@ namespace OthelloAI
 
         public string FilePath { get; set; }
 
-        public PatternType Type { get; set; }
-
         public abstract void Reset();
-        public abstract int Eval(Board b);
-        public abstract float EvalTraining(Board b);
-
-        public int Eval(RotatedAndMirroredBoards b)
-        {
-            return Type switch
-            {
-                PatternType.X_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot270) - 128 * 4,
-                PatternType.XY_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot90) - 128 * 4,
-                PatternType.DIAGONAL => Eval(b.rot0) + Eval(b.inv_rot0) - 128 * 2,
-                PatternType.ASYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.rot90) + Eval(b.inv_rot90) +
-                                                            Eval(b.rot180) + Eval(b.inv_rot180) + Eval(b.rot270) + Eval(b.inv_rot270) - 128 * 8,
-                _ => throw new NotImplementedException(),
-            };
-        }
-
-        public float EvalTraining(RotatedAndMirroredBoards b)
-        {
-            return Type switch
-            {
-                PatternType.X_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot270),
-                PatternType.XY_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot90),
-                PatternType.DIAGONAL => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0),
-                PatternType.ASYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.rot90) + EvalTraining(b.inv_rot90) +
-                                                            EvalTraining(b.rot180) + EvalTraining(b.inv_rot180) + EvalTraining(b.rot270) + EvalTraining(b.inv_rot270),
-                _ => throw new NotImplementedException(),
-            };
-        }
+        public abstract int Eval(RotatedAndMirroredBoards b);
+        public abstract float EvalTraining(RotatedAndMirroredBoards b);
+        public abstract int NumOfEvaluation(int n_discs);
 
         public abstract void UpdataEvaluation(Board board, float add, float range);
         public abstract void ApplyTrainedEvaluation(float range);
@@ -89,11 +53,11 @@ namespace OthelloAI
         }
     }
 
-    public class PatternWeightsSum : PatternWeights
+    public class WeightsSum : Weights
     {
-        PatternWeights[] Weights { get; }
+        Weights[] Weights { get; }
 
-        public PatternWeightsSum(PatternWeights[] weights)
+        public WeightsSum(Weights[] weights)
         {
             Weights = weights;
         }
@@ -115,14 +79,19 @@ namespace OthelloAI
                 w.UpdataEvaluation(board, add, range);
         }
 
-        public override int Eval(Board b)
+        public override int Eval(RotatedAndMirroredBoards b)
         {
             return Weights.Sum(w => w.Eval(b));
         }
 
-        public override float EvalTraining(Board b)
+        public override float EvalTraining(RotatedAndMirroredBoards b)
         {
             return Weights.Sum(w => w.EvalTraining(b));
+        }
+
+        public override int NumOfEvaluation(int n_discs)
+        {
+            return Weights.Sum(w => w.NumOfEvaluation(n_discs));
         }
 
         public override void ApplyTrainedEvaluation(float range)
@@ -144,12 +113,11 @@ namespace OthelloAI
         }
     }
 
-
-    public class PatternWeightsStagebased : PatternWeights
+    public class WeightsStagebased : Weights
     {
-        PatternWeights[] Weights { get; }
+        Weights[] Weights { get; }
 
-        public PatternWeightsStagebased(PatternWeights[] weights)
+        public WeightsStagebased(Weights[] weights)
         {
             Weights = weights;
         }
@@ -159,9 +127,14 @@ namespace OthelloAI
             return (n_stone - 5) / (60 / n_div);
         }
 
-        protected PatternWeights GetCurrentWeights(Board board)
+        protected Weights GetCurrentWeights(Board board)
         {
-            return Weights[GetStage(board.n_stone, Weights.Length)];
+            return GetCurrentWeights(board.n_stone);
+        }
+
+        protected Weights GetCurrentWeights(int n_discs)
+        {
+            return Weights[GetStage(n_discs, Weights.Length)];
         }
 
         public override float[] GetWeights()
@@ -180,14 +153,19 @@ namespace OthelloAI
             GetCurrentWeights(board).UpdataEvaluation(board, add, range);
         }
 
-        public override int Eval(Board b)
+        public override int Eval(RotatedAndMirroredBoards b)
         {
-            return GetCurrentWeights(b).Eval(b);
+            return GetCurrentWeights(b.rot0).Eval(b);
         }
 
-        public override float EvalTraining(Board b)
+        public override float EvalTraining(RotatedAndMirroredBoards b)
         {
-            return GetCurrentWeights(b).EvalTraining(b);
+            return GetCurrentWeights(b.rot0).EvalTraining(b);
+        }
+
+        public override int NumOfEvaluation(int n_discs)
+        {
+            return GetCurrentWeights(n_discs).NumOfEvaluation(n_discs);
         }
 
         public override void ApplyTrainedEvaluation(float range)
@@ -209,9 +187,10 @@ namespace OthelloAI
         }
     }
 
-    public class PatternWeightsArray : PatternWeights
+    public class WeightsArray : Weights
     {
         public BoardHasher Hasher { get; }
+        public SymmetricType Type { get; set; }
 
         public float[] Weights { get; private set; }
         protected byte[] WeightsB { get; private set; }
@@ -220,10 +199,12 @@ namespace OthelloAI
 
         public int NumOfStates { get; }
 
-        public PatternWeightsArray(BoardHasher hasher)
+        public WeightsArray(BoardHasher hasher)
         {
             Hasher = hasher;
             NumOfStates = Hasher.NumOfStates;
+
+            Type = Hasher.SymmetricType;
         }
 
         public override void Reset()
@@ -232,15 +213,50 @@ namespace OthelloAI
             WeightsB = new byte[Hasher.ArrayLength];
         }
 
-        public override int Eval(Board b)
+        public int Eval(Board b)
         {
             return WeightsB[Hasher.Hash(b)];
         }
 
-        public override float EvalTraining(Board b)
+        public override int Eval(RotatedAndMirroredBoards b)
+        {
+            return Type switch
+            {
+                SymmetricType.X_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot270) - 128 * 4,
+                SymmetricType.XY_SYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot90) - 128 * 4,
+                SymmetricType.DIAGONAL => Eval(b.rot0) + Eval(b.inv_rot0) - 128 * 2,
+                SymmetricType.ASYMMETRIC => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.rot90) + Eval(b.inv_rot90) +
+                                                            Eval(b.rot180) + Eval(b.inv_rot180) + Eval(b.rot270) + Eval(b.inv_rot270) - 128 * 8,
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        public float EvalTraining(Board b)
         {
             return Weights[Hasher.Hash(b)];
         }
+
+        public override float EvalTraining(RotatedAndMirroredBoards b)
+        {
+            return Type switch
+            {
+                SymmetricType.X_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot270),
+                SymmetricType.XY_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot90),
+                SymmetricType.DIAGONAL => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0),
+                SymmetricType.ASYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.rot90) + EvalTraining(b.inv_rot90) +
+                                                            EvalTraining(b.rot180) + EvalTraining(b.inv_rot180) + EvalTraining(b.rot270) + EvalTraining(b.inv_rot270),
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        public override int NumOfEvaluation(int n_discs) => Type switch
+        {
+            SymmetricType.X_SYMMETRIC => 4,
+            SymmetricType.XY_SYMMETRIC => 4,
+            SymmetricType.DIAGONAL => 2,
+            SymmetricType.ASYMMETRIC => 8,
+            _ => throw new NotImplementedException(),
+        };
 
         public override void UpdataEvaluation(Board board, float add, float range)
         {
@@ -283,165 +299,6 @@ namespace OthelloAI
                 float e = Weights[index];
                 writer.Write(e);
             }
-        }
-    }
-
-    public class PatternWeights2Disc : PatternWeights
-    {
-        public ulong mask1, mask2;
-        public float w_xx, w_xy, w_x0, w_0x;
-        public byte b_xx, b_xy, b_x0, b_0x;
-
-        public PatternWeights2Disc(ulong mask1, ulong mask2)
-        {
-            this.mask1 = mask1;
-            this.mask2 = mask2;
-        }
-
-        public override float[] GetWeights() => new float[] { w_xx, w_xy, w_x0, w_0x };
-
-        public override int Eval(Board b)
-        {
-            if ((b.bitB & mask1) != 0)
-            {
-                if ((b.bitB & mask2) != 0)
-                    return b_xx;
-                else if ((b.bitW & mask2) != 0)
-                    return b_xy;
-                else
-                    return b_x0;
-            }
-            else if ((b.bitW & mask1) != 0)
-            {
-                if ((b.bitB & mask2) != 0)
-                    return -b_xy;
-                else if ((b.bitW & mask2) != 0)
-                    return -b_xx;
-                else
-                    return -b_x0;
-            }
-            else
-            {
-                if ((b.bitB & mask2) != 0)
-                    return b_0x;
-                else if ((b.bitW & mask2) != 0)
-                    return -b_0x;
-                else
-                    return 0;
-            }
-        }
-
-        public override float EvalTraining(Board b)
-        {
-            if ((b.bitB & mask1) != 0)
-            {
-                if ((b.bitB & mask2) != 0)
-                    return w_xx;
-                else if ((b.bitW & mask2) != 0)
-                    return w_xy;
-                else
-                    return w_x0;
-            }
-            else if ((b.bitW & mask1) != 0)
-            {
-                if ((b.bitB & mask2) != 0)
-                    return -w_xy;
-                else if ((b.bitW & mask2) != 0)
-                    return -w_xx;
-                else
-                    return -w_x0;
-            }
-            else
-            {
-                if ((b.bitB & mask2) != 0)
-                    return w_0x;
-                else if ((b.bitW & mask2) != 0)
-                    return -w_0x;
-                else
-                    return 0;
-            }
-        }
-
-        public override void UpdataEvaluation(Board b, float add, float range)
-        {
-            if ((b.bitB & mask1) != 0)
-            {
-                if ((b.bitB & mask2) != 0)
-                {
-                    w_xx += add;
-                    b_xx = ConvertToInt8(w_xx, range);
-                }
-                else if ((b.bitW & mask2) != 0)
-                {
-                    w_xy += add;
-                    b_xy = ConvertToInt8(w_xy, range);
-                }
-                else
-                {
-                    w_x0 += add;
-                    b_x0 = ConvertToInt8(w_x0, range);
-                }
-            }
-            else if ((b.bitW & mask1) != 0)
-            {
-                if ((b.bitB & mask2) != 0)
-                {
-                    w_xy -= add;
-                    b_xy = ConvertToInt8(w_xy, range);
-                }
-                else if ((b.bitW & mask2) != 0)
-                {
-                    w_xx -= add;
-                    b_xx = ConvertToInt8(w_xx, range);
-                }
-                else
-                {
-                    w_x0 -= add;
-                    b_x0 = ConvertToInt8(w_x0, range);
-                }
-            }
-            else
-            {
-                if ((b.bitB & mask2) != 0)
-                {
-                    w_0x += add;
-                    b_0x = ConvertToInt8(w_0x, range);
-                }
-                else if ((b.bitW & mask2) != 0)
-                {
-                    w_0x -= add;
-                    b_0x = ConvertToInt8(w_0x, range);
-                }
-            }
-        }
-
-        public override void ApplyTrainedEvaluation(float range)
-        {
-            b_xx = ConvertToInt8(w_xx, range);
-            b_xy = ConvertToInt8(w_xy, range);
-            b_x0 = ConvertToInt8(w_x0, range);
-            b_0x = ConvertToInt8(w_0x, range);
-        }
-
-        public override void Reset()
-        {
-            w_xx = w_xy = w_x0 = w_0x = 0;
-        }
-
-        public override void Read(BinaryReader reader)
-        {
-            w_xx = reader.ReadSingle();
-            w_xy = reader.ReadSingle();
-            w_x0 = reader.ReadSingle();
-            w_0x = reader.ReadSingle();
-        }
-
-        public override void Write(BinaryWriter writer)
-        {
-            writer.Write(w_xx);
-            writer.Write(w_xy);
-            writer.Write(w_x0);
-            writer.Write(w_0x);
         }
     }
 }

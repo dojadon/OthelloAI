@@ -48,7 +48,7 @@ namespace OthelloAI
 
         public static void TestB()
         {
-            PatternWeights weight = null;
+            Weights weight = null;
 
             // weight.Load();
 
@@ -115,7 +115,7 @@ namespace OthelloAI
 
         public static void TestA()
         {
-            PatternWeights weight = null;
+            Weights weight = null;
 
             // weight.Load();
 
@@ -170,14 +170,14 @@ namespace OthelloAI
         public static void TestC()
         {
             int count = 10;
-            PatternWeights CreatePattern(ulong mask)
+            Weights CreatePattern(ulong mask)
             {
-                return PatternWeights.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
+                return Weights.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, $"{mask}_{count++}", true);
             }
             var rand = new Random();
             // Pattern[] patterns = Program.PATTERNS;
             // Pattern[] patterns = new[] { CreatePattern(10485), CreatePattern(312003), CreatePattern(395015) };
-            PatternWeights weight = null;
+            Weights weight = null;
 
             PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
@@ -246,13 +246,13 @@ namespace OthelloAI
         public static void TestD()
         {
             int count = 0;
-            PatternWeights CreatePattern(ulong mask)
+            Weights CreatePattern(ulong mask)
             {
                 // return Pattern.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, PatternType.ASYMMETRIC, $"{mask}_{count++}", true);
                 return null;
             }
 
-            static PlayerAI CreatePlayer(PatternWeights weights)
+            static PlayerAI CreatePlayer(Weights weights)
             {
                 return new PlayerAI(new EvaluatorWeightsBased(weights))
                 {
@@ -340,7 +340,7 @@ namespace OthelloAI
 
             for (int size = 2; size < 11; size++)
             {
-                var patterns = Enumerable.Range(0, 100).Select(_ => PatternWeights.Create(CreateRandomHasher(size), 1, PatternType.ASYMMETRIC)).ToArray();
+                var patterns = Enumerable.Range(0, 100).Select(_ => Weights.Create(CreateRandomHasher(size), 1)).ToArray();
                 timer.Reset();
 
                 for (int i = 0; i < n; i++)

@@ -148,9 +148,9 @@ namespace OthelloAI.GA
                 return g;
             }
 
-            static float CalcExeCost(Individual<float[]> ind, int stage)
+            static float CalcExeCost(Individual<float[]> ind, int n_dsics)
             {
-                return ind.Tuples[PatternWeightsStagebased.GetStage(stage, ind.Tuples.Length)].Length;
+                return ind.Weights.NumOfEvaluation(n_dsics);
             }
 
             static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2, int stage)
@@ -166,8 +166,8 @@ namespace OthelloAI.GA
 
                 else if (t1 > t2)
                 {
-                    float f = n2 * (t1 - t2) / (t1 * (n2 - n1));
-                    return (f, 0);
+                    float f = n1 * (t1 - t2) / (t1 * (n2 - n1));
+                    return (0, f);
                 }
                 else
                 {
@@ -377,7 +377,7 @@ namespace OthelloAI.GA
         public GenomeGroup<T>[][] Genome { get; }
         public TupleB<T>[][] Tuples { get; }
 
-        public PatternWeights Weights { get; }
+        public Weights Weights { get; }
 
         public GenomeInfo<T> Info { get; }
 
@@ -389,7 +389,7 @@ namespace OthelloAI.GA
             Info = info;
 
             Tuples = new TupleB<T>[info.NumStages][];
-            var weights = new PatternWeights[info.NumStages];
+            var weights = new Weights[info.NumStages];
 
             for (int i = 0; i < genome.Length; i++)
             {
@@ -406,10 +406,10 @@ namespace OthelloAI.GA
                     list.Add(new TupleB<T>(g.Genome, g.Size, info));
                 }
                 Tuples[i] = list.OrderBy(t => t.TupleBit).ToArray();
-                weights[i] = new PatternWeightsSum(Tuples[i].Select(t => new PatternWeightsArray(new BoardHasherMask(t.TupleBit))).ToArray());
+                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArray(new BoardHasherMask(t.TupleBit))).ToArray());
             }
 
-            Weights = new PatternWeightsStagebased(weights);
+            Weights = new WeightsStagebased(weights);
         }
 
         public Evaluator CreateEvaluator() => new EvaluatorWeightsBased(Weights);
@@ -435,7 +435,7 @@ namespace OthelloAI.GA
                 if (Tuples[i].Length != y.Tuples[i].Length)
                     return false;
 
-                for (int j = 0; j < Tuples.Length; j++)
+                for (int j = 0; j < Tuples[i].Length; j++)
                     if (Tuples[i][j].TupleBit != y.Tuples[i][j].TupleBit)
                         return false;
             }

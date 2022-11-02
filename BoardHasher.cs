@@ -10,9 +10,18 @@ namespace OthelloAI
         BIN, TER
     }
 
+    public enum SymmetricType
+    {
+        X_SYMMETRIC,
+        XY_SYMMETRIC,
+        DIAGONAL,
+        ASYMMETRIC
+    }
+
     public abstract class BoardHasher
     {
         public abstract HashType HashType { get; }
+        public abstract SymmetricType SymmetricType { get; }
 
         public int ArrayLength => HashType switch
         {
@@ -131,6 +140,8 @@ namespace OthelloAI
 
         public override int HashLength => HasherBin.HashLength;
 
+        public override SymmetricType SymmetricType => HasherBin.SymmetricType;
+
         public override int[] Positions => HasherBin.Positions;
 
         public override int Hash(in Board b) => BinTerUtil.ConvertBinToTer(HasherBin.Hash(b.bitB), HashLength) + 2 * BinTerUtil.ConvertBinToTer(HasherBin.Hash(b.bitW), HashLength);
@@ -140,6 +151,7 @@ namespace OthelloAI
     {
         public override int[] Positions { get; }
         public override int HashLength => Positions.Length;
+        public override SymmetricType SymmetricType { get; }
 
         public BoardHasherScanning(int[] positions)
         {
@@ -162,33 +174,12 @@ namespace OthelloAI
         }
     }
 
-    public class BoardHasherScanning2 : BoardHasherTer
-    {
-        public override int[] Positions { get; }
-        public override int HashLength => Positions.Length;
-
-        public int Pos1 { get; }
-        public int Pos2 { get; }
-
-        public BoardHasherScanning2(int pos1, int pos2)
-        {
-            Positions = new int[] { pos1, pos2};
-
-            Pos1 = pos1;
-            Pos2 = pos2;
-        }
-
-        public override int Hash(in Board board)
-        {
-            return (int)((board.bitB >> Pos1) & 1) * 3 + (int)((board.bitW >> Pos1) & 1) * 6 + (int)((board.bitB >> Pos2) & 1) + (int)((board.bitW >> Pos2) & 1) * 2;
-        }
-    }
-
     public class BoardHasherMask : BoardHasherBin
     {
         public ulong Mask { get; }
         public override int HashLength { get; }
         public override int[] Positions { get; }
+        public override SymmetricType SymmetricType { get; }
 
         public override int Hash(ulong b) => (int)Bmi2.X64.ParallelBitExtract(b, Mask);
 
@@ -207,6 +198,20 @@ namespace OthelloAI
             list.Reverse();
 
             Positions = list.ToArray();
+
+            SymmetricType = GetSymmetricType();
+        }
+
+        public SymmetricType GetSymmetricType()
+        {
+            if(Mask == Board.HorizontalMirror(Mask) || Mask == Board.VerticalMirror(Mask))
+            {
+                return SymmetricType.X_SYMMETRIC;
+            }
+            else
+            {
+                return SymmetricType.ASYMMETRIC;
+            }
         }
     }
 
@@ -215,6 +220,7 @@ namespace OthelloAI
         public int Line { get; }
         public override int HashLength => 8;
         public override int[] Positions { get; } = Enumerable.Range(0, 8).ToArray();
+        public override SymmetricType SymmetricType => SymmetricType.X_SYMMETRIC;
 
         public override int Hash(ulong b) => (int)((b >> (Line * 8)) & 0xFF);
 
