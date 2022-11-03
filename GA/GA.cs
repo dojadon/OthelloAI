@@ -55,6 +55,8 @@ namespace OthelloAI.GA
         public Func<T> GenomeGenerator { get; set; }
         public Func<T, int, ulong> Decoder { get; set; }
 
+        public Func<IEnumerable<T>, float> VarianceT { get; set; }
+
         public int NumStages { get; set; }
         public int NumTuples { get; set; }
         public int SizeMax { get; set; }
@@ -73,6 +75,18 @@ namespace OthelloAI.GA
 
             return new Individual<T>(Enumerable.Range(0, NumStages).Select(_ => Enumerable.Range(0, NumTuples).Select(_ => CreateGenome()).ToArray()).ToArray(), this);
         }
+
+        public float VarianceG(IEnumerable<GenomeGroup<T>> genomes)
+        {
+            float v1 = genomes.Select(g => g.Size * 0.1F).Variance();
+            float v2 = VarianceT(genomes.Select(g => g.Genome));
+            return v1 + v2;
+        }
+
+        public float Variance(Individual<T>[] pop)
+        {
+            return Enumerable.Range(0, NumStages).Select(s => Enumerable.Range(0, NumTuples).Select(t => pop.Select(i => i.Genome[s][t])).Select(VarianceG).Sum()).Sum();
+        }
     }
 
     public class IndividualIO<T>
@@ -80,14 +94,22 @@ namespace OthelloAI.GA
         public Action<T, BinaryWriter> WriteGenome { get; set; }
         public Func<BinaryReader, T> ReadGenome { get; set; }
 
-        public Func<T, int, ulong> Decoder { get; set; }
+        public GenomeInfo<T> Info { get; set; }
 
         public void Write(Individual<T> ind, BinaryWriter writer)
         {
             writer.Write(ind.Genome.Length);
 
-            // foreach (var g in ind.Genome)
-            // WriteGenome(g, writer);
+            foreach (var g1 in ind.Genome)
+            {
+                writer.Write(g1.Length);
+
+                foreach (var g2 in g1)
+                {
+                    WriteGenome(g2.Genome, writer);
+                    writer.Write(g2.Size);
+                }
+            }
         }
 
         public void Write(List<Individual<T>> pop, BinaryWriter writer)
@@ -100,20 +122,27 @@ namespace OthelloAI.GA
 
         public List<Individual<T>> Read(BinaryReader reader)
         {
-            int n = reader.ReadInt32();
-            var result = new List<Individual<T>>();
+            return Enumerable.Range(0, reader.ReadInt32()).Select(_ => ReadIndividual(reader)).ToList();
+        }
 
-            for (int i = 0; i < n; i++)
+        public Individual<T> ReadIndividual(BinaryReader reader)
+        {
+            GenomeGroup<T>[][] gene = new GenomeGroup<T>[reader.ReadInt32()][];
+
+            for (int i = 0; i < gene.Length; i++)
             {
-                T[] gene = new T[reader.ReadInt32()];
+                gene[i] = new GenomeGroup<T>[reader.ReadInt32()];
 
-                for (int j = 0; j < gene.Length; j++)
-                    gene[j] = ReadGenome(reader);
+                for(int j = 0; j < gene[i].Length; j++)
+                {
+                    var g = ReadGenome(reader);
+                    int size = reader.ReadInt32();
 
-                // result.Add(new Individual<T>(gene, Decoder));
+                    gene[i][j] = new GenomeGroup<T>(g, size);
+                }
             }
 
-            return result;
+            return new Individual<T>(gene, Info);
         }
 
         public void Save(string file, List<Individual<T>> pop)
@@ -134,10 +163,13 @@ namespace OthelloAI.GA
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
 
-        public static readonly float[] TIME = { 0, 0, 403.9F, 426.06F, 454.05F, 479.2F, 506.6F, 534.2F, 568.2F, 728.4F, 837.2F };
-
         public static void TestBRKGA()
         {
+            static float Variance(IEnumerable<float[]> g)
+            {
+                return Enumerable.Range(0, 19).Select(i => g.Select(a => a[i]).Variance()).Sum();
+            }
+
             static ulong Decode(float[] keys, int size)
             {
                 var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(size);
@@ -182,9 +214,10 @@ namespace OthelloAI.GA
                 NumTuples = 3,
                 SizeMin = 8,
                 SizeMax = 9,
-                MaxNumWeights = (int) Math.Pow(3, 9),
+                MaxNumWeights = (int)Math.Pow(3, 9),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
                 Decoder = Decode,
+                VarianceT = Variance,
             };
 
             var ga = new GA<float[], Score<float[]>>()
@@ -206,7 +239,7 @@ namespace OthelloAI.GA
 
                 IO = new IndividualIO<float[]>()
                 {
-                    Decoder = Decode,
+                    Info = info,
                     ReadGenome = reader =>
                     {
                         var gene = new float[reader.ReadInt32()];
@@ -224,6 +257,11 @@ namespace OthelloAI.GA
 
             var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
+
+            var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw_v = File.AppendText(log);
+
+            var variances = new List<float>();
 
             ga.Run(ga.Init(100), (n_gen, time, pop) =>
             {
@@ -262,8 +300,13 @@ namespace OthelloAI.GA
                     Console.WriteLine();
                 }
 
+                float v = info.Variance(pop.OrderBy(s => s.score).Select(s => s.ind).Take(10).ToArray());
+                variances.Add(v);
+
+                sw_v.WriteLine(variances.TakeLast(100).Average());
+
                 Console.WriteLine($"Gen : {n_gen}, {time}");
-                Console.WriteLine(score.score);
+                Console.WriteLine(variances.TakeLast(100).Average());
                 Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
             });
         }

@@ -36,7 +36,6 @@ namespace OthelloAI
             // PATTERN_EDGE2X.Info(32, 2F);
 
             // Tester.Test1();
-            // GA.GA<float[], GA.Score<float[]>>.TestBRKGA();
             // Test();
             // Train();
             // MPCParamSolver.Test();
