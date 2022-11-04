@@ -40,12 +40,15 @@ namespace OthelloAI.GA
     public class VariatorEliteArchive<T> : IVariator<T, Score<T>>
     {
         public int NumElites { get; set; }
-        public int NumMutants { get; set; }
+        public int NumEliteMutants { get; set; }
+        public int NumRandomMutants { get; set; }
+
         public int NumCx { get; set; }
 
         public GenomeInfo<T> Generator { get; set; }
 
         public IGeneticOperator2<T> Crossover { get; set; }
+        public IGeneticOperator1<T> MutantElite { get; set; }
 
         public List<Individual<T>> Vary(List<Score<T>> score, Random rand)
         {
@@ -59,9 +62,10 @@ namespace OthelloAI.GA
             while (result.Count < NumElites + NumCx)
                 result.Add(Crossover.Operate(rand.Choice(elites), rand.Choice(non_elites), rand));
 
-            var mutants = Enumerable.Range(0, NumMutants).Select(_ => Generator.Generate(rand));
+            var mutants_elite = Enumerable.Range(0, NumEliteMutants).Select(_ => MutantElite.Operate(rand.Choice(elites), rand));
+            var mutants_random = Enumerable.Range(0, NumRandomMutants).Select(_ => Generator.Generate(rand));
 
-            return result.Concat(mutants).ToList();
+            return result.Concat(mutants_elite).Concat(mutants_random).ToList();
         }
     }
 }

@@ -32,6 +32,45 @@ namespace OthelloAI.GA
         public Individual<T> Operate(Individual<T> ind, Random rand);
     }
 
+    public class Mutant : IGeneticOperator1<float[]>
+    {
+        public float ProbSwapping { get; }
+        public float ProbChangingSize { get; }
+
+        public Mutant(float probSwapping, float probChangingSize)
+        {
+            ProbSwapping = probSwapping;
+            ProbChangingSize = probChangingSize;
+        }
+
+        public GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
+        {
+            int size = gene.Size;
+            float[] g = gene.Genome;
+
+            if (rand.NextDouble() < ProbChangingSize)
+            {
+                size = rand.Next(info.SizeMin, info.SizeMax + 1);
+            }
+
+            if (rand.NextDouble() < ProbSwapping)
+            {
+                int i1 = rand.Next(0, g.Length);
+                int i2 = rand.Next(0, g.Length);
+
+                (g[i2], g[i1]) = (g[i1], g[i2]);
+            }
+
+            return new GenomeGroup<float[]>(g, size);
+        }
+
+        public Individual<float[]> Operate(Individual<float[]> ind, Random rand)
+        {
+            var g = ind.Genome.Select(a => a.Select(g => Operate(g, ind.Info, rand)).ToArray()).ToArray();
+            return new Individual<float[]>(g, ind.Info);
+        }
+    }
+
     public interface IGeneticOperator2<T>
     {
         public Individual<T> Operate(Individual<T> ind1, Individual<T> ind2, Random rand);

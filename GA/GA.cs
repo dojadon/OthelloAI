@@ -223,7 +223,7 @@ namespace OthelloAI.GA
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true), 2, 54, 100 * 50)
+                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 6400, true), 2, 54, 100 * 400)
                 {
                     GetDepthFraction = GetDepthFraction
                 },
@@ -231,9 +231,11 @@ namespace OthelloAI.GA
                 Variator = new VariatorEliteArchive<float[]>()
                 {
                     NumElites = 20,
-                    NumCx = 70,
-                    NumMutants = 10,
+                    NumCx = 60,
+                    NumEliteMutants = 10,
+                    NumRandomMutants = 10,
                     Crossover = new CrossoverEliteBiased(0.7F),
+                    MutantElite = new Mutant(0.08F, 0.08F),
                     Generator = info,
                 },
 
@@ -259,10 +261,11 @@ namespace OthelloAI.GA
             using StreamWriter sw = File.AppendText(log);
 
             var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw_v = File.AppendText(log);
+            using StreamWriter sw_v = File.AppendText(log_v);
 
             var variances = new List<float>();
 
+            // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
             ga.Run(ga.Init(100), (n_gen, time, pop) =>
             {
                 var score = pop.MinBy(ind => ind.score).First();
@@ -277,7 +280,6 @@ namespace OthelloAI.GA
                     }
                     sw.WriteLine();
                 }
-                sw.Flush();
 
                 foreach (var t in score.ind.Tuples)
                 {
@@ -308,6 +310,9 @@ namespace OthelloAI.GA
                 Console.WriteLine($"Gen : {n_gen}, {time}");
                 Console.WriteLine(variances.TakeLast(100).Average());
                 Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+
+                sw.Flush();
+                sw_v.Flush();
             });
         }
     }
