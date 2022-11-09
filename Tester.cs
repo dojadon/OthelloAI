@@ -227,31 +227,34 @@ namespace OthelloAI
             }, () => new float[players.Length]);
         }
 
-        public static double[] TestEvaluationTime(int n_times, int n_weights, int[] sizes, string type)
+        public static double[] TestEvaluationTime(int n_times, int n_stages, int[] sizes, string type)
         {
-            var rand = new Random();
-            var timer = new System.Diagnostics.Stopwatch();
-
-            BoardHasher CreateRandomHasher(int size) => type switch
+            BoardHasher CreateRandomHasher(int size, Random rand) => type switch
             {
                 "pext" => new BoardHasherMask(rand.GenerateRegion(24, size)),
                 "scan" => new BoardHasherScanning(new BoardHasherMask(rand.GenerateRegion(24, size)).Positions),
                 _ => null
             };
 
+            int n = 10;
+
             return sizes.Select(size =>
             {
-                var patterns = Enumerable.Range(0, n_weights).Select(_ => Weights.Create(CreateRandomHasher(size), 1)).ToArray();
-                timer.Reset();
+                var timer = new System.Diagnostics.Stopwatch();
+                var rand = new Random();
 
-                for (int i = 0; i < n_times; i++)
+                for (int i = 0; i < n; i++)
                 {
-                    var p = rand.Choice(patterns);
-                    var b = new RotatedAndMirroredBoards(rand.NextBoard());
+                    var weight = Weights.Create(CreateRandomHasher(size, rand), n_stages);
 
-                    timer.Start();
-                    p.Eval(b);
-                    timer.Stop();
+                    for (int j = 0; j < n_times / n; j++)
+                    {
+                        var b = new RotatedAndMirroredBoards(rand.NextBoard());
+
+                        timer.Start();
+                        weight.Eval(b);
+                        timer.Stop();
+                    }
                 }
 
                 var time_s = (double)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency / n_times;
