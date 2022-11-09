@@ -57,7 +57,7 @@ namespace OthelloAI.GA
                 PlayerAI p1 = CreatePlayer(ind1, ind2);
                 PlayerAI p2 = CreatePlayer(ind2, ind1);
 
-                Board b = Tester.PlayGame(Tester.CreateRnadomGame(rand, 6), p1, p2);
+                Board b = Tester.PlayGame(p1, p2, Tester.CreateRandomGame(6, rand));
                 int result = b.GetStoneCountGap();
 
                 if (result > 0)
@@ -128,12 +128,12 @@ namespace OthelloAI.GA
 
                     if (k == 0)
                     {
-                        b = Tester.PlayGame(Board.Init, p1, p2);
+                        b = Tester.PlayGame(p1, p2, Board.Init);
                         result = b.GetStoneCountGap();
                     }
                     else
                     {
-                        b = Tester.PlayGame(Board.Init, p2, p1);
+                        b = Tester.PlayGame(p2, p1, Board.Init);
                         result = -b.GetStoneCountGap();
                     }
 
@@ -301,7 +301,7 @@ namespace OthelloAI.GA
             foreach (var w in pop)
                 w.Reset();
 
-            var trainers = pop.Select(p => new PatternTrainer(p, 0.001F)).ToArray();
+            var trainers = pop.Select(p => new Trainer(p, 0.001F)).ToArray();
 
             for (int i = 0; i < NumGames / 16; i++)
             {
@@ -339,7 +339,7 @@ namespace OthelloAI.GA
         {
             var rand = new Random();
             var player = CreatePlayer(new EvaluatorWeightsBased(w));
-            var trainer = new PatternTrainer(w, 0.002F);
+            var trainer = new Trainer(w, 0.002F);
 
             for (int i = 0; i < NumGames / 16; i++)
             {

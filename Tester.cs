@@ -1,15 +1,55 @@
-﻿using OthelloAI.GA;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 
 namespace OthelloAI
 {
-    class Tester
+    public static class Tester
     {
-        public static Board CreateRnadomGame(Random rand, int num_moves)
+        public static Board PlayGame(PlayerAI p1, PlayerAI p2, Board board)
+        {
+            return PlayGame(p1, p2, board, (_, _, _, _) => { });
+        }
+
+        public static Board PlayGame(PlayerAI p1, PlayerAI p2, Board board, Action<Board, int, ulong, float> action)
+        {
+            return PlayGame<object>(p1, p2, board, (b, c, m, e) => { action(b, c, m, e); return null; }).b;
+        }
+
+        public static (Board b, T[] array) PlayGame<T>(PlayerAI p1, PlayerAI p2, Board board, Func<Board, int, ulong, float, T> action)
+        {
+            return PlayGame(p1, p2, board, action, () => default);
+        }
+
+        public static (Board b, T[] array) PlayGame<T>(PlayerAI p1, PlayerAI p2, Board board, Func<Board, int, ulong, float, T> action, Func<T> generator)
+        {
+            var array = Enumerable.Range(0, 64).Select(_ => generator()).ToArray();
+
+            bool Step(PlayerAI player, int stone)
+            {
+                (_, _, ulong move, float e) = player.DecideMoveWithEvaluation(board, stone);
+
+                if (move != 0)
+                {
+                    array[board.n_stone] = action(board, stone, move, e);
+                    board = board.Reversed(move, stone);
+                    return true;
+                }
+                return false;
+            }
+
+            while (Step(p1, 1) | Step(p2, -1))
+            {
+            }
+            return (board, array);
+        }
+
+        public static Board CreateRandomGame(int num_moves)
+        {
+            return CreateRandomGame(num_moves, Program.Random);
+        }
+
+        public static Board CreateRandomGame(int num_moves, Random rand)
         {
             Board Step(Board b)
             {
@@ -28,53 +68,51 @@ namespace OthelloAI
             return board;
         }
 
-        public static Board PlayGame(Board init, Player p1, Player p2)
+        static void TestFFO(PlayerAI p)
         {
-            static bool Step(ref Board board, Player player, int stone)
+            static (Board, int) Parse(string[] lines)
             {
-                (_, _, ulong move) = player.DecideMove(board, stone);
-                if (move != 0)
+                Board b = new Board(Enumerable.Range(0, 64).Select(i => lines[0][i] switch
                 {
-                    board = board.Reversed(move, stone);
-                    return true;
-                }
-                return false;
+                    'X' => 1,
+                    'O' => -1,
+                    _ => 0
+                }).ToArray());
+
+                return (b, lines[1].StartsWith("Black") ? 1 : -1);
             }
 
-            Board board = init;
-            while (Step(ref board, p1, 1) | Step(ref board, p2, -1))
+            string export = "No, Empty, Time, Nodes\r\n";
+
+            for (int no = 40; no <= 44; no++)
             {
+                string[] lines = File.ReadAllLines($"ffotest/end{no}.pos");
+                (Board board, int color) = Parse(lines);
+                Console.WriteLine(lines[1]);
+                Console.WriteLine(color);
+                Console.WriteLine(board);
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+
+                p.SolveEndGame(board, p.Params[^1].CreateCutoffParameters(board.n_stone));
+                sw.Stop();
+                float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
+
+                Console.WriteLine($"FFO Test No.{no}");
+                Console.WriteLine($"Discs : {64 - board.n_stone}");
+                Console.WriteLine($"Taken Time : {time} ms");
+                Console.WriteLine($"Nodes : {p.SearchedNodeCount}");
+
+                export += $"{no}, {64 - board.n_stone}, {time}, {p.SearchedNodeCount}\r\n";
             }
-            return board;
+
+            File.WriteAllText($"FFO_Test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv", export);
         }
 
         public static void TestB()
         {
             Weights weight = null;
-
             // weight.Load();
-
-            int Play(PlayerAI p1, PlayerAI p2)
-            {
-                bool Step(ref Board board, Player player, int stone)
-                {
-                    (int x, int y, ulong move) = player.DecideMove(board, stone);
-
-                    if (move != 0)
-                    {
-                        board = board.Reversed(move, stone);
-                        return true;
-                    }
-                    return false;
-                }
-
-                Board board = Tester.CreateRnadomGame(GA.GATest.Random, 8);
-                while (Step(ref board, p1, 1) | Step(ref board, p2, -1))
-                {
-                }
-
-                return board.GetStoneCountGap();
-            }
 
             int n = 8;
 
@@ -102,7 +140,7 @@ namespace OthelloAI
 
                     double avg = Enumerable.Range(0, 500).AsParallel().Select(i =>
                     {
-                        return Play(p1, p2) switch
+                        return PlayGame(p1, p2, CreateRandomGame(8)).GetStoneCountGap() switch
                         {
                             < 0 => 0,
                             > 0 => 1,
@@ -115,231 +153,98 @@ namespace OthelloAI
             }
         }
 
-        public static void TestA()
+        public static long[][] TestSearchedNodesCount(Weights weight, float depth, int n_games)
         {
-            Weights weight = Program.WEIGHT;
-
-            int Play(PlayerAI p1, PlayerAI p2, List<long> count)
+            var player = new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                bool Step(ref Board board, Player player, int stone)
-                {
-                    if (board.n_stone >= 50)
-                        return false;
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: depth),
+                                              // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
+                },
+                PrintInfo = false,
+            };
 
-                    (int x, int y, ulong move) = player.DecideMove(board, stone);
-                    count.Add(p1.SearchedNodeCount);
-
-                    if (move != 0)
-                    {
-                        board = board.Reversed(move, stone);
-                        return true;
-                    }
-                    return false;
-                }
-
-                Board board = Tester.CreateRnadomGame(GA.GATest.Random, 8);
-                while (Step(ref board, p1, 1) | Step(ref board, p2, -1))
-                {
-                }
-
-                return board.GetStoneCountGap();
-            }
-
-            for (int i = 0; i < 2; i++)
-            {
-                PlayerAI player = new PlayerAI(new EvaluatorWeightsBased(weight))
-                {
-                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 1 + i * 0.1F),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
-                    PrintInfo = false,
-                };
-
-                double avg = Enumerable.Range(0, 2000).AsParallel().SelectMany(i =>
-                {
-                    List<long> c = new();
-                    Play(player, player, c);
-                    return c;
-                }).Average();
-
-                Console.WriteLine($"{1 + i * 0.1F}, {avg}");
-            }
+            return Enumerable.Range(0, n_games).AsParallel().Select(i => PlayGame(player, player, CreateRandomGame(8), (b, c, m, e) => player.SearchedNodeCount).array).ToArray();
         }
 
-        public static void TestC()
+        public static long[][][] TestSearchedNodesCount(Weights weight, float[] depths, int n_games)
         {
-            int count = 10;
-            Weights CreatePattern(ulong mask)
+            var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                return Weights.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, $"{mask}_{count++}", true);
-            }
-            var rand = new Random();
-            // Pattern[] patterns = Program.PATTERNS;
-            // Pattern[] patterns = new[] { CreatePattern(10485), CreatePattern(312003), CreatePattern(395015) };
-            Weights weight = null;
-
-            PlayerAI[] players = Enumerable.Range(0, 4).Select(i => new PlayerAI(new EvaluatorWeightsBased(weight))
-            {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: i * 2),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
+                                              // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
+                },
                 PrintInfo = false,
             }).ToArray();
 
-            IEnumerable<float>[][] Play()
+            return Enumerable.Range(0, n_games).AsParallel().Select(i => PlayGame(players[^1], players[^1], CreateRandomGame(8), (b, c, m, e) =>
             {
-                List<float>[][] evaluations = Enumerable.Range(0, 64).Select(_ => Enumerable.Range(0, players.Length).Select(_ => new List<float>()).ToArray()).ToArray();
-
-                bool Step(ref Board board, int stone)
+                foreach (var p in players[0..^1])
                 {
-                    ulong move = 0;
-
-                    if (20 < board.n_stone && board.n_stone < 50)
-                    {
-                        for (int i = 0; i < players.Length; i++)
-                        {
-                            (_, _, move, float e) = players[i].DecideMoveWithEvaluation(board, stone);
-                            evaluations[board.n_stone][i].Add(e * stone);
-                        }
-                    }
-                    else
-                    {
-                        (_, _, move) = players[^1].DecideMove(board, stone);
-                    }
-
-                    if (move != 0)
-                    {
-                        board = board.Reversed(move, stone);
-                        return true;
-                    }
-                    return false;
+                    p.DecideMove(b, c);
                 }
-
-                Board board = Board.Init;
-
-                while (board.n_stone < 60)
-                {
-                    board = Tester.CreateRnadomGame(GA.GATest.Random, 8);
-                    while (Step(ref board, 1) | Step(ref board, -1))
-                    {
-                    }
-                }
-
-                int result = board.GetStoneCountGap();
-                float Error(float x) => (x - result) * (x - result);
-
-                return evaluations.Select(l1 => l1.Select(l2 => l2.Select(Error)).ToArray()).ToArray();
-            }
-
-            var e = Enumerable.Range(0, 10000).AsParallel().Select(i => Play()).ToArray();
-
-            var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw = File.AppendText(log);
-
-            for (int i = 20; i < 50; i++)
-            {
-                var error = Enumerable.Range(0, players.Length).Select(j => e.SelectMany(l => l[i][j]).Where(f => f < 1000).Average()).ToArray();
-                sw.WriteLine(string.Join(",", error));
-            }
+                return players.Select(p => p.SearchedNodeCount).ToArray();
+            }, () => new long[players.Length]).array).ToArray();
         }
 
-        public static void TestD()
+        public static float[][][] TestError(Weights weight, float[] depths, int n_games)
         {
-            int count = 0;
-            Weights CreateWeight(ulong mask)
+            var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                return Weights.Create(new BoardHasherScanning(new BoardHasherMask(mask).Positions), 60, $"{mask}_{count++}", true);
-            }
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
+                                              // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
+                },
+                PrintInfo = false,
+            }).ToArray();
 
-            static PlayerAI CreatePlayer(Weights weights)
+            return Enumerable.Range(0, n_games).AsParallel().Select(i =>
             {
-                return new PlayerAI(new EvaluatorWeightsBased(weights))
+                (var board, var t) = PlayGame(players[^1], players[^1], CreateRandomGame(8), (b, c, m, e) =>
                 {
-                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 7),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
-                    PrintInfo = false,
-                };
-            }
-
-            var s1 = "148451\r\n18403\r\n25571\r\n50887\r\n213955\r\n18375\r\n58083\r\n91075\r\n148423\r\n83907";
-            var s2 = "10485\t312003\t395015\r\n10485\t312003\t460547\r\n10485\t279491\t460547\r\n10485\t279491\t395015\r\n12537\t279491\t460547\r\n10485\t312257\t460547\r\n12533\t312003\t395015\r\n12533\t312003\t460547\r\n12537\t312195\t460547\r\n10485\t312195\t460547";
-
-            PlayerAI[] p1 = s1.Split("\r\n").Select(ulong.Parse).Select(CreateWeight).Select(CreatePlayer).ToArray();
-            PlayerAI[] p2 = s2.Split("\r\n").Select(t => new WeightsSum(t.Split("\t").Select(ulong.Parse).Select(CreateWeight).ToArray())).Select(CreatePlayer).ToArray();
-            PlayerAI[] p3 = new[] { CreatePlayer( Program.WEIGHT) };
-            PlayerAI[][] p12 = new[] { p1 };
-
-            PlayerAI[] players = p1;
-
-            Program.WEIGHT.Load();
-
-            float[][] Play()
-            {
-                Random rand = new();
-                var boards = new Board[64];
-
-                bool Step(ref Board board, int stone)
-                {
-                    (_, _, ulong move) = rand.Choice(players).DecideMove(board, stone);
-
-                    if (move != 0)
-                    {
-                        boards[board.n_stone - 4] = board;
-                        board = board.Reversed(move, stone);
-                        return true;
-                    }
-                    return false;
-                }
-
-                Board board = Board.Init;
-
-                while (board.n_stone < 60)
-                {
-                    board = Tester.CreateRnadomGame(GA.GATest.Random, 6);
-                    while (Step(ref board, 1) | Step(ref board, -1))
-                    {
-                    }
-                }
+                    return players[0..^1].Select(p => p.DecideMoveWithEvaluation(b, c).e * c).Concat(new[] { e * c }).ToArray();
+                }, () => new float[players.Length]);
 
                 int result = board.GetStoneCountGap();
-                float Error(float x) => (x - result) * (x - result);
+                float Error(float e) => (e - result) * (e - result);
 
-                float[] Calc(IEnumerable<PlayerAI> ps)
-                {
-                    return boards.Select(b => b.n_stone < 10 ? 0 : ps.Select(p => p.Evaluator.EvalTraining(b)).Select(Error).Average()).ToArray();
-                }
-                return p12.Select(Calc).ToArray();
-            }
+                return t.Select(tt => tt.Select(Error).ToArray()).ToArray();
 
-            var e = Enumerable.Range(0, 4000).AsParallel().Select(i => Play()).ToArray();
-
-            var log = $"test/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw = File.AppendText(log);
-
-            for (int i = 10; i < 50; i++)
-            {
-                var error = Enumerable.Range(0, 3).Select(j => e.Select(l => l[j][i]).Where(f => f < 1000).Average()).ToArray();
-                sw.WriteLine(string.Join(",", error));
-                Console.WriteLine(string.Join(",", error));
-            }
+            }).ToArray();
         }
 
-        public static void TestE()
+        public static (Board b, float[][] e) TestError(Weights weight, float[] depths)
+        {
+            var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
+            {
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
+                                              // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
+                },
+                PrintInfo = false,
+            }).ToArray();
+
+            return PlayGame(players[^1], players[^1], CreateRandomGame(8), (b, c, m, e) =>
+            {
+                return players[0..^1].Select(p => p.DecideMoveWithEvaluation(b, c).e * c).Concat(new[] { e * c }).ToArray();
+            }, () => new float[players.Length]);
+        }
+
+        public static double[] TestEvaluationTime(int n_times, int n_weights, int[] sizes, string type)
         {
             var rand = new Random();
             var timer = new System.Diagnostics.Stopwatch();
-            int n = (int)1E+7;
 
-            BoardHasher CreateRandomHasher(int n)
+            BoardHasher CreateRandomHasher(int size) => type switch
             {
-                // return new BoardHasherMask(rand.GenerateRegion(24, n));
-                return new BoardHasherScanning(new BoardHasherMask(rand.GenerateRegion(24, n)).Positions);
-            }
+                "pext" => new BoardHasherMask(rand.GenerateRegion(24, size)),
+                "scan" => new BoardHasherScanning(new BoardHasherMask(rand.GenerateRegion(24, size)).Positions),
+                _ => null
+            };
 
-            for (int size = 2; size < 11; size++)
+            return sizes.Select(size =>
             {
-                var patterns = Enumerable.Range(0, 100).Select(_ => Weights.Create(CreateRandomHasher(size), 1)).ToArray();
+                var patterns = Enumerable.Range(0, n_weights).Select(_ => Weights.Create(CreateRandomHasher(size), 1)).ToArray();
                 timer.Reset();
 
-                for (int i = 0; i < n; i++)
+                for (int i = 0; i < n_times; i++)
                 {
                     var p = rand.Choice(patterns);
                     var b = new RotatedAndMirroredBoards(rand.NextBoard());
@@ -349,35 +254,9 @@ namespace OthelloAI
                     timer.Stop();
                 }
 
-                var time_s = (double)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency / n;
-                var time_nano = time_s * 1E+9;
-                Console.WriteLine($"{size}, {time_nano}");
-            }
-        }
-
-        public static void TestF()
-        {
-            static (float, float) GetDepthFraction(float t1, float t2)
-            {
-                int n1 = 12;
-                int n2 = 54;
-
-                if (Math.Abs(t1 - t2) < 1E-3)
-                    return (0, 0);
-
-                if (t1 > t2)
-                {
-                    float f = n1 * (t1 - t2) / (t2 * (n2 - n1));
-                    return (1, 1 + f);
-                }
-                else
-                {
-                    float f = n1 * (t2 - t1) / (t1 * (n2 - n1));
-                    return (1 + f, 1);
-                }
-            }
-
-            Console.WriteLine(GetDepthFraction(1, 3));
+                var time_s = (double)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency / n_times;
+                return time_s * 1E+9;
+            }).ToArray();
         }
     }
 }

@@ -39,33 +39,6 @@ namespace OthelloAI
         }
     }
 
-    public class EvaluatorPatternBased_Release : Evaluator
-    {
-        public override int Eval(Board board)
-        {
-            var boards = new RotatedAndMirroredBoards(board);
-
-            return Program.PATTERN_EDGE2X.Eval(boards)
-                    + Program.PATTERN_EDGE_BLOCK.Eval(boards)
-                    + Program.PATTERN_CORNER_BLOCK.Eval(boards)
-                    + Program.PATTERN_CORNER.Eval(boards)
-                    + Program.PATTERN_LINE1.Eval(boards)
-                    + Program.PATTERN_LINE2.Eval(boards);
-        }
-
-        public override float EvalTraining(Board board)
-        {
-            var boards = new RotatedAndMirroredBoards(board);
-
-            return Program.PATTERN_EDGE2X.EvalTraining(boards)
-                    + Program.PATTERN_EDGE_BLOCK.EvalTraining(boards)
-                    + Program.PATTERN_CORNER_BLOCK.EvalTraining(boards)
-                    + Program.PATTERN_CORNER.EvalTraining(boards)
-                    + Program.PATTERN_LINE1.EvalTraining(boards)
-                    + Program.PATTERN_LINE2.EvalTraining(boards);
-        }
-    }
-
     public class EvaluatorBiasedRandomChoice : Evaluator
     {
         Random Rand { get; } = new Random(DateTime.Now.Millisecond);

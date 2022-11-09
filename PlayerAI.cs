@@ -261,6 +261,8 @@ namespace OthelloAI
 
         public List<float> Times { get; } = new List<float>();
         public long SearchedNodeCount { get; set; }
+        public int[] NodeCount { get; } = new int[10];
+        public int[] PrunedNodeCount { get; } = new int[10];
 
         public PlayerAI(Evaluator evaluator)
         {
@@ -292,7 +294,7 @@ namespace OthelloAI
             if (Math.Abs(e) >= 10000)
                 return e / 10000;
             else
-                return e * 10 / 127.0F;
+                return e * Weights.WEIGHT_RANGE / 127.0F;
         }
 
         int color = 0;
@@ -306,6 +308,11 @@ namespace OthelloAI
         public (int x, int y, ulong move, float e) DecideMoveWithEvaluation(Board board, int stone)
         {
             SearchedNodeCount = 0;
+            for(int i = 0; i < NodeCount.Length; i++)
+            {
+                NodeCount[i] = 0;
+                PrunedNodeCount[i] = 0;
+            }
 
             color = stone;
             if (stone == -1)
