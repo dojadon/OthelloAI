@@ -4,6 +4,26 @@ using System.Linq;
 
 namespace OthelloAI
 {
+    public static class ArrayUtil
+    {
+        public static float[][] AverageAxis3(float[][][] a)
+        {
+            int l1 = a[0].Length;
+            int l2 = a[0][0].Length;
+
+            float[][] result = new float[l1][];
+            for(int i = 0; i < result.Length; i++)
+            {
+                result[i] = new float[l2];
+
+                for (int j = 0; j < result[i].Length; j++)
+                    result[i][j] = a.Select(aa => aa[i][j]).Average();
+            }
+
+            return result;
+        }
+    }
+
     public static class LinqUtil
     {
         public static IEnumerable<T> MinBy<T, U>(this IEnumerable<T> source, Func<T, U> selector)

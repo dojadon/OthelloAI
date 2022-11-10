@@ -279,11 +279,11 @@ namespace OthelloAI
         {
             SearchedNodeCount++;
 
-            if (color == 0 ^ board.n_stone % 2 == 0)
-            {
-                return -Evaluator.Eval(board.ColorFliped());
-            }
-            else
+            //if (color == 0 ^ board.n_stone % 2 == 0)
+            //{
+            //    return -Evaluator.Eval(board.ColorFliped());
+            //}
+            //else
             {
                 return Evaluator.Eval(board);
             }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -186,7 +187,7 @@ namespace OthelloAI
             }, () => new long[players.Length]).array).ToArray();
         }
 
-        public static float[][][] TestError(Weights weight, float[] depths, int n_games)
+        public static float[][][] TestError(Weights weight, IEnumerable<float> depths, int n_games)
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
@@ -196,31 +197,22 @@ namespace OthelloAI
                 PrintInfo = false,
             }).ToArray();
 
-            return Enumerable.Range(0, n_games).AsParallel().Select(i =>
+            return Enumerable.Range(0, n_games).AsParallel().AsOrdered().Select(i =>
             {
-                (var board, var t) = PlayGame(players[^1], players[^1], CreateRandomGame(8), (b, c, m, e) =>
-                {
-                    return players[0..^1].Select(p => p.DecideMoveWithEvaluation(b, c).e * c).Concat(new[] { e * c }).ToArray();
-                }, () => new float[players.Length]);
+                if (i % 100 == 0)
+                    Console.WriteLine(i);
+
+                (var board, var t) = TestError(players);
 
                 int result = board.GetStoneCountGap();
                 float Error(float e) => (e - result) * (e - result);
 
                 return t.Select(tt => tt.Select(Error).ToArray()).ToArray();
-
             }).ToArray();
         }
 
-        public static (Board b, float[][] e) TestError(Weights weight, float[] depths)
+        public static (Board b, float[][] e) TestError(PlayerAI[] players)
         {
-            var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
-            {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
-                                              // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
-                },
-                PrintInfo = false,
-            }).ToArray();
-
             return PlayGame(players[^1], players[^1], CreateRandomGame(8), (b, c, m, e) =>
             {
                 return players[0..^1].Select(p => p.DecideMoveWithEvaluation(b, c).e * c).Concat(new[] { e * c }).ToArray();

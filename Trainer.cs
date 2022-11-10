@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -164,16 +165,28 @@ namespace OthelloAI
             return e;
         }
 
-        public static void Train(Weights weights, float lr, RecordReader reader)
+        public static List<float> Train(Weights weight, int depth, int n_games)
         {
-            var trainer = new Trainer(weights, lr);
-            reader.OnLoadMove += (b, r) => trainer.Update(b, r);
-            reader.OnLoadGame += i =>
+            var evaluator = new EvaluatorWeightsBased(weight);
+            Player player = new PlayerAI(evaluator)
             {
-                if (i % 50000 == 0)
-                    Console.WriteLine(i);
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: depth),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                PrintInfo = false,
             };
-            reader.Read();
+
+            var trainer = new Trainer(weight, 0.001F);
+
+            for (int i = 0; i < n_games / 16; i++)
+            {
+                var data = TrainerUtil.PlayForTrainingParallel(16, player);
+                data.ForEach(t => trainer.Update(t.board, t.result));
+
+                Console.WriteLine($"{i} / {n_games / 16}");
+                Console.WriteLine(trainer.Log.TakeLast(10000).Average());
+            }
+
+            return trainer.Log;
         }
     }
 }
