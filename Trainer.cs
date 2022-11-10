@@ -138,12 +138,12 @@ namespace OthelloAI
 
     public class Trainer
     {
-        public Weights Weights { get; }
+        public Weight Weights { get; }
         public float LearningRate { get; }
 
         public List<float> Log { get; } = new List<float>();
 
-        public Trainer(Weights weights, float lr)
+        public Trainer(Weight weights, float lr)
         {
             Weights = weights;
             LearningRate = lr;
@@ -165,7 +165,7 @@ namespace OthelloAI
             return e;
         }
 
-        public static List<float> Train(Weights weight, int depth, int n_games)
+        public static List<float> Train(Weight weight, int depth, int n_games)
         {
             var evaluator = new EvaluatorWeightsBased(weight);
             Player player = new PlayerAI(evaluator)

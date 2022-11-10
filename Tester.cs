@@ -112,7 +112,7 @@ namespace OthelloAI
 
         public static void TestB()
         {
-            Weights weight = null;
+            Weight weight = null;
             // weight.Load();
 
             int n = 8;
@@ -154,7 +154,7 @@ namespace OthelloAI
             }
         }
 
-        public static long[][] TestSearchedNodesCount(Weights weight, float depth, int n_games)
+        public static long[][] TestSearchedNodesCount(Weight weight, float depth, int n_games)
         {
             var player = new PlayerAI(new EvaluatorWeightsBased(weight))
             {
@@ -167,7 +167,7 @@ namespace OthelloAI
             return Enumerable.Range(0, n_games).AsParallel().Select(i => PlayGame(player, player, CreateRandomGame(8), (b, c, m, e) => player.SearchedNodeCount).array).ToArray();
         }
 
-        public static long[][][] TestSearchedNodesCount(Weights weight, float[] depths, int n_games)
+        public static long[][][] TestSearchedNodesCount(Weight weight, float[] depths, int n_games)
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
@@ -187,7 +187,7 @@ namespace OthelloAI
             }, () => new long[players.Length]).array).ToArray();
         }
 
-        public static float[][][] TestError(Weights weight, IEnumerable<float> depths, int n_games)
+        public static float[][][] TestError(Weight weight, IEnumerable<float> depths, int n_games)
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
@@ -237,14 +237,14 @@ namespace OthelloAI
 
                 for (int i = 0; i < n; i++)
                 {
-                    var weight = Weights.Create(CreateRandomHasher(size, rand), n_stages);
+                    var weight = Weight.Create(CreateRandomHasher(size, rand), n_stages);
 
                     for (int j = 0; j < n_times / n; j++)
                     {
-                        var b = new RotatedAndMirroredBoards(rand.NextBoard());
+                        var b = rand.NextBoard();
 
                         timer.Start();
-                        weight.Eval(b);
+                        weight.Eval(new RotatedAndMirroredBoards(b));
                         timer.Stop();
                     }
                 }

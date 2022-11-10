@@ -294,7 +294,7 @@ namespace OthelloAI
             if (Math.Abs(e) >= 10000)
                 return e / 10000;
             else
-                return e * Weights.WEIGHT_RANGE / 127.0F;
+                return e * Weight.WEIGHT_RANGE / 127.0F;
         }
 
         int color = 0;

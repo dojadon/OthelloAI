@@ -425,7 +425,7 @@ namespace OthelloAI.GA
         public GenomeGroup<T>[][] Genome { get; }
         public TupleB<T>[][] Tuples { get; }
 
-        public Weights Weights { get; }
+        public Weight Weights { get; }
 
         public GenomeInfo<T> Info { get; }
 
@@ -437,7 +437,7 @@ namespace OthelloAI.GA
             Info = info;
 
             Tuples = new TupleB<T>[info.NumStages][];
-            var weights = new Weights[info.NumStages];
+            var weights = new Weight[info.NumStages];
 
             for (int i = 0; i < genome.Length; i++)
             {

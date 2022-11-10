@@ -1,28 +1,20 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.Intrinsics.X86;
+using System.Threading.Tasks;
 
 namespace OthelloAI
 {
-    public abstract class Weights
+    public abstract class Weight
     {
         public const float WEIGHT_RANGE = 10;
 
-        public static Weights Create(BoardHasher hasher, int n_stages, string file = "", bool load = false)
+        public static Weight Create(BoardHasher hasher, int n_stages)
         {
-            Weights[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new WeightsArray(hasher)).ToArray();
-            var weights = new WeightsStagebased(weights_stage)
-            {
-                FilePath = file,
-            };
-
-            if (load)
-                weights.Load();
-
-            return weights;
+            Weight[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new WeightsArray(hasher)).ToArray();
+            return new WeightsStagebased(weights_stage);
         }
-
-        public string FilePath { get; set; }
 
         public abstract void Reset();
         public abstract int Eval(RotatedAndMirroredBoards b);
@@ -42,24 +34,24 @@ namespace OthelloAI
             return (byte)Math.Clamp(x / range * 127 + 128, 0, 255);
         }
 
-        public void Load()
+        public void Load(string path)
         {
-            using var reader = new BinaryReader(new FileStream(FilePath, FileMode.Open));
+            using var reader = new BinaryReader(new FileStream(path, FileMode.Open));
             Read(reader);
         }
 
-        public void Save()
+        public void Save(string path)
         {
-            using var writer = new BinaryWriter(new FileStream(FilePath, FileMode.Create));
+            using var writer = new BinaryWriter(new FileStream(path, FileMode.Create));
             Write(writer);
         }
     }
 
-    public class WeightsSum : Weights
+    public class WeightsSum : Weight
     {
-        Weights[] Weights { get; }
+        Weight[] Weights { get; }
 
-        public WeightsSum(params Weights[] weights)
+        public WeightsSum(params Weight[] weights)
         {
             Weights = weights;
         }
@@ -115,11 +107,11 @@ namespace OthelloAI
         }
     }
 
-    public class WeightsStagebased : Weights
+    public class WeightsStagebased : Weight
     {
-        Weights[] Weights { get; }
+        Weight[] Weights { get; }
 
-        public WeightsStagebased(Weights[] weights)
+        public WeightsStagebased(Weight[] weights)
         {
             Weights = weights;
         }
@@ -129,12 +121,12 @@ namespace OthelloAI
             return (n_stone - 5) / (60 / n_div);
         }
 
-        protected Weights GetCurrentWeights(Board board)
+        protected Weight GetCurrentWeights(Board board)
         {
             return GetCurrentWeights(board.n_stone);
         }
 
-        protected Weights GetCurrentWeights(int n_discs)
+        protected Weight GetCurrentWeights(int n_discs)
         {
             return Weights[GetStage(n_discs, Weights.Length)];
         }
@@ -189,7 +181,108 @@ namespace OthelloAI
         }
     }
 
-    public class WeightsArray : Weights
+    public class WeightsArrayR : Weight
+    {
+        public BoardHasher Hasher { get; }
+
+        public  float[] weights;
+        byte[] weights_b;
+
+        readonly ulong mask;
+        readonly int hash_length;
+
+        public override float[] GetWeights() => weights;
+
+        public int NumOfStates { get; }
+
+        public WeightsArrayR(ulong m)
+        {
+            mask = m;
+            hash_length = Board.BitCount(mask);
+
+            Hasher = new BoardHasherMask(mask);
+            NumOfStates = Hasher.NumOfStates;
+
+            Reset();
+        }
+
+        public override void Reset()
+        {
+            weights = new float[Hasher.ArrayLength];
+            weights_b = new byte[Hasher.ArrayLength];
+        }
+
+        public int Eval(Board b)
+        {
+            ulong idx = Bmi2.X64.ParallelBitExtract(b.bitB, mask) | (Bmi2.X64.ParallelBitExtract(b.bitW, mask) << hash_length);
+            return weights_b[idx];
+        }
+
+        public override int Eval(RotatedAndMirroredBoards b)
+        {
+            return Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.rot90) + Eval(b.inv_rot90)
+                + Eval(b.rot180) + Eval(b.inv_rot180) + Eval(b.rot270) + Eval(b.inv_rot270) - 128 * 8;
+        }
+
+        public float EvalTraining(Board b)
+        {
+            return weights[Hasher.Hash(b)];
+        }
+
+        public override float EvalTraining(RotatedAndMirroredBoards b)
+        {
+            return EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.rot90) + EvalTraining(b.inv_rot90) +
+                EvalTraining(b.rot180) + EvalTraining(b.inv_rot180) + EvalTraining(b.rot270) + EvalTraining(b.inv_rot270);
+        }
+
+        public override int NumOfEvaluation(int n_discs) => 8;
+
+        public override void UpdataEvaluation(Board board, float add, float range)
+        {
+            int hash = Hasher.Hash(board);
+            int flipped = Hasher.FlipHash(hash);
+
+            weights[hash] += add;
+            weights[flipped] -= add;
+
+            weights_b[hash] = ConvertToInt8(weights[hash], range);
+            weights_b[flipped] = ConvertToInt8(weights[flipped], range);
+        }
+
+        public override void ApplyTrainedEvaluation(float range)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                uint index = Hasher.ConvertStateToHash(i);
+                weights_b[index] = ConvertToInt8(weights[index], range);
+            }
+        }
+
+        public override void Read(BinaryReader reader)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                float e = reader.ReadSingle();
+
+                uint index = Hasher.ConvertStateToHash(i);
+                weights[index] = e;
+                weights_b[index] = ConvertToInt8(weights[index], WEIGHT_RANGE);
+            }
+        }
+
+        public override void Write(BinaryWriter writer)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                uint index = Hasher.ConvertStateToHash(i);
+
+                float e = weights[index];
+                writer.Write(e);
+            }
+        }
+    }
+
+    public class WeightsArray : Weight
     {
         public BoardHasher Hasher { get; }
         public SymmetricType Type { get; set; }
