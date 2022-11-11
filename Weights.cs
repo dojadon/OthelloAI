@@ -196,8 +196,6 @@ namespace OthelloAI
 
         public WeightsArrayS(ulong m)
         {
-            NumOfStates = Hasher.NumOfStates;
-
             var boards = new RotatedAndMirroredBoards(new Board(m, 0));
             foreach((var b, var i) in boards.Select((b, i) => (b, i)))
             {
@@ -205,6 +203,7 @@ namespace OthelloAI
             }
 
             Hasher = new BoardHasherScanning(pos[0]);
+            NumOfStates = Hasher.NumOfStates;
 
             Reset();
         }

@@ -219,25 +219,25 @@ namespace OthelloAI
             }, () => new float[players.Length]);
         }
 
-        public static double[] TestEvaluationTime(int n_times, int n_stages, int[] sizes, string type)
+        public static double[] TestEvaluationTime(int n_times, IEnumerable<int> sizes, string type)
         {
-            BoardHasher CreateRandomHasher(int size, Random rand) => type switch
+            Weight Create(int size, Random rand) => type switch
             {
-                "pext" => new BoardHasherMask(rand.GenerateRegion(24, size)),
-                "scan" => new BoardHasherScanning(new BoardHasherMask(rand.GenerateRegion(24, size)).Positions),
+                "pext" => new WeightsArrayR(rand.GenerateRegion(24, size)),
+                "scan" => new WeightsArrayS(rand.GenerateRegion(24, size)),
                 _ => null
             };
 
             int n = 10;
 
-            return sizes.Select(size =>
+            return (new int[] { 2 }).Concat(sizes).Select(size =>
             {
                 var timer = new System.Diagnostics.Stopwatch();
                 var rand = new Random();
 
                 for (int i = 0; i < n; i++)
                 {
-                    var weight = Weight.Create(CreateRandomHasher(size, rand), n_stages);
+                    var weight = Create(size, rand);
 
                     for (int j = 0; j < n_times / n; j++)
                     {
@@ -251,7 +251,7 @@ namespace OthelloAI
 
                 var time_s = (double)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency / n_times;
                 return time_s * 1E+9;
-            }).ToArray();
+            }).Skip(1).ToArray();
         }
     }
 }

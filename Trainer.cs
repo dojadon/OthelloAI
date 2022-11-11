@@ -28,7 +28,7 @@ namespace OthelloAI
         }
     }
 
-    public struct TrainingDataElement
+    public readonly struct TrainingDataElement
     {
         public readonly Board board;
         public readonly float result;
@@ -124,7 +124,7 @@ namespace OthelloAI
             for (int i = 0; i < n_game; i++)
             {
                 Board board = Tester.CreateRandomGame(8, rand);
-                List<Board> boards = new List<Board>();
+                var boards = new List<Board>();
 
                 while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
                 {

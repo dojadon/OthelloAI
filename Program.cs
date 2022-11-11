@@ -25,18 +25,19 @@ namespace OthelloAI
 
         static void Main()
         {
-            WEIGHT.Load("e.dat");
+            int n = 10000000;
+            var sizes = Enumerable.Range(2, 10).ToArray();
 
-            var log = $"test/log_test_error_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"G:/マイドライブ/Lab/test/log_e_time_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
-            var e3 = Tester.TestError(WEIGHT, Enumerable.Range(0, 4).Select(i => i * 2F), 10000);
-            var e = np.array(e3).mean(0);
+            double[] t1 = Tester.TestEvaluationTime(n, sizes, "pext");
+            double[] t2 = Tester.TestEvaluationTime(n, sizes, "scan");
 
-            for (int i = 0; i < e.shape[0]; i++)
+            for(int i = 0; i < sizes.Length; i++)
             {
-                Console.WriteLine(e[i].ToString());
-                sw.WriteLine(string.Join(", ", e[i].ToArray<float>()));
+                Console.WriteLine($"{sizes[i]}, {t1[i]}, {t2[i]}");
+                sw.WriteLine($"{sizes[i]}, {t1[i]}, {t2[i]}");
             }
         }
 
