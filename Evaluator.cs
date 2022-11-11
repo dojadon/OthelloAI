@@ -28,14 +28,12 @@ namespace OthelloAI
 
         public override int Eval(Board board)
         {
-            var boards = new RotatedAndMirroredBoards(board);
-            return Weights.Eval(boards);
+            return Weights.Eval(board);
         }
 
         public override float EvalTraining(Board board)
         {
-            var boards = new RotatedAndMirroredBoards(board);
-            return Weights.EvalTraining(boards);
+            return Weights.EvalTraining(board);
         }
     }
 

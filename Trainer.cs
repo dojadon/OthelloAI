@@ -151,11 +151,9 @@ namespace OthelloAI
 
         public float Update(Board board, float result)
         {
-            var boards = new RotatedAndMirroredBoards(board);
+            float e = result - Weights.EvalTraining(board);
 
-            float e = result - Weights.EvalTraining(boards);
-
-            foreach (var b in boards)
+            foreach (var b in new RotatedAndMirroredBoards(board))
             {
                 Weights.UpdataEvaluation(b, e * LearningRate, 6);
             }

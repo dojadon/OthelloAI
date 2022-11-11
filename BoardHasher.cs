@@ -176,6 +176,19 @@ namespace OthelloAI
 
     public class BoardHasherMask : BoardHasherBin
     {
+        public static int[] MaskToPositions(ulong mask)
+        {
+            var list = new List<int>();
+
+            for (int i = 0; i < 64; i++)
+            {
+                if (((mask >> i) & 1) != 0)
+                    list.Add(i);
+            }
+            list.Reverse();
+            return list.ToArray();
+        }
+
         public ulong Mask { get; }
         public override int HashLength { get; }
         public override int[] Positions { get; }
@@ -187,18 +200,7 @@ namespace OthelloAI
         {
             Mask = mask;
             HashLength = Board.BitCount(mask);
-
-            var list = new List<int>();
-
-            for (int i = 0; i < 64; i++)
-            {
-                if (((mask >> i) & 1) != 0)
-                    list.Add(i);
-            }
-            list.Reverse();
-
-            Positions = list.ToArray();
-
+            Positions = MaskToPositions(mask);
             SymmetricType = GetSymmetricType();
         }
 

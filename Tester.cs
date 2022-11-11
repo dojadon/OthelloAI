@@ -244,7 +244,7 @@ namespace OthelloAI
                         var b = rand.NextBoard();
 
                         timer.Start();
-                        weight.Eval(new RotatedAndMirroredBoards(b));
+                        weight.Eval(b);
                         timer.Stop();
                     }
                 }
