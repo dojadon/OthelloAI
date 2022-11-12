@@ -454,7 +454,7 @@ namespace OthelloAI.GA
                     list.Add(new TupleB<T>(g.Genome, g.Size, info));
                 }
                 Tuples[i] = list.OrderBy(t => t.TupleBit).ToArray();
-                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArray(new BoardHasherMask(t.TupleBit))).ToArray());
+                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t.TupleBit)).ToArray());
             }
 
             Weights = new WeightsStagebased(weights);

@@ -17,8 +17,8 @@ namespace OthelloAI
         }
 
         public abstract void Reset();
-        public abstract int Eval(Board b);
-        public abstract float EvalTraining(Board b);
+        public abstract int Eval(RotatedAndMirroredBoards b);
+        public abstract float EvalTraining(RotatedAndMirroredBoards b);
         public abstract int NumOfEvaluation(int n_discs);
 
         public abstract void UpdataEvaluation(Board board, float add, float range);
@@ -73,12 +73,12 @@ namespace OthelloAI
                 w.UpdataEvaluation(board, add, range);
         }
 
-        public override int Eval(Board b)
+        public override int Eval(RotatedAndMirroredBoards b)
         {
             return Weights.Sum(w => w.Eval(b));
         }
 
-        public override float EvalTraining(Board b)
+        public override float EvalTraining(RotatedAndMirroredBoards b)
         {
             return Weights.Sum(w => w.EvalTraining(b));
         }
@@ -147,14 +147,14 @@ namespace OthelloAI
             GetCurrentWeights(board).UpdataEvaluation(board, add, range);
         }
 
-        public override int Eval(Board b)
+        public override int Eval(RotatedAndMirroredBoards b)
         {
-            return GetCurrentWeights(b).Eval(b);
+            return GetCurrentWeights(b.rot0).Eval(b);
         }
 
-        public override float EvalTraining(Board b)
+        public override float EvalTraining(RotatedAndMirroredBoards b)
         {
-            return GetCurrentWeights(b).EvalTraining(b);
+            return GetCurrentWeights(b.rot0).EvalTraining(b);
         }
 
         public override int NumOfEvaluation(int n_discs)
@@ -188,7 +188,7 @@ namespace OthelloAI
         public float[] weights;
         byte[] weights_b;
 
-        readonly int[][] pos = new int[8][];
+        readonly int[] pos;
 
         public override float[] GetWeights() => weights;
 
@@ -196,13 +196,8 @@ namespace OthelloAI
 
         public WeightsArrayS(ulong m)
         {
-            var boards = new RotatedAndMirroredBoards(new Board(m, 0));
-            foreach((var b, var i) in boards.Select((b, i) => (b, i)))
-            {
-                pos[i] = BoardHasherMask.MaskToPositions(b.bitB);
-            }
-
-            Hasher = new BoardHasherScanning(pos[0]);
+            pos = BoardHasherMask.MaskToPositions(m);
+            Hasher = new BoardHasherScanning(pos);
             NumOfStates = Hasher.NumOfStates;
 
             Reset();
@@ -214,13 +209,13 @@ namespace OthelloAI
             weights_b = new byte[Hasher.ArrayLength];
         }
 
-        public int Hash(Board board, int idx)
+        public int Hash(Board board)
         {
             int hash = 0;
 
-            for (int i = 0; i < pos[idx].Length; i++)
+            for (int i = 0; i < pos.Length; i++)
             {
-                int p = pos[idx][i];
+                int p = pos[i];
 
                 hash *= 3;
                 hash += (int)((board.bitB >> p) & 1);
@@ -229,26 +224,26 @@ namespace OthelloAI
             return hash;
         }
 
-        public int Eval(Board b, int i)
+        public int Eval(Board b)
         {
-            return weights_b[Hash(b, i)];
+            return weights_b[Hash(b)];
         }
 
-        public override int Eval(Board b)
+        public override int Eval(RotatedAndMirroredBoards b)
         {
-            return Eval(b, 0) + Eval(b, 1) + Eval(b, 2) + Eval(b, 3)
-                + Eval(b, 4) + Eval(b, 5) + Eval(b, 6) + Eval(b, 7) - 128 * 8;
+            return Eval(b.rot0) + Eval(b.rot90) + Eval(b.rot180) + Eval(b.rot270)
+                + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.inv_rot180) + Eval(b.inv_rot270) - 128 * 8;
         }
 
-        public float EvalTraining_(Board b, int i)
+        public float EvalTraining(Board b)
         {
-            return weights[Hash(b, i)];
+            return weights[Hash(b)];
         }
 
-        public override float EvalTraining(Board b)
+        public override float EvalTraining(RotatedAndMirroredBoards b)
         {
-            return EvalTraining_(b, 0) + EvalTraining_(b, 1) + EvalTraining_(b, 2) + EvalTraining_(b, 3)
-                + EvalTraining_(b, 4) + EvalTraining_(b, 5) + EvalTraining_(b, 6) + EvalTraining_(b, 7);
+            return EvalTraining(b.rot0) + EvalTraining(b.rot90) + EvalTraining(b.rot180) + EvalTraining(b.rot270)
+                + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.inv_rot180) + EvalTraining(b.inv_rot270);
         }
 
         public override int NumOfEvaluation(int n_discs) => 8;
@@ -335,23 +330,21 @@ namespace OthelloAI
             return weights_b[idx];
         }
 
-        public override int Eval(Board board)
+        public override int Eval(RotatedAndMirroredBoards b)
         {
-            var b = new RotatedAndMirroredBoards(board);
             return Eval_(b.rot0) + Eval_(b.inv_rot0) + Eval_(b.rot90) + Eval_(b.inv_rot90)
                 + Eval_(b.rot180) + Eval_(b.inv_rot180) + Eval_(b.rot270) + Eval_(b.inv_rot270) - 128 * 8;
         }
 
-        public float EvalTraining__(Board b)
+        public float EvalTraining_(Board b)
         {
             return weights[Hasher.Hash(b)];
         }
 
-        public override float EvalTraining(Board board)
+        public override float EvalTraining(RotatedAndMirroredBoards b)
         {
-            var b = new RotatedAndMirroredBoards(board);
-            return EvalTraining__(b.rot0) + EvalTraining__(b.inv_rot0) + EvalTraining__(b.rot90) + EvalTraining__(b.inv_rot90) +
-                EvalTraining__(b.rot180) + EvalTraining__(b.inv_rot180) + EvalTraining__(b.rot270) + EvalTraining__(b.inv_rot270);
+            return EvalTraining_(b.rot0) + EvalTraining_(b.inv_rot0) + EvalTraining_(b.rot90) + EvalTraining_(b.inv_rot90) +
+                EvalTraining_(b.rot180) + EvalTraining_(b.inv_rot180) + EvalTraining_(b.rot270) + EvalTraining_(b.inv_rot270);
         }
 
         public override int NumOfEvaluation(int n_discs) => 8;
@@ -396,128 +389,6 @@ namespace OthelloAI
                 uint index = Hasher.ConvertStateToHash(i);
 
                 float e = weights[index];
-                writer.Write(e);
-            }
-        }
-    }
-
-    public class WeightsArray : Weight
-    {
-        public BoardHasher Hasher { get; }
-        public SymmetricType Type { get; set; }
-
-        public float[] Weights { get; private set; }
-        protected byte[] WeightsB { get; private set; }
-
-        public override float[] GetWeights() => Weights;
-
-        public int NumOfStates { get; }
-
-        public WeightsArray(BoardHasher hasher)
-        {
-            Hasher = hasher;
-            NumOfStates = Hasher.NumOfStates;
-
-            Type = Hasher.SymmetricType;
-
-            Reset();
-        }
-
-        public override void Reset()
-        {
-            Weights = new float[Hasher.ArrayLength];
-            WeightsB = new byte[Hasher.ArrayLength];
-        }
-
-        public int Eval_(Board b)
-        {
-            return WeightsB[Hasher.Hash(b)];
-        }
-
-        public override int Eval(Board board)
-        {
-            var b = new RotatedAndMirroredBoards(board);
-
-            return Type switch
-            {
-                SymmetricType.X_SYMMETRIC => Eval_(b.rot0) + Eval_(b.inv_rot0) + Eval_(b.inv_rot90) + Eval_(b.rot270) - 128 * 4,
-                SymmetricType.XY_SYMMETRIC => Eval_(b.rot0) + Eval_(b.inv_rot0) + Eval_(b.inv_rot90) + Eval_(b.rot90) - 128 * 4,
-                SymmetricType.DIAGONAL => Eval_(b.rot0) + Eval_(b.inv_rot0) - 128 * 2,
-                SymmetricType.ASYMMETRIC => Eval_(b.rot0) + Eval_(b.inv_rot0) + Eval_(b.rot90) + Eval_(b.inv_rot90) +
-                                                            Eval_(b.rot180) + Eval_(b.inv_rot180) + Eval_(b.rot270) + Eval_(b.inv_rot270) - 128 * 8,
-                _ => throw new NotImplementedException(),
-            };
-        }
-
-        public float EvalTraining__(Board b)
-        {
-            return Weights[Hasher.Hash(b)];
-        }
-
-        public override float EvalTraining(Board board)
-        {
-            var b = new RotatedAndMirroredBoards(board);
-
-            return Type switch
-            {
-                SymmetricType.X_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot270),
-                SymmetricType.XY_SYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot90),
-                SymmetricType.DIAGONAL => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0),
-                SymmetricType.ASYMMETRIC => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.rot90) + EvalTraining(b.inv_rot90) +
-                                                            EvalTraining(b.rot180) + EvalTraining(b.inv_rot180) + EvalTraining(b.rot270) + EvalTraining(b.inv_rot270),
-                _ => throw new NotImplementedException(),
-            };
-        }
-
-        public override int NumOfEvaluation(int n_discs) => Type switch
-        {
-            SymmetricType.X_SYMMETRIC => 4,
-            SymmetricType.XY_SYMMETRIC => 4,
-            SymmetricType.DIAGONAL => 2,
-            SymmetricType.ASYMMETRIC => 8,
-            _ => throw new NotImplementedException(),
-        };
-
-        public override void UpdataEvaluation(Board board, float add, float range)
-        {
-            int hash = Hasher.Hash(board);
-            int flipped = Hasher.FlipHash(hash);
-
-            Weights[hash] += add;
-            Weights[flipped] -= add;
-
-            WeightsB[hash] = ConvertToInt8(Weights[hash], range);
-            WeightsB[flipped] = ConvertToInt8(Weights[flipped], range);
-        }
-
-        public override void ApplyTrainedEvaluation(float range)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-                WeightsB[index] = ConvertToInt8(Weights[index], range);
-            }
-        }
-
-        public override void Read(BinaryReader reader)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                float e = reader.ReadSingle();
-
-                uint index = Hasher.ConvertStateToHash(i);
-                Weights[index] = e;
-                WeightsB[index] = ConvertToInt8(Weights[index], WEIGHT_RANGE);
-            }
-        }
-
-        public override void Write(BinaryWriter writer)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-
-                float e = Weights[index];
                 writer.Write(e);
             }
         }

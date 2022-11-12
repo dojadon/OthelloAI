@@ -261,6 +261,7 @@ namespace OthelloAI
 
         public List<float> Times { get; } = new List<float>();
         public long SearchedNodeCount { get; set; }
+        public double TakenTime { get; set; }
         public int[] NodeCount { get; } = new int[10];
         public int[] PrunedNodeCount { get; } = new int[10];
 
@@ -269,7 +270,7 @@ namespace OthelloAI
             Evaluator = evaluator;
         }
 
-        protected float EvalFinishedGame(Board board)
+        protected static float EvalFinishedGame(Board board)
         {
             // SearchedNodeCount++;
             return board.GetStoneCountGap() * 10000;
@@ -289,15 +290,13 @@ namespace OthelloAI
             }
         }
 
-        public float CorrectEvaluation(float e)
+        public static float CorrectEvaluation(float e)
         {
             if (Math.Abs(e) >= 10000)
                 return e / 10000;
             else
                 return e * Weight.WEIGHT_RANGE / 127.0F;
         }
-
-        int color = 0;
 
         public override (int x, int y, ulong move) DecideMove(Board board, int stone)
         {
@@ -314,7 +313,6 @@ namespace OthelloAI
                 PrunedNodeCount[i] = 0;
             }
 
-            color = stone;
             if (stone == -1)
                 board = board.ColorFliped();
 
@@ -322,6 +320,8 @@ namespace OthelloAI
 
             ulong result = 0;
             float e = 0;
+
+            var timer = System.Diagnostics.Stopwatch.StartNew();
 
             foreach(var param in Params.OrderByDescending(p => p.stage))
             {
@@ -334,6 +334,9 @@ namespace OthelloAI
                 (result, e) = SolveRoot(board, param);
                 break;
             }
+
+            timer.Stop();
+            TakenTime = (double) timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
             (int x, int y) = Board.ToPos(result);
 
