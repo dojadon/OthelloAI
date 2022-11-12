@@ -27,7 +27,7 @@ namespace OthelloAI
         {
             WEIGHT.Load("e.dat");
 
-            var t = Tester.TestError(WEIGHT, Enumerable.Range(0, 4).Select(i => i * 2F), 10000);
+            var t = Tester.TestError(WEIGHT, Enumerable.Range(0, 7).Select(i => i * 1F), 5000);
             var a = np.array(t).mean(0);
 
             var log = $"G:/マイドライブ/Lab/test/log_s_err_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";

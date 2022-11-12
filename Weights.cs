@@ -10,12 +10,6 @@ namespace OthelloAI
     {
         public const float WEIGHT_RANGE = 10;
 
-        public static Weight Create(BoardHasher hasher, int n_stages)
-        {
-            Weight[] weights_stage = Enumerable.Range(0, n_stages).Select(_ => new WeightsArray(hasher)).ToArray();
-            return new WeightsStagebased(weights_stage);
-        }
-
         public abstract void Reset();
         public abstract int Eval(RotatedAndMirroredBoards b);
         public abstract float EvalTraining(RotatedAndMirroredBoards b);

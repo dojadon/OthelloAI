@@ -328,10 +328,10 @@ namespace OthelloAI
                 if (board.n_stone < param.stage)
                     continue;
 
-                if (param.Depth(board.n_stone) <= 0)
+                if (param.Depth(board.n_stone) <= 1E-5)
                     e = Eval(board);
-
-                (result, e) = SolveRoot(board, param);
+                else
+                    (result, e) = SolveRoot(board, param);
                 break;
             }
 
