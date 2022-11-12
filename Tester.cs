@@ -1,9 +1,12 @@
-﻿using System;
+﻿using MathNet.Numerics.Distributions;
+using NumSharp;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Diagnostics;
-using NumSharp;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -136,10 +139,58 @@ namespace OthelloAI
             File.WriteAllText($"FFO_Test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv", export);
         }
 
+        public static void TestA()
+        {
+            var weight = Program.WEIGHT;
+            weight.Load("e.dat");
+
+            var e1 = new EvaluatorWeightsBased(weight);
+            var e2 = new EvaluatorRandomize(e1, 80 / 10 * 127);
+
+            PlayerAI p1 = new PlayerAI(e1)
+            {
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 6),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                PrintInfo = false,
+            };
+
+            PlayerAI p2 = new PlayerAI(e2)
+            {
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 8),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                PrintInfo = false,
+            };
+
+            int count = 0;
+            int w1 = 0;
+
+            Parallel.For(0, 500, i =>
+            {
+                int result;
+                if (i % 2 == 0)
+                {
+                    result = PlayGame(p1, p2, CreateRandomGame(5)).GetStoneCountGap();
+                }
+                else
+                {
+                    result = -PlayGame(p2, p1, CreateRandomGame(5)).GetStoneCountGap();
+                }
+
+                if (result == 0)
+                    return;
+
+                Interlocked.Add(ref count, 1);
+                if (result > 0)
+                    Interlocked.Add(ref w1, 1);
+
+                Console.WriteLine($"{w1}, {count - w1}");
+            });
+        }
+
         public static void TestB()
         {
-            Weight weight = null;
-            // weight.Load();
+            var weight = Program.WEIGHT;
+            weight.Load("e.dat");
 
             int n = 8;
 
@@ -154,8 +205,6 @@ namespace OthelloAI
                         PrintInfo = false,
                     };
 
-                    // p1.Depth_Prob = i * 0.2F;
-
                     PlayerAI p2 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
                         Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: j),
@@ -163,11 +212,9 @@ namespace OthelloAI
                         PrintInfo = false,
                     };
 
-                    // p2.Depth_Prob = j * 0.2F;
-
                     double avg = Enumerable.Range(0, 500).AsParallel().Select(i =>
                     {
-                        return PlayGame(p1, p2, CreateRandomGame(8)).GetStoneCountGap() switch
+                        return PlayGame(p1, p2, CreateRandomGame(5)).GetStoneCountGap() switch
                         {
                             < 0 => 0,
                             > 0 => 1,

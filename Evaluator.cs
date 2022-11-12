@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MathNet.Numerics.Distributions;
 
 namespace OthelloAI
 {
     public abstract class Evaluator
     {
-        public abstract int Eval(Board board);
+        public abstract float Eval(Board board);
 
         public abstract float EvalTraining(Board board);
 
@@ -26,7 +27,7 @@ namespace OthelloAI
             Weights = weights;
         }
 
-        public override int Eval(Board board)
+        public override float Eval(Board board)
         {
             return Weights.Eval(new RotatedAndMirroredBoards(board));
         }
@@ -34,6 +35,28 @@ namespace OthelloAI
         public override float EvalTraining(Board board)
         {
             return Weights.EvalTraining(new RotatedAndMirroredBoards(board));
+        }
+    }
+
+    public class EvaluatorRandomize : Evaluator
+    {
+        public Evaluator Evaluator { get; }
+        public float V { get; }
+
+        public EvaluatorRandomize(Evaluator evaluator, float v)
+        {
+            Evaluator = evaluator;
+            V = v;
+        }
+
+        public override float Eval(Board board)
+        {
+            return Evaluator.Eval(board) + (float) Normal.Sample(Program.Random, 0, V);
+        }
+
+        public override float EvalTraining(Board board)
+        {
+            return Evaluator.EvalTraining(board);
         }
     }
 
@@ -63,7 +86,7 @@ namespace OthelloAI
             return Evaluators[^1].e;
         }
 
-        public override int Eval(Board board)
+        public override float Eval(Board board)
         {
             return Current.Eval(board);
         }
@@ -96,7 +119,7 @@ namespace OthelloAI
             return Evaluators[Rand.Next(Evaluators.Length)];
         }
 
-        public override int Eval(Board board)
+        public override float Eval(Board board)
         {
             return Current.Eval(board);
         }

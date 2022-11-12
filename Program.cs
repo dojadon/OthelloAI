@@ -25,6 +25,8 @@ namespace OthelloAI
 
         static void Main()
         {
+            Tester.TestB();
+            return;
             WEIGHT.Load("e.dat");
 
             var t = Tester.TestError(WEIGHT, Enumerable.Range(0, 7).Select(i => i * 1F), 5000);
