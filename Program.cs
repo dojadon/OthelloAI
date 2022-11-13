@@ -11,9 +11,6 @@ namespace OthelloAI
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
 
-        public const int NUM_STAGES = 1;
-        public const bool LOAD = false;
-
         public static readonly Weight WEIGHT_EDGE2X = new WeightsArrayR(0b01000010_11111111UL);
         public static readonly Weight WEIGHT_EDGE_BLOCK = new WeightsArrayR(0b00000111_00000111_00000111UL);
         public static readonly Weight WEIGHT_CORNER_BLOCK = new WeightsArrayR(0b00000001_00000001_00000001_00000011_00011111UL);
@@ -25,11 +22,12 @@ namespace OthelloAI
 
         static void Main()
         {
-            Tester.TestB();
+            Tester.TestError2();
             return;
+
             WEIGHT.Load("e.dat");
 
-            var t = Tester.TestError(WEIGHT, Enumerable.Range(0, 7).Select(i => i * 1F), 5000);
+            var t = Tester.TestError(WEIGHT, new [] { 4F, 6F }, 0, 1000);
             var a = np.array(t).mean(0);
 
             var log = $"G:/マイドライブ/Lab/test/log_s_err_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";

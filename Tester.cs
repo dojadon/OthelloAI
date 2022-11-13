@@ -1,5 +1,4 @@
-﻿using MathNet.Numerics.Distributions;
-using NumSharp;
+﻿using NumSharp;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -144,20 +143,21 @@ namespace OthelloAI
             var weight = Program.WEIGHT;
             weight.Load("e.dat");
 
-            var e1 = new EvaluatorWeightsBased(weight);
-            var e2 = new EvaluatorRandomize(e1, 80 / 10 * 127);
+            var e = new EvaluatorWeightsBased(weight);
+            var e1 = new EvaluatorRandomize(e, 20 / 10 * 127);
+            var e2 = new EvaluatorRandomize(e, 70 / 10 * 127);
 
             PlayerAI p1 = new PlayerAI(e1)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 6),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 4),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
 
             PlayerAI p2 = new PlayerAI(e2)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 8),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 6),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
 
@@ -308,7 +308,7 @@ namespace OthelloAI
             }
         }
 
-        public static float[][][] TestError(Weight weight, IEnumerable<float> depths, int n_games)
+        public static float[][][] TestError(Weight weight, IEnumerable<float> depths, int depth_index, int n_games)
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
@@ -323,7 +323,7 @@ namespace OthelloAI
                 if (i % 100 == 0)
                     Console.WriteLine(i);
 
-                (var board, var t) = TestError(players);
+                (var board, var t) = TestError(players, depth_index);
 
                 int result = board.GetStoneCountGap();
                 float Error(float e) => (e - result) * (e - result);
@@ -332,12 +332,40 @@ namespace OthelloAI
             }).ToArray();
         }
 
-        public static (Board b, float[][] e) TestError(PlayerAI[] players)
+        public static (Board b, float[][] e) TestError(PlayerAI[] players, int index)
         {
-            return PlayGame(players[^1], players[^1], CreateRandomGame(8), r =>
+            return PlayGame(players[index], players[index], CreateRandomGame(8), r =>
             {
-                return players[0..^1].Select(p => p.DecideMoveWithEvaluation(r.prev_board, r.color).e * r.color).Concat(new[] { r.evaluation * r.color }).ToArray();
+                return players.Select((p, i) => r.color * (i == index ? r.evaluation : p.DecideMoveWithEvaluation(r.prev_board, r.color).e)).ToArray();
             }, () => new float[players.Length]);
+        }
+
+        public static void TestError2()
+        {
+            var weight = Program.WEIGHT;
+            var depths = Enumerable.Range(0, 6).Select(i => i * 2);
+
+            weight.Load(@"G:\マイドライブ\Lab\e\e.dat");
+
+            var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
+            {
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)
+                },
+                PrintInfo = false,
+            }).ToArray();
+
+            var e = WthorRecordReader.Read(@"G:\マイドライブ\Lab\WTH\WTH_2001.wtb").AsParallel().Where(t => t.boards.Count > 35).Select(t =>
+            {
+                float Err(float e) => (e - t.result) * (e - t.result);
+
+                var b = t.boards[35];
+                return players.Select(p => p.DecideMoveWithEvaluation(b, 1).e).Select(Err).ToArray();
+            }).ToArray();
+
+            var ee = Enumerable.Range(0, players.Length).Select(i => e.Select(a => a[i]).Average());
+
+            Console.WriteLine(string.Join(", ", ee));
         }
 
         public static double[] TestEvaluationTime(int n_times, IEnumerable<int> sizes, string type)
