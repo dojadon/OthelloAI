@@ -343,7 +343,7 @@ namespace OthelloAI.GA
 
             for (int i = 0; i < NumGames / 16; i++)
             {
-                var data = TrainerUtil.PlayForTraining(16, player, rand, false);
+                var data = TrainerUtil.PlayForTraining(16, player, rand);
                 data.ForEach(t => trainer.Update(t.board, t.result));
             }
 

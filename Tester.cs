@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 
 namespace OthelloAI
 {
@@ -80,18 +81,30 @@ namespace OthelloAI
 
         public static Board CreateRandomGame(int num_moves, Random rand)
         {
-            Board Step(Board b)
+            return CreateRandomGame(num_moves, rand, Board.Init);
+        }
+
+        public static Board CreateRandomGame(int num_moves, Random rand, Board init)
+        {
+            Board board = init;
+
+            Player player = new PlayerRandom(rand);
+            int n = 0;
+
+            bool Step(int stone)
             {
-                Move[] moves = new Move(b).NextMoves();
-                Move move = moves[rand.Next(moves.Length)];
-                return move.reversed;
+                (_, _, ulong move) = player.DecideMove(board, stone);
+
+                if (move != 0)
+                {
+                    board = board.Reversed(move, stone);
+                    return ++n < num_moves;
+                }
+                return false;
             }
 
-            Board board = Board.Init;
-
-            for (int i = 0; i < num_moves; i++)
+            while (Step(1) | Step(-1))
             {
-                board = Step(board);
             }
 
             return board;

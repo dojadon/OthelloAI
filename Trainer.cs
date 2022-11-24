@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -12,7 +11,7 @@ namespace OthelloAI
         {
         }
 
-        public TrainingData(List<TrainingDataElement> data)
+        public TrainingData(IEnumerable<TrainingDataElement> data)
         {
             AddRange(data);
         }
@@ -44,10 +43,15 @@ namespace OthelloAI
     {
         public static TrainingData PlayForTrainingParallel(int n_game, Player player)
         {
-            return PlayForTrainingParallel(n_game, player, false);
+            return new TrainingData(PlayForTrainingParallelSeparated(n_game, player).SelectMany(x => x));
         }
 
-        public static TrainingData PlayForTrainingParallel(int n_game, Player player, bool bi_result)
+        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player)
+        {
+            return PlayForTrainingParallelSeparated(n_game, player, player, rand => Tester.CreateRandomGame(6, rand));
+        }
+
+        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player1, Player player2, Func<Random, Board> createInitBoard)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -63,11 +67,7 @@ namespace OthelloAI
 
             int GetResult(Board b)
             {
-                int r = b.GetStoneCountGap();
-                if (!bi_result)
-                    return r;
-
-                return Math.Max(-1, Math.Min(1, r));
+                return b.GetStoneCountGap();
             }
 
             int count = 0;
@@ -79,10 +79,10 @@ namespace OthelloAI
 
                 while (count < n_game)
                 {
-                    Board board = Tester.CreateRandomGame(8, rand);
+                    Board board = createInitBoard(rand);
                     List<Board> boards = new List<Board>();
 
-                    while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
+                    while (Step(ref board, boards, player1, 1) | Step(ref board, boards, player2, -1))
                     {
                     }
                     results.Add(boards, GetResult(board));
@@ -91,12 +91,12 @@ namespace OthelloAI
                 }
 
                 return results;
-            }).ToList().SelectMany(d => d);
-
-            return new TrainingData(data.ToList());
+            }).ToList();
+            
+            return data.Select(d => new TrainingData(d)).ToArray();
         }
 
-        public static TrainingData PlayForTraining(int n_game, Player player, Random rand, bool bi_result)
+        public static TrainingData PlayForTraining(int n_game, Player player, Random rand)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -112,11 +112,7 @@ namespace OthelloAI
 
             int GetResult(Board b)
             {
-                int r = b.GetStoneCountGap();
-                if (!bi_result)
-                    return r;
-
-                return Math.Max(-1, Math.Min(1, r));
+                return b.GetStoneCountGap();
             }
 
             var results = new TrainingData();
@@ -186,6 +182,58 @@ namespace OthelloAI
             }
 
             return trainer.Log;
+        }
+
+        public static List<int> Train(int n_games)
+        {
+            ulong[] masks = new[] { 0b01000010_11111111UL, 0b00000111_00000111_00000111UL,
+                0b00000001_00000001_00000001_00000011_00011111UL, 0b11111111UL, 0b11111111_00000000UL };
+
+            Weight weight1 = new WeightsSum(masks.Select(m => new WeightsArrayR(m)).ToArray());
+            Weight weight2 = new WeightsSum(masks.Select(m => new WeightsStagebased(Enumerable.Range(0, 4).Select(_ => new WeightsArrayR(m)).ToArray())).ToArray());
+
+            Player player1 = new PlayerAI(new EvaluatorWeightsBased(weight1))
+            {
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 1),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                PrintInfo = false,
+            };
+
+            Player player2 = new PlayerAI(new EvaluatorWeightsBased(weight2))
+            {
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 5),
+                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                PrintInfo = false,
+            };
+
+            var trainer1 = new Trainer(weight1, 0.001F);
+            var trainer2 = new Trainer(weight2, 0.001F);
+
+            Board init = new Board(Board.InitB | 9295429630892703873UL, Board.InitW);
+
+            var results = new List<int>();
+
+            for (int i = 0; i < n_games / 16; i++)
+            {
+                var data = TrainerUtil.PlayForTrainingParallelSeparated(16, player1, player2, rand => Tester.CreateRandomGame(6, rand, init));
+
+                foreach (var t in data.SelectMany(d => d))
+                {
+                    trainer1.Update(t.board, t.result);
+                    trainer2.Update(t.board, t.result);
+                }
+
+                results.AddRange(data.Where(d => d.Count > 0).Select(d => d[^1].result > 0 ? 1 : -1));
+                Console.WriteLine($"{results.TakeLast(1000).Average():f3}, {trainer1.Log.TakeLast(10000).Average():f2}, {trainer2.Log.TakeLast(10000).Average():f2}");
+
+                if(i % 100 == 0)
+                {
+                    weight1.Save("e1.dat");
+                    weight2.Save("e2.dat");
+                }
+            }
+
+            return results;
         }
     }
 }

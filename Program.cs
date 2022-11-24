@@ -22,6 +22,9 @@ namespace OthelloAI
 
         static void Main()
         {
+            Trainer.Train(1000000);
+            return;
+
             Tester.TestError2();
             return;
 

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -252,6 +250,22 @@ namespace OthelloAI
         }
     }
 
+    public class SearcehdOneMoveEventArg
+    {
+        public ulong Move { get; }
+        public bool Pruned { get; }
+        public float Eval { get; }
+        public float Depth { get; }
+
+        public SearcehdOneMoveEventArg(ulong move, bool pruned, float eval, float depth)
+        {
+            Move = move;
+            Pruned = pruned;
+            Eval = PlayerAI.CorrectEvaluation(eval);
+            Depth = depth;
+        }
+    }
+
     public class PlayerAI : Player
     {
         public const int INF = 10000000;
@@ -264,6 +278,9 @@ namespace OthelloAI
         public double TakenTime { get; set; }
         public int[] NodeCount { get; } = new int[10];
         public int[] PrunedNodeCount { get; } = new int[10];
+
+        public delegate void SearcehdOneMoveEventHandler(object sender, SearcehdOneMoveEventArg e);
+        public event SearcehdOneMoveEventHandler SearcehdOneMoveEvent;
 
         public PlayerAI(Evaluator evaluator)
         {
@@ -307,11 +324,6 @@ namespace OthelloAI
         public (int x, int y, ulong move, float e) DecideMoveWithEvaluation(Board board, int stone)
         {
             SearchedNodeCount = 0;
-            for(int i = 0; i < NodeCount.Length; i++)
-            {
-                NodeCount[i] = 0;
-                PrunedNodeCount[i] = 0;
-            }
 
             if (stone == -1)
                 board = board.ColorFliped();
@@ -323,7 +335,7 @@ namespace OthelloAI
 
             var timer = System.Diagnostics.Stopwatch.StartNew();
 
-            foreach(var param in Params.OrderByDescending(p => p.stage))
+            foreach (var param in Params.OrderByDescending(p => p.stage))
             {
                 if (board.n_stone < param.stage)
                     continue;
@@ -336,7 +348,7 @@ namespace OthelloAI
             }
 
             timer.Stop();
-            TakenTime = (double) timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
+            TakenTime = (double)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
             (int x, int y) = Board.ToPos(result);
 
@@ -350,10 +362,10 @@ namespace OthelloAI
             _ => (0, 0)
         };
 
-        public (ulong , float) SolveIterativeDeepening(Board board, CutoffParameters param, float depth, int interval, int times)
+        public (ulong, float) SolveIterativeDeepening(Board board, CutoffParameters param, float depth, int interval, int times)
         {
             var search = new Search(param);
-            float d = depth - interval * Math.Min(times - 1, (int) Math.Ceiling((double) depth / interval) - 1);
+            float d = depth - interval * Math.Min(times - 1, (int)Math.Ceiling((double)depth / interval) - 1);
 
             while (true)
             {
@@ -436,7 +448,10 @@ namespace OthelloAI
             float alpha = max;
 
             if (PrintInfo)
+            {
                 Console.WriteLine($"{Board.ToPos(result.move)} : {max}");
+                SearcehdOneMoveEvent?.Invoke(this, new SearcehdOneMoveEventArg(result.move, false, max, depth));
+            }
 
             for (int i = 1; i < array.Length; i++)
             {
@@ -451,11 +466,15 @@ namespace OthelloAI
                     alpha = Math.Max(alpha, eval);
 
                     if (PrintInfo)
+                    {
                         Console.WriteLine($"{Board.ToPos(move.move)} : {eval}");
+                        SearcehdOneMoveEvent?.Invoke(this, new SearcehdOneMoveEventArg(move.move, false, eval, depth));
+                    }
                 }
                 else if (PrintInfo)
                 {
                     Console.WriteLine($"{Board.ToPos(move.move)} : Pruned");
+                    SearcehdOneMoveEvent?.Invoke(this, new SearcehdOneMoveEventArg(move.move, true, eval, depth));
                 }
 
                 if (max < eval)
@@ -503,7 +522,7 @@ namespace OthelloAI
 
                     if (beta <= eval)
                     {
-                       // ProbcutNode2[depth]++;
+                        // ProbcutNode2[depth]++;
                         return eval;
                     }
 
@@ -536,11 +555,11 @@ namespace OthelloAI
                     alpha = eval;
                     eval = -Solve(search, move, depth - 1, -beta, -alpha);
 
-                   // ProbcutNode1[depth]++;
+                    // ProbcutNode1[depth]++;
 
                     if (beta <= eval)
                     {
-                       // ProbcutNode2[depth]++;
+                        // ProbcutNode2[depth]++;
                         return eval;
                     }
 
@@ -595,7 +614,7 @@ namespace OthelloAI
             if (search.IsCanceled)
                 return -1000000;
 
-            if(0 < depth && depth < 1)
+            if (0 < depth && depth < 1)
             {
                 if (depth > GA.GATest.Random.NextDouble())
                     depth = 1;
