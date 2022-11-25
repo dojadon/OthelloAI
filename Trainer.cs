@@ -186,30 +186,38 @@ namespace OthelloAI
 
         public static List<int> Train(int n_games)
         {
-            ulong[] masks = new[] { 0b01000010_11111111UL, 0b00000111_00000111_00000111UL,
-                0b00000001_00000001_00000001_00000011_00011111UL, 0b11111111UL, 0b11111111_00000000UL };
+            ulong[] masks = new[] {
+                0b11000011_01111110UL,
+                0b00000001_00000111_00000111_00001110UL,
+                0b00000001_00000001_00000001_00000011_00011110UL,
+                0b00111100_01111110UL,
+                0b11111111_00000000UL };
 
             Weight weight1 = new WeightsSum(masks.Select(m => new WeightsArrayR(m)).ToArray());
             Weight weight2 = new WeightsSum(masks.Select(m => new WeightsStagebased(Enumerable.Range(0, 4).Select(_ => new WeightsArrayR(m)).ToArray())).ToArray());
 
             Player player1 = new PlayerAI(new EvaluatorWeightsBased(weight1))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 1),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 2),
+                                              new SearchParameters(stage: 56, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
 
             Player player2 = new PlayerAI(new EvaluatorWeightsBased(weight2))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 5),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 7),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
+
+            weight1.Load("e1.dat");
+            weight2.Load("e2.dat");
 
             var trainer1 = new Trainer(weight1, 0.001F);
             var trainer2 = new Trainer(weight2, 0.001F);
 
-            Board init = new Board(Board.InitB | 9295429630892703873UL, Board.InitW);
+            // Board init = new Board(Board.InitB | 0b10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000001UL, Board.InitW);
+            Board init = new Board(Board.InitB | 0b10000001_00000000_00000000_00000000_00000000_00000000_00000000_10000001UL, Board.InitW);
 
             var results = new List<int>();
 
@@ -223,8 +231,8 @@ namespace OthelloAI
                     trainer2.Update(t.board, t.result);
                 }
 
-                results.AddRange(data.Where(d => d.Count > 0).Select(d => d[^1].result > 0 ? 1 : -1));
-                Console.WriteLine($"{results.TakeLast(1000).Average():f3}, {trainer1.Log.TakeLast(10000).Average():f2}, {trainer2.Log.TakeLast(10000).Average():f2}");
+                results.AddRange(data.Where(d => d.Count > 0).Select(d => d[^1].result > 0 ? 1 : 0));
+                Console.WriteLine($"{results.TakeLast(10000).Average():f3}, {trainer1.Log.TakeLast(1000000).Average():f2}, {trainer2.Log.TakeLast(1000000).Average():f2}");
 
                 if(i % 100 == 0)
                 {
