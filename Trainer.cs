@@ -186,11 +186,18 @@ namespace OthelloAI
 
         public static List<int> Train(int n_games)
         {
+            //ulong[] masks = new[] {
+            //    0b11000011_01111110UL,
+            //    0b00000001_00000111_00000111_00001110UL,
+            //    0b00000001_00000001_00000001_00000011_00011110UL,
+            //    0b00111100_01111110UL,
+            //    0b11111111_00000000UL };
+
             ulong[] masks = new[] {
-                0b11000011_01111110UL,
-                0b00000001_00000111_00000111_00001110UL,
-                0b00000001_00000001_00000001_00000011_00011110UL,
-                0b00111100_01111110UL,
+                0b01000010_11111111UL,
+                0b00000111_00000111_00000111UL,
+                0b00000001_00000001_00000001_00000011_00011111UL,
+                0b11111111UL,
                 0b11111111_00000000UL };
 
             Weight weight1 = new WeightsSum(masks.Select(m => new WeightsArrayR(m)).ToArray());
@@ -205,7 +212,7 @@ namespace OthelloAI
 
             Player player2 = new PlayerAI(new EvaluatorWeightsBased(weight2))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 7),
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 6),
                                               new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
@@ -216,8 +223,8 @@ namespace OthelloAI
             var trainer1 = new Trainer(weight1, 0.001F);
             var trainer2 = new Trainer(weight2, 0.001F);
 
-            // Board init = new Board(Board.InitB | 0b10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000001UL, Board.InitW);
-            Board init = new Board(Board.InitB | 0b10000001_00000000_00000000_00000000_00000000_00000000_00000000_10000001UL, Board.InitW);
+            Board init = new Board(Board.InitB | 0b10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000001UL, Board.InitW);
+            // Board init = new Board(Board.InitB | 0b10000001_00000000_00000000_00000000_00000000_00000000_00000000_10000001UL, Board.InitW);
 
             var results = new List<int>();
 

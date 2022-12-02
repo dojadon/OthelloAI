@@ -3,10 +3,11 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 namespace OthelloAI
 {
-    public abstract class Weight
+    public abstract class Weight 
     {
         public const float WEIGHT_RANGE = 10;
 
@@ -289,17 +290,21 @@ namespace OthelloAI
 
     public class WeightsArrayR : Weight
     {
+        [XmlIgnore]
         public BoardHasher Hasher { get; }
 
+        [XmlIgnore]
         public  float[] weights;
+
+        [XmlIgnore]
         byte[] weights_b;
 
         readonly ulong mask;
+
+        [XmlIgnore]
         readonly int hash_length;
 
         public override float[] GetWeights() => weights;
-
-        public int NumOfStates { get; }
 
         public WeightsArrayR(ulong m)
         {
@@ -307,7 +312,6 @@ namespace OthelloAI
             hash_length = Board.BitCount(mask);
 
             Hasher = new BoardHasherMask(mask);
-            NumOfStates = Hasher.NumOfStates;
 
             Reset();
         }
@@ -357,7 +361,7 @@ namespace OthelloAI
 
         public override void ApplyTrainedEvaluation(float range)
         {
-            for (int i = 0; i < NumOfStates; i++)
+            for (int i = 0; i < Hasher.NumOfStates; i++)
             {
                 uint index = Hasher.ConvertStateToHash(i);
                 weights_b[index] = ConvertToInt8(weights[index], range);
@@ -366,7 +370,7 @@ namespace OthelloAI
 
         public override void Read(BinaryReader reader)
         {
-            for (int i = 0; i < NumOfStates; i++)
+            for (int i = 0; i < Hasher.NumOfStates; i++)
             {
                 float e = reader.ReadSingle();
 
@@ -378,7 +382,7 @@ namespace OthelloAI
 
         public override void Write(BinaryWriter writer)
         {
-            for (int i = 0; i < NumOfStates; i++)
+            for (int i = 0; i < Hasher.NumOfStates; i++)
             {
                 uint index = Hasher.ConvertStateToHash(i);
 

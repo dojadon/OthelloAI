@@ -210,7 +210,7 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumStages = 5,
+                NumStages = 1,
                 NumTuples = 3,
                 SizeMin = 8,
                 SizeMax = 9,
