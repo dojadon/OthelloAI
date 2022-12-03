@@ -22,10 +22,15 @@ namespace OthelloAI.GA
         {
             var mu = score.OrderBy(s => s.score).Select(s => s.ind).Take(Mu).ToArray();
 
-            var mutants = Enumerable.Range(0, LambdaM).Select(_ => Mutant.Operate(rand.Choice(mu), rand));
-            var crossovers = Enumerable.Range(0, LambdaCX).Select(_ => Crossover.Operate(rand.Choice(mu), rand.Choice(mu), rand));
+            var result = new HashSet<Individual<T>>(mu);
 
-            return mu.MultiConcat(mutants, crossovers).ToList();
+            while (result.Count < Mu + LambdaM)
+                result.Add(Mutant.Operate(rand.Choice(mu), rand));
+
+            while (result.Count < Mu + LambdaM + LambdaCX)
+                result.Add(Crossover.Operate(rand.Choice(mu), rand.Choice(mu), rand));
+
+            return result.ToList();
         }
     }
 
