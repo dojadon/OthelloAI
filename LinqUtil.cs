@@ -26,6 +26,11 @@ namespace OthelloAI
 
     public static class LinqUtil
     {
+        public static IEnumerable<T> MultiConcat<T>(this IEnumerable<T> first, params IEnumerable<T>[] secondAndAfter)
+        {
+            return first.Concat(secondAndAfter.SelectMany(_ => _));
+        }
+
         public static IEnumerable<T> MinBy<T, U>(this IEnumerable<T> source, Func<T, U> selector)
         {
             var lookup = source.ToLookup(selector);

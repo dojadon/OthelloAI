@@ -32,12 +32,39 @@ namespace OthelloAI.GA
         public Individual<T> Operate(Individual<T> ind, Random rand);
     }
 
-    public class Mutant : IGeneticOperator1<float[]>
+    public class MutantBits : IGeneticOperator1<ulong>
+    {
+        public static ulong Mutant(ulong g, ulong mask, Random rand)
+        {
+            int n1 = Board.BitCount(g);
+            int n2 = Board.BitCount(mask) - n1;
+            ulong dist = g;
+
+            dist ^= Bmi2.X64.ParallelBitDeposit(1UL << rand.Next(n1), g);
+            dist |= Bmi2.X64.ParallelBitDeposit(1UL << rand.Next(n2), mask ^ g);
+
+            return dist;
+        }
+
+        public static GenomeGroup<ulong> Mutant(GenomeGroup<ulong> gene, Random rand)
+        {
+            ulong mask = (2UL << gene.Size) - 1;
+            return new GenomeGroup<ulong>(Mutant(gene.Genome, mask, rand), gene.Size);
+        }
+
+        public Individual<ulong> Operate(Individual<ulong> ind, Random rand)
+        {
+            var g = ind.Genome.Select(a => a.Select(g => Mutant(g, rand)).ToArray()).ToArray();
+            return new Individual<ulong>(g, ind.Info);
+        }
+    }
+
+    public class MutantRK : IGeneticOperator1<float[]>
     {
         public float ProbSwapping { get; }
         public float ProbChangingSize { get; }
 
-        public Mutant(float probSwapping, float probChangingSize)
+        public MutantRK(float probSwapping, float probChangingSize)
         {
             ProbSwapping = probSwapping;
             ProbChangingSize = probChangingSize;
@@ -74,6 +101,20 @@ namespace OthelloAI.GA
     public interface IGeneticOperator2<T>
     {
         public Individual<T> Operate(Individual<T> ind1, Individual<T> ind2, Random rand);
+    }
+
+    public class CrossoverExchange<T> : IGeneticOperator2<T>
+    {
+        public GenomeGroup<T>[] Cx(GenomeGroup<T>[] g1, GenomeGroup<T>[] g2, Random rand)
+        {
+            return g1.Zip(g2, (a1, a2) => rand.NextDouble() > 0.5 ? a1 : a2).ToArray();
+        }
+
+        public Individual<T> Operate(Individual<T> ind1, Individual<T> ind2, Random rand)
+        {
+            var gene = ind1.Genome.Zip(ind2.Genome, (g1, g2) => Cx(g1, g2, rand)).ToArray();
+            return new Individual<T>(gene, ind1.Info);
+        }
     }
 
     public class CrossoverEliteBiased : IGeneticOperator2<float[]>

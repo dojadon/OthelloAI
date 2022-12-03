@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using NumSharp;
+using OthelloAI.GA;
 
 namespace OthelloAI
 {
@@ -22,7 +23,7 @@ namespace OthelloAI
 
         static void Main()
         {
-            Trainer.Train(1000000);
+            GATest.TestES();
             return;
 
             Tester.TestError2();

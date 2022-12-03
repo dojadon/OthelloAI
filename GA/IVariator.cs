@@ -9,6 +9,26 @@ namespace OthelloAI.GA
         public List<Individual<T>> Vary(List<U> score, Random rand);
     }
 
+    public class VariatorES<T> : IVariator<T, Score<T>>
+    {
+        public int Mu { get; set; }
+        public int LambdaM { get; set; }
+        public int LambdaCX { get; set; }
+
+        public IGeneticOperator1<T> Mutant { get; set; }
+        public IGeneticOperator2<T> Crossover { get; set; }
+
+        public List<Individual<T>> Vary(List<Score<T>> score, Random rand)
+        {
+            var mu = score.OrderBy(s => s.score).Select(s => s.ind).Take(Mu).ToArray();
+
+            var mutants = Enumerable.Range(0, LambdaM).Select(_ => Mutant.Operate(rand.Choice(mu), rand));
+            var crossovers = Enumerable.Range(0, LambdaCX).Select(_ => Crossover.Operate(rand.Choice(mu), rand.Choice(mu), rand));
+
+            return mu.MultiConcat(mutants, crossovers).ToList();
+        }
+    }
+
     public class VariatorEliteArchiveNSGA2<T> : IVariator<T, ScoreNSGA2<T>>
     {
         public int NumElites { get; set; }

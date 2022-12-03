@@ -133,7 +133,7 @@ namespace OthelloAI.GA
             {
                 gene[i] = new GenomeGroup<T>[reader.ReadInt32()];
 
-                for(int j = 0; j < gene[i].Length; j++)
+                for (int j = 0; j < gene[i].Length; j++)
                 {
                     var g = ReadGenome(reader);
                     int size = reader.ReadInt32();
@@ -162,6 +162,95 @@ namespace OthelloAI.GA
     {
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
+
+        public static void TestES()
+        {
+            var info = new GenomeInfo<ulong>()
+            {
+                NumStages = 1,
+                NumTuples = 2,
+                SizeMin = 8,
+                SizeMax = 8,
+                MaxNumWeights = (int)Math.Pow(3, 8) * 2,
+                GenomeGenerator = () => Random.GenerateRegion(19, 8),
+                Decoder = (g, _) => g,
+                VarianceT = _ => 0,
+            };
+
+            var ga = new GA<ulong, Score<ulong>>()
+            {
+                Info = info,
+                Evaluator = new PopulationEvaluatorRandomTournament<ulong>(new PopulationTrainerCoLearning(1, 54, 6400, true), 2, 54, 100 * 400)
+                {
+                    GetDepthFraction = (_, _, _) => (1, 1)
+                },
+                // Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
+                Variator = new VariatorES<ulong>()
+                {
+                    Mu = 10,
+                    LambdaM = 45,
+                    LambdaCX = 45,
+                    Mutant = new MutantBits(),
+                    Crossover = new CrossoverExchange<ulong>(),
+                },
+
+                IO = new IndividualIO<ulong>()
+                {
+                    Info = info,
+                    ReadGenome = reader => reader.ReadUInt64(),
+                    WriteGenome = (gene, writer) => writer.Write(gene)
+                },
+            };
+
+            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw = File.AppendText(log);
+
+            var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw_v = File.AppendText(log_v);
+
+            // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
+            ga.Run(ga.Init(100), (n_gen, time, pop) =>
+            {
+                var score = pop.MinBy(ind => ind.score).First();
+
+                foreach (var s in pop.OrderBy(s => s.score))
+                {
+                    sw.Write(s.score + ",");
+
+                    foreach (var t in s.ind.Tuples)
+                    {
+                        sw.Write(",," + string.Join(", ", t.Select(t => t.TupleBit)));
+                    }
+                    sw.WriteLine();
+                }
+
+                foreach (var t in score.ind.Tuples)
+                {
+                    ulong[] tuples = t.Select(t => t.TupleBit).ToArray();
+
+                    for (int i = 0; i < tuples.Length / 2.0F; i++)
+                    {
+                        var b1 = tuples[i * 2];
+
+                        if (i * 2 + 1 < tuples.Length)
+                        {
+                            var b2 = tuples[i * 2 + 1];
+                            Console.WriteLine(new Board(b1, Board.HorizontalMirror(b2)));
+                        }
+                        else
+                        {
+                            Console.WriteLine(new Board(b1, 0));
+                        }
+                    }
+                    Console.WriteLine();
+                }
+
+                Console.WriteLine($"Gen : {n_gen}, {time}");
+                Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+
+                sw.Flush();
+            });
+        }
 
         public static void TestBRKGA()
         {
@@ -235,7 +324,7 @@ namespace OthelloAI.GA
                     NumEliteMutants = 10,
                     NumRandomMutants = 10,
                     Crossover = new CrossoverEliteBiased(0.7F),
-                    MutantElite = new Mutant(0.08F, 0.08F),
+                    MutantElite = new MutantRK(0.08F, 0.08F),
                     Generator = info,
                 },
 
@@ -381,7 +470,7 @@ namespace OthelloAI.GA
         }
     }
 
-    public class TupleB<T>
+    public class TupleData<T>
     {
         public T Genome { get; }
         public ulong TupleBit { get; }
@@ -389,7 +478,7 @@ namespace OthelloAI.GA
 
         public int Size { get; }
 
-        public TupleB(T genome, int size, GenomeInfo<T> info)
+        public TupleData(T genome, int size, GenomeInfo<T> info)
         {
             Genome = genome;
             Size = size;
@@ -400,13 +489,13 @@ namespace OthelloAI.GA
 
         public override bool Equals(object obj)
         {
-            if (obj is TupleB<T> t)
+            if (obj is TupleData<T> t)
                 return Equals(t);
 
             return false;
         }
 
-        public bool Equals(TupleB<T> y)
+        public bool Equals(TupleData<T> y)
         {
             if (ReferenceEquals(this, y))
                 return true;
@@ -423,7 +512,7 @@ namespace OthelloAI.GA
     public class Individual<T>
     {
         public GenomeGroup<T>[][] Genome { get; }
-        public TupleB<T>[][] Tuples { get; }
+        public TupleData<T>[][] Tuples { get; }
 
         public Weight Weights { get; }
 
@@ -436,12 +525,12 @@ namespace OthelloAI.GA
             Genome = genome;
             Info = info;
 
-            Tuples = new TupleB<T>[info.NumStages][];
+            Tuples = new TupleData<T>[info.NumStages][];
             var weights = new Weight[info.NumStages];
 
             for (int i = 0; i < genome.Length; i++)
             {
-                var list = new List<TupleB<T>>();
+                var list = new List<TupleData<T>>();
 
                 int n_weights = 0;
                 foreach (var g in Genome[i])
@@ -451,7 +540,7 @@ namespace OthelloAI.GA
 
                     n_weights += g.NumWeights;
 
-                    list.Add(new TupleB<T>(g.Genome, g.Size, info));
+                    list.Add(new TupleData<T>(g.Genome, g.Size, info));
                 }
                 Tuples[i] = list.OrderBy(t => t.TupleBit).ToArray();
                 weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t.TupleBit)).ToArray());
@@ -490,7 +579,7 @@ namespace OthelloAI.GA
             return true;
         }
 
-        public int GetHashCode(IEnumerable<TupleB<T>> tuples)
+        public int GetHashCode(IEnumerable<TupleData<T>> tuples)
         {
             return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next.TupleBit));
         }
