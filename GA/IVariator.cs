@@ -24,14 +24,14 @@ namespace OthelloAI.GA
 
             var result = new HashSet<Individual<T>>(mu);
 
+            for (int i = 0; i < LambdaCX; i++)
+            {
+                result.Add(Crossover.Operate(rand.Choice(mu), rand.Choice(mu), rand));
+            }
+
             while (result.Count < Mu + LambdaM)
             {
                 result.Add(Mutant.Operate(rand.Choice(mu), rand));
-            }
-
-            while (result.Count < Mu + LambdaM + LambdaCX)
-            {
-                result.Add(Crossover.Operate(rand.Choice(mu), rand.Choice(mu), rand));
             }
 
             return result.ToList();
