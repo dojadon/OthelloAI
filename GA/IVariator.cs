@@ -27,13 +27,11 @@ namespace OthelloAI.GA
             while (result.Count < Mu + LambdaM)
             {
                 result.Add(Mutant.Operate(rand.Choice(mu), rand));
-                Console.WriteLine(result.Count);
             }
 
             while (result.Count < Mu + LambdaM + LambdaCX)
             {
                 result.Add(Crossover.Operate(rand.Choice(mu), rand.Choice(mu), rand));
-                Console.WriteLine(result.Count);
             }
 
             return result.ToList();
