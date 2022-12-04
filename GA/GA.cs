@@ -188,8 +188,8 @@ namespace OthelloAI.GA
                 Variator = new VariatorES<ulong>()
                 {
                     Mu = 10,
-                    LambdaM = 45,
-                    LambdaCX = 45,
+                    LambdaM = 80,
+                    LambdaCX = 10,
                     Mutant = new MutantBits(),
                     Crossover = new CrossoverExchange<ulong>(),
                 },
@@ -204,9 +204,6 @@ namespace OthelloAI.GA
 
             var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
-
-            var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw_v = File.AppendText(log_v);
 
             // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
             ga.Run(ga.Init(100), (n_gen, time, pop) =>

@@ -107,7 +107,15 @@ namespace OthelloAI.GA
     {
         public GenomeGroup<T>[] Cx(GenomeGroup<T>[] g1, GenomeGroup<T>[] g2, Random rand)
         {
-            return g1.Zip(g2, (a1, a2) => rand.NextDouble() > 0.5 ? a1 : a2).ToArray();
+            var randoms = Enumerable.Range(0, g1.Length).Select(_ => rand.Next(2)).ToArray();
+
+            if (randoms.All(r => r == 0))
+                randoms[rand.Next(randoms.Length)] = 1;
+
+            if (randoms.All(r => r == 1))
+                randoms[rand.Next(randoms.Length)] = 0;
+
+            return g1.ZipThree(g2, randoms, (a1, a2, r) => r > 0.5 ? a1 : a2).ToArray();
         }
 
         public Individual<T> Operate(Individual<T> ind1, Individual<T> ind2, Random rand)
