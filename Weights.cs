@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using System.Xml.Serialization;
 
 namespace OthelloAI
@@ -290,18 +292,14 @@ namespace OthelloAI
 
     public class WeightsArrayR : Weight
     {
-        [XmlIgnore]
         public BoardHasher Hasher { get; }
 
-        [XmlIgnore]
         public  float[] weights;
 
-        [XmlIgnore]
         byte[] weights_b;
 
         readonly ulong mask;
 
-        [XmlIgnore]
         readonly int hash_length;
 
         public override float[] GetWeights() => weights;
