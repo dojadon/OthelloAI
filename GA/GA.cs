@@ -343,13 +343,8 @@ namespace OthelloAI.GA
                 },
             };
 
-            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"G:/マイドライブ/Lab/test/log_ga_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
-
-            var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw_v = File.AppendText(log_v);
-
-            var variances = new List<float>();
 
             // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
             ga.Run(ga.Init(100), (n_gen, time, pop) =>
@@ -388,17 +383,10 @@ namespace OthelloAI.GA
                     Console.WriteLine();
                 }
 
-                float v = info.Variance(pop.OrderBy(s => s.score).Select(s => s.ind).Take(10).ToArray());
-                variances.Add(v);
-
-                sw_v.WriteLine(variances.TakeLast(100).Average());
-
                 Console.WriteLine($"Gen : {n_gen}, {time}");
-                Console.WriteLine(variances.TakeLast(100).Average());
                 Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
                 sw.Flush();
-                sw_v.Flush();
             });
         }
     }
