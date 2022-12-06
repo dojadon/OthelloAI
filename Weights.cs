@@ -199,7 +199,7 @@ namespace OthelloAI
 
             Reset();
         }
-
+         
         public override void Reset()
         {
             weights = new float[Hasher.ArrayLength];

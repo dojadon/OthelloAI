@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MathNet.Numerics.Distributions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
@@ -32,6 +33,36 @@ namespace OthelloAI.GA
         public Individual<T> Operate(Individual<T> ind, Random rand);
     }
 
+    public class GeneticOperators1<T> : IGeneticOperator1<T>
+    {
+        (IGeneticOperator1<T> op, float p)[] Operators { get; }
+
+        public GeneticOperators1(params (IGeneticOperator1<T> op, float p)[] operators)
+        {
+            Operators = operators;
+
+            float total = 0;
+            for(int  i = 0; i < Operators.Length; i++)
+            {
+                Operators[i].p = total;
+                total = Operators[i].p;
+            }
+
+            Operators[^1].p = 1;
+        }
+
+        public IGeneticOperator1<T> Next(Random rand)
+        {
+            double d = rand.NextDouble();
+            return Operators.First(t => d < t.p).op;
+        }
+
+        public Individual<T> Operate(Individual<T> ind, Random rand)
+        {
+            return Next(rand).Operate(ind, rand);
+        }
+    }
+
     public class MutantBits : IGeneticOperator1<ulong>
     {
         public static ulong Mutant(ulong g, ulong mask, Random rand)
@@ -59,15 +90,17 @@ namespace OthelloAI.GA
         }
     }
 
-    public class MutantRK : IGeneticOperator1<float[]>
+    public class MutantRandomKey : IGeneticOperator1<float[]>
     {
         public float ProbSwapping { get; }
         public float ProbChangingSize { get; }
+        public float Variance { get; }
 
-        public MutantRK(float probSwapping, float probChangingSize)
+        public MutantRandomKey(float probSwapping, float probChangingSize, float variance)
         {
             ProbSwapping = probSwapping;
             ProbChangingSize = probChangingSize;
+            Variance = variance;    
         }
 
         public GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
@@ -86,6 +119,12 @@ namespace OthelloAI.GA
                 int i2 = rand.Next(0, g.Length);
 
                 (g[i2], g[i1]) = (g[i1], g[i2]);
+            }
+
+            if(Variance > 0)
+            {
+                for(int i = 0; i < g.Length; i++)
+                    g[i] += (float)Normal.Sample(rand, 0, Variance);
             }
 
             return new GenomeGroup<float[]>(g, size);

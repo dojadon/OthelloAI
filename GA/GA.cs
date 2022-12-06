@@ -321,7 +321,7 @@ namespace OthelloAI.GA
                     NumEliteMutants = 10,
                     NumRandomMutants = 10,
                     Crossover = new CrossoverEliteBiased(0.7F),
-                    MutantElite = new MutantRK(0.08F, 0.08F),
+                    MutantElite = new MutantRandomKey(0.00F, 0.1F, 0.2F),
                     Generator = info,
                 },
 
