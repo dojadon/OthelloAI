@@ -433,12 +433,13 @@ namespace OthelloAI
             }
         }
 
-        public static Weight[] CreateNetworkFromLogFile(string path, int gen, int n_per_gen, int n)
+        public static (Weight, ulong[])[] CreateNetworkFromLogFile(string path, int gen, int n_per_gen, int n)
         {
-            Weight Create(string line)
+            static (Weight, ulong[]) Create(string line)
             {
                 var tokens = line.Split(",").Where(s => s.Length > 0).Skip(1);
-                return new WeightsSum(tokens.Select(ulong.Parse).Select(u => new WeightsArrayR(u)).ToArray());
+                var masks = tokens.Select(ulong.Parse).ToArray();
+                return ( new WeightsSum(masks.Select(u => new WeightsArrayR(u)).ToArray()), masks);
             }
 
             var lines = File.ReadAllLines(path);
@@ -448,12 +449,12 @@ namespace OthelloAI
             return lines[idx..(idx + n)].Select(Create).ToArray();
         }
 
-        public static void TestGAResultTraining(int gen, int n_game)
+        public static void TestGAResultTraining(int gen, int n_game, string log1, string log2)
         {
-            Weight[] weights1 = CreateNetworkFromLogFile(@"G:\マイドライブ\Lab\test\ga_log_2022_12_02_16_01.csv", gen, 100, 10);
-            Weight[] weights2 = CreateNetworkFromLogFile(@"G:\マイドライブ\Lab\test\ga_log_2022_12_04_16_15.csv", gen, 100, 10);
+            (Weight w, ulong[] m)[] weights1 = CreateNetworkFromLogFile(log1, gen, 100, 10);
+            (Weight w, ulong[] m)[] weights2 = CreateNetworkFromLogFile(log2, gen, 100, 10);
 
-            Weight[] weights = weights1.Concat(weights2).ToArray();
+            Weight[] weights = weights1.Concat(weights2).Select(t => t.w).ToArray();
             Trainer[] trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
 
             var evaluator = new EvaluatorRandomChoice(weights.Select(w => new EvaluatorWeightsBased(w)).ToArray());
@@ -468,15 +469,15 @@ namespace OthelloAI
             for (int i = 0; i < n_game / 16; i++)
             {
                 var data = TrainerUtil.PlayForTrainingParallel(16, player);
-                data.ForEach(d => trainers.Select(t => t.Update(d.board, d.result)).ToArray());
+                data.ForEach(d => Array.ForEach(trainers, t => t.Update(d.board, d.result)));
                 Console.WriteLine($"{gen}, {i}, {trainers.Select(t => t.Log.TakeLast(100000).Average()).Average()}");
 
                 if (i % 50 == 0)
                 {
                     for (int j = 0; j < weights1.Length; j++)
                     {
-                        weights1[j].Save($"e/{gen}_1_{j}.dat");
-                        weights2[j].Save($"e/{gen}_2_{j}.dat");
+                        weights1[j].w.Save($"e/1_{gen}_{j}.dat");
+                        weights2[j].w.Save($"e/2_{gen}_{j}.dat");
                     }
                 }
             }
@@ -484,33 +485,36 @@ namespace OthelloAI
 
         public static void TestGAResult()
         {
-            var log = $"G:/マイドライブ/Lab/test/log_e_time_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"G:/マイドライブ/Lab/test/ga/log_ga_test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            for (int i = 0; i < 20; i++)
+            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_07_12_17.csv";
+            var ga_log2 = @"G:\マイドライブ\Lab\test\ga\log_es_2022_12_07_12_17.csv";
+
+            for (int i = 0; i < 1; i++)
             {
                 int gen = i * 100;
-                TestGAResultTraining(gen, 10000);
-                float rate = TestGAResult(gen, 100);
+                //TestGAResultTraining(gen, 4000, ga_log1, ga_log2);
+                float rate = TestGAResult(gen, 100, ga_log1, ga_log2);
 
                 using StreamWriter sw = File.AppendText(log);
                 sw.WriteLine($"{gen}, {rate}");
             }
         }
 
-        public static float TestGAResult(int gen, int n_game)
+        public static float TestGAResult(int gen, int n_game, string log1, string log2)
         {
-            Weight[] weights1 = CreateNetworkFromLogFile(@"G:\マイドライブ\Lab\test\ga_log_2022_12_02_16_01.csv", gen, 100, 10);
-            Weight[] weights2 = CreateNetworkFromLogFile(@"G:\マイドライブ\Lab\test\ga_log_2022_12_04_16_15.csv", gen, 100, 10);
+            (Weight w, ulong[] m)[] weights1 = CreateNetworkFromLogFile(log1, gen, 100, 10);
+            (Weight w, ulong[] m)[] weights2 = CreateNetworkFromLogFile(log2, gen, 100, 10);
 
             for (int j = 0; j < weights1.Length; j++)
             {
-                weights1[j].Load($"e/1_{j}.dat");
-                weights2[j].Load($"e/2_{j}.dat");
+                weights1[j].w.Load($"e/1_{gen}_{j}.dat");
+                weights2[j].w.Load($"e/2_{gen}_{j}.dat");
             }
 
-            static PlayerAI CreatePlayer(Weight[] weight, Random rand)
+            static PlayerAI CreatePlayer(Weight weight, Random rand)
             {
-                return new PlayerAI(new EvaluatorWeightsBased(rand.Choice(weight)))
+                return new PlayerAI(new EvaluatorWeightsBased(weight))
                 {
                     Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 7),
                                               new SearchParameters(stage: 46, type: SearchType.Normal, depth: 64)},
@@ -522,17 +526,33 @@ namespace OthelloAI
              {
                  Random rand = new Random();
 
-                 var p1 = CreatePlayer(weights1, rand);
-                 var p2 = CreatePlayer(weights2, rand);
+                 var t1 = rand.Choice(weights1);
+                 var t2 = rand.Choice(weights2);
 
-                 Board board = CreateRandomGame(4, rand);
+                 var p1 = CreatePlayer(t1.w, rand);
+                 var p2 = CreatePlayer(t2.w, rand);
+
+                 //foreach(var m in t1.m)
+                 //    Console.WriteLine(new Board(m, 0));
+
+                 //Console.WriteLine("_______");
+
+                 //foreach (var m in t2.m)
+                 //    Console.WriteLine(new Board(m, 0));
+
+                 Board board = CreateRandomGame(2, rand);
 
                  if (rand.NextDouble() > 0.5)
+                 {
                      board = PlayGame(p1, p2, board);
+                 }
                  else
+                 {
                      board = PlayGame(p2, p1, board).ColorFliped();
+                 }
 
                  int result = board.GetStoneCountGap();
+                 Console.WriteLine(result);
 
                  if (result > 0)
                      return 1;
