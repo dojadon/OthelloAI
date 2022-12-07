@@ -616,7 +616,7 @@ namespace OthelloAI
 
             if (0 < depth && depth < 1)
             {
-                if (depth > GA.GATest.Random.NextDouble())
+                if (depth > Program.Random.NextDouble())
                     depth = 1;
                 else
                     depth = 0;

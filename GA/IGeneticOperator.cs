@@ -6,28 +6,6 @@ using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI.GA
 {
-    public class GeneticOperators<T, U> where U : Score<T>
-    {
-        public ISelector<T, U> Selector { get; set; }
-        public IGeneticOperator1<T> Operator1 { get; set; }
-        public IGeneticOperator2<T> Operator2 { get; set; }
-
-        public float ProbCx { get; set; }
-
-        public Individual<T> Operate(List<U> pop, Random rand)
-        {
-            if (rand.NextDouble() > ProbCx)
-            {
-                var pair = Selector.SelectPair(pop, rand);
-                return Operator2.Operate(pair.Item1.ind, pair.Item2.ind, rand);
-            }
-            else
-            {
-                return Operator1.Operate(Selector.Select(pop, rand).ind, rand);
-            }
-        }
-    }
-
     public interface IGeneticOperator1<T>
     {
         public Individual<T> Operate(Individual<T> ind, Random rand);

@@ -40,16 +40,6 @@ namespace OthelloAI.GA
         }
     }
 
-    public class ScoreElite<T> : Score<T>
-    {
-        public bool is_elite;
-
-        public ScoreElite(Individual<T> ind, float score, bool is_elite) : base(ind, score)
-        {
-            this.is_elite = is_elite;
-        }
-    }
-
     public class GenomeInfo<T>
     {
         public Func<T> GenomeGenerator { get; set; }
@@ -160,9 +150,6 @@ namespace OthelloAI.GA
 
     public class GATest
     {
-        private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
-        public static Random Random => ThreadLocalRandom.Value;
-
         public static void TestES()
         {
             var info = new GenomeInfo<ulong>()
@@ -172,7 +159,7 @@ namespace OthelloAI.GA
                 SizeMin = 8,
                 SizeMax = 8,
                 MaxNumWeights = (int)Math.Pow(3, 8) * 2,
-                GenomeGenerator = () => Random.GenerateRegion(19, 8),
+                GenomeGenerator = () => Program.Random.GenerateRegion(19, 8),
                 Decoder = (g, _) => g,
                 VarianceT = _ => 0,
             };
@@ -299,9 +286,9 @@ namespace OthelloAI.GA
                 NumStages = 1,
                 NumTuples = 3,
                 SizeMin = 8,
-                SizeMax = 9,
+                SizeMax = 8,
                 MaxNumWeights = (int)Math.Pow(3, 9),
-                GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float)Random.NextDouble()).ToArray(),
+                GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float) Program.Random.NextDouble()).ToArray(),
                 Decoder = Decode,
                 VarianceT = Variance,
             };
@@ -318,10 +305,10 @@ namespace OthelloAI.GA
                 {
                     NumElites = 20,
                     NumCx = 60,
-                    NumEliteMutants = 10,
-                    NumRandomMutants = 10,
+                    NumEliteMutants = 20,
+                    NumRandomMutants = 0,
                     Crossover = new CrossoverEliteBiased(0.7F),
-                    MutantElite = new MutantRandomKey(0.00F, 0.1F, 0.2F),
+                    MutantElite = new MutantRandomKey(0.00F, 0.1F, 0.25F),
                     Generator = info,
                 },
 
@@ -343,7 +330,7 @@ namespace OthelloAI.GA
                 },
             };
 
-            var log = $"G:/マイドライブ/Lab/test/log_ga_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"G:/マイドライブ/Lab/test/ga/log_brkga_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
             // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>

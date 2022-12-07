@@ -241,19 +241,6 @@ namespace OthelloAI.GA
         }
     }
 
-    public class PopulationEvaluatorElite<T> : IPopulationEvaluator<T, ScoreElite<T>>
-    {
-        public IPopulationEvaluator<T, Score<T>> Evaluator { get; set; }
-
-        public int NumElite { get; set; }
-
-        public List<ScoreElite<T>> Evaluate(List<Individual<T>> pop)
-        {
-            var score = Evaluator.Evaluate(pop);
-            return score.OrderBy(s => s.score).Select((s, i) => new ScoreElite<T>(s.ind, s.score, i < NumElite)).ToList();
-        }
-    }
-
     public abstract class PopulationTrainer
     {
         public int Depth { get; }
