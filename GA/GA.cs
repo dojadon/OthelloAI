@@ -155,11 +155,11 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<ulong>()
             {
                 NumStages = 1,
-                NumTuples = 2,
-                SizeMin = 8,
-                SizeMax = 8,
-                MaxNumWeights = (int)Math.Pow(3, 8) * 2,
-                GenomeGenerator = () => Program.Random.GenerateRegion(19, 8),
+                NumTuples = 9,
+                SizeMin = 7,
+                SizeMax = 7,
+                MaxNumWeights = (int)Math.Pow(3, 9),
+                GenomeGenerator = () => Program.Random.GenerateRegion(19, 7),
                 Decoder = (g, _) => g,
                 VarianceT = _ => 0,
             };
@@ -177,7 +177,7 @@ namespace OthelloAI.GA
                     Mu = 10,
                     LambdaM = 80,
                     LambdaCX = 10,
-                    Mutant = new MutantBits(),
+                    Mutant = new MutantBits(0.25F),
                     Crossover = new CrossoverExchange<ulong>(),
                 },
 
@@ -189,7 +189,7 @@ namespace OthelloAI.GA
                 },
             };
 
-            var log = $"ga/log_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"G:/マイドライブ/Lab/test/ga/log_es_7x9_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
             // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>

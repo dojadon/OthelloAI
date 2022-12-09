@@ -134,25 +134,25 @@ namespace OthelloAI
 
     public class Trainer
     {
-        public Weight Weights { get; }
+        public Weight Weight { get; }
         public float LearningRate { get; }
 
         public List<float> Log { get; } = new List<float>();
 
         public Trainer(Weight weights, float lr)
         {
-            Weights = weights;
+            Weight = weights;
             LearningRate = lr;
         }
 
         public float Update(Board board, float result)
         {
             var boards = new RotatedAndMirroredBoards(board);
-            float e = result - Weights.EvalTraining(boards);
+            float e = result - Weight.EvalTraining(boards);
 
             foreach (var b in boards)
             {
-                Weights.UpdataEvaluation(b, e * LearningRate, 6);
+                Weight.UpdataEvaluation(b, e * LearningRate, 6);
             }
 
             Log.Add(e * e);
@@ -160,7 +160,7 @@ namespace OthelloAI
             return e;
         }
 
-        public static List<float> Train(Weight weight, int depth, int n_games)
+        public static List<float> Train(Weight weight, int depth, int n_games, string path = "")
         {
             var evaluator = new EvaluatorWeightsBased(weight);
             Player player = new PlayerAI(evaluator)
@@ -179,6 +179,9 @@ namespace OthelloAI
 
                 Console.WriteLine($"{i} / {n_games / 16}");
                 Console.WriteLine(trainer.Log.TakeLast(10000).Average());
+
+                if (i % 100 == 0 && path != "")
+                    weight.Save(path);
             }
 
             return trainer.Log;

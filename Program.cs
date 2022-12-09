@@ -23,7 +23,7 @@ namespace OthelloAI
 
         static void Main()
         {
-            //GATest.TestBRKGA();
+            //GATest.TestES();
 
             Tester.TestGAResult();
             return;

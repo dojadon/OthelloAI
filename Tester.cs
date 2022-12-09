@@ -433,13 +433,12 @@ namespace OthelloAI
             }
         }
 
-        public static (Weight, ulong[])[] CreateNetworkFromLogFile(string path, int gen, int n_per_gen, int n)
+        public static Weight[] CreateNetworkFromLogFile(string path, int gen, int n_per_gen, int n)
         {
-            static (Weight, ulong[]) Create(string line)
+            static Weight Create(string line)
             {
                 var tokens = line.Split(",").Where(s => s.Length > 0).Skip(1);
-                var masks = tokens.Select(ulong.Parse).ToArray();
-                return ( new WeightsSum(masks.Select(u => new WeightsArrayR(u)).ToArray()), masks);
+                return new WeightsSum(tokens.Select(ulong.Parse).Select(u => new WeightsArrayR(u)).ToArray());
             }
 
             var lines = File.ReadAllLines(path);
@@ -449,75 +448,93 @@ namespace OthelloAI
             return lines[idx..(idx + n)].Select(Create).ToArray();
         }
 
-        public static void TestGAResultTraining(int gen, int n_game, string log1, string log2)
+        public static void TestGAResultTraining(Trainer[] trainers, int n_game)
         {
-            (Weight w, ulong[] m)[] weights1 = CreateNetworkFromLogFile(log1, gen, 100, 10);
-            (Weight w, ulong[] m)[] weights2 = CreateNetworkFromLogFile(log2, gen, 100, 10);
-
-            Weight[] weights = weights1.Concat(weights2).Select(t => t.w).ToArray();
-            Trainer[] trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
-
-            var evaluator = new EvaluatorRandomChoice(weights.Select(w => new EvaluatorWeightsBased(w)).ToArray());
+            var evaluator = new EvaluatorRandomChoice(trainers.Select(t => new EvaluatorWeightsBased(t.Weight)).ToArray());
 
             Player player = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 5),
+                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 4),
                                               new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
 
-            for (int i = 0; i < n_game / 16; i++)
+            int steps = n_game / 16;
+
+            for (int i = 0; i < steps; i++)
             {
                 var data = TrainerUtil.PlayForTrainingParallel(16, player);
                 data.ForEach(d => Array.ForEach(trainers, t => t.Update(d.board, d.result)));
-                Console.WriteLine($"{gen}, {i}, {trainers.Select(t => t.Log.TakeLast(100000).Average()).Average()}");
 
-                if (i % 50 == 0)
-                {
-                    for (int j = 0; j < weights1.Length; j++)
-                    {
-                        weights1[j].w.Save($"e/1_{gen}_{j}.dat");
-                        weights2[j].w.Save($"e/2_{gen}_{j}.dat");
-                    }
-                }
+                if (i % 10 == 0)
+                    Console.WriteLine($"{i}/{steps}, {trainers.Select(t => t.Log.TakeLast(100000).Average()).Average()}");
             }
         }
 
         public static void TestGAResult()
         {
+            int n_elites_per_gen = 10;
+
+            int n_games_training = 1600;
+            int n_games_eval = 2000;
+
+            int[] gens = Enumerable.Range(0, 41).Select(i => i * 25).ToArray();
+
             var log = $"G:/マイドライブ/Lab/test/ga/log_ga_test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_07_12_17.csv";
-            var ga_log2 = @"G:\マイドライブ\Lab\test\ga\log_es_2022_12_07_12_17.csv";
+            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_7x9_2022_12_08_07_07.csv";
+            var dir_path = $"e/{Path.GetFileNameWithoutExtension(ga_log1)}";
+            // var ga_log2 = @"G:\マイドライブ\Lab\test\ga\log_es_2022_12_07_12_17.csv";
 
-            for (int i = 0; i < 1; i++)
+            var weights = gens.Select(g => CreateNetworkFromLogFile(ga_log1, g, 100, n_elites_per_gen)).ToArray();
+
+            Directory.CreateDirectory(dir_path);
+
+            //for (int i = 0; i < gens.Length; i++)
+            //    for (int j = 0; j < n_elites_per_gen; j++)
+            //        weights[i][j].Load($"{dir_path}/1_{gens[i]}_{j}");
+
+            var trainers = weights.Select(a => a.Select(w => new Trainer(w, 0.001F)).ToArray()).ToArray();
+
+            TestGAResultTraining(trainers.SelectMany(w => w).ToArray(), n_games_training);
+
+            for (int i = 0; i < gens.Length; i++)
             {
-                int gen = i * 100;
-                //TestGAResultTraining(gen, 4000, ga_log1, ga_log2);
-                float rate = TestGAResult(gen, 100, ga_log1, ga_log2);
+                for (int j = 0; j < n_elites_per_gen; j++)
+                {
+                    weights[i][j].Save($"{dir_path}/1_{gens[i]}_{j}");
+                }
 
-                using StreamWriter sw = File.AppendText(log);
-                sw.WriteLine($"{gen}, {rate}");
+                float err = trainers[i].Select(t => t.Log.TakeLast(100000).Average()).Average();
+                Console.WriteLine($"{gens[i]}, {err}");
+            }
+
+            return;
+
+            using StreamWriter sw = File.AppendText(log);
+
+            for (int i = 0; i < gens.Length; i++)
+            {
+                int gen = gens[i];
+
+                float rate1 = TestGAResult(weights[i], weights[^1], n_games_eval);
+                //float rate2 = TestGAResult(w2, w1000, n_games_eval);
+
+                sw.WriteLine($"{gen}, {rate1}");
+                sw.Flush();
             }
         }
 
-        public static float TestGAResult(int gen, int n_game, string log1, string log2)
+        public static float TestGAResult(Weight[] weights1, Weight[] weights2, int n_game)
         {
-            (Weight w, ulong[] m)[] weights1 = CreateNetworkFromLogFile(log1, gen, 100, 10);
-            (Weight w, ulong[] m)[] weights2 = CreateNetworkFromLogFile(log2, gen, 100, 10);
-
-            for (int j = 0; j < weights1.Length; j++)
-            {
-                weights1[j].w.Load($"e/1_{gen}_{j}.dat");
-                weights2[j].w.Load($"e/2_{gen}_{j}.dat");
-            }
-
             static PlayerAI CreatePlayer(Weight weight, Random rand)
             {
-                return new PlayerAI(new EvaluatorWeightsBased(weight))
+                var e = new EvaluatorRandomize(new EvaluatorWeightsBased(weight), 36);
+
+                return new PlayerAI(e)
                 {
-                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 7),
-                                              new SearchParameters(stage: 46, type: SearchType.Normal, depth: 64)},
+                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 5),
+                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
                     PrintInfo = false,
                 };
             }
@@ -526,21 +543,10 @@ namespace OthelloAI
              {
                  Random rand = new Random();
 
-                 var t1 = rand.Choice(weights1);
-                 var t2 = rand.Choice(weights2);
+                 var p1 = CreatePlayer(rand.Choice(weights1), rand);
+                 var p2 = CreatePlayer(rand.Choice(weights2), rand);
 
-                 var p1 = CreatePlayer(t1.w, rand);
-                 var p2 = CreatePlayer(t2.w, rand);
-
-                 //foreach(var m in t1.m)
-                 //    Console.WriteLine(new Board(m, 0));
-
-                 //Console.WriteLine("_______");
-
-                 //foreach (var m in t2.m)
-                 //    Console.WriteLine(new Board(m, 0));
-
-                 Board board = CreateRandomGame(2, rand);
+                 Board board = Board.Init;
 
                  if (rand.NextDouble() > 0.5)
                  {

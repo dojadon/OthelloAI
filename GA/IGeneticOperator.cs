@@ -1,6 +1,5 @@
 ﻿using MathNet.Numerics.Distributions;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
 
@@ -20,7 +19,7 @@ namespace OthelloAI.GA
             Operators = operators;
 
             float total = 0;
-            for(int  i = 0; i < Operators.Length; i++)
+            for (int i = 0; i < Operators.Length; i++)
             {
                 Operators[i].p = total;
                 total = Operators[i].p;
@@ -43,6 +42,13 @@ namespace OthelloAI.GA
 
     public class MutantBits : IGeneticOperator1<ulong>
     {
+        public float Prob { get; set; }
+
+        public MutantBits(float prob)
+        {
+            Prob = prob;
+        }
+
         public static ulong Mutant(ulong g, ulong mask, Random rand)
         {
             int n1 = Board.BitCount(g);
@@ -63,7 +69,11 @@ namespace OthelloAI.GA
 
         public Individual<ulong> Operate(Individual<ulong> ind, Random rand)
         {
-            var g = ind.Genome.Select(a => a.Select(g => Mutant(g, rand)).ToArray()).ToArray();
+            var g = ind.Genome.Select(a =>
+            {
+                return a.Select(g => rand.NextDouble() < Prob ? Mutant(g, rand) : g).ToArray();
+            }).ToArray();
+
             return new Individual<ulong>(g, ind.Info);
         }
     }
@@ -78,7 +88,7 @@ namespace OthelloAI.GA
         {
             ProbSwapping = probSwapping;
             ProbChangingSize = probChangingSize;
-            Variance = variance;    
+            Variance = variance;
         }
 
         public GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
@@ -99,9 +109,9 @@ namespace OthelloAI.GA
                 (g[i2], g[i1]) = (g[i1], g[i2]);
             }
 
-            if(Variance > 0)
+            if (Variance > 0)
             {
-                for(int i = 0; i < g.Length; i++)
+                for (int i = 0; i < g.Length; i++)
                     g[i] += (float)Normal.Sample(rand, 0, Variance);
             }
 

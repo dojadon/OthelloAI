@@ -1,14 +1,34 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OthelloAI
 {
     public abstract class Player
     {
         public abstract (int x, int y, ulong move) DecideMove(Board board, int stone);
+    }
+
+    public class PlayerEpsilonGreedy : Player
+    {
+        Player Player { get; }
+        public float Epsilon { get; }
+        Random Random { get; }
+        PlayerRandom PlayerRandom { get; }
+
+        public PlayerEpsilonGreedy(Player player, float epsilon, Random rand)
+        {
+            Player = player;
+            Epsilon = epsilon;
+            Random = rand;
+            PlayerRandom = new PlayerRandom(rand);
+        }
+
+        public override (int x, int y, ulong move) DecideMove(Board board, int stone)
+        {
+            if (Random.NextDouble() < Epsilon)
+                return PlayerRandom.DecideMove(board, stone);
+            else
+                return Player.DecideMove(board, stone);
+        }
     }
 
     public class PlayerRandom : Player
@@ -33,7 +53,7 @@ namespace OthelloAI
 
             ulong move = 0;
 
-            for(int i = 0; i < index + 1; i++)
+            for (int i = 0; i < index + 1; i++)
             {
                 move = Board.NextMove(moves);
                 moves = Board.RemoveMove(moves, move);
