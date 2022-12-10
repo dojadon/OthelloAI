@@ -45,7 +45,8 @@ namespace OthelloAI.GA
         public Func<T> GenomeGenerator { get; set; }
         public Func<T, int, ulong> Decoder { get; set; }
 
-        public Func<IEnumerable<T>, float> VarianceT { get; set; }
+        public Func<IEnumerable<T>, float[]> VarianceT { get; set; }
+        public Func<IEnumerable<T>, float[]> AverageT { get; set; }
 
         public int NumStages { get; set; }
         public int NumTuples { get; set; }
@@ -66,16 +67,24 @@ namespace OthelloAI.GA
             return new Individual<T>(Enumerable.Range(0, NumStages).Select(_ => Enumerable.Range(0, NumTuples).Select(_ => CreateGenome()).ToArray()).ToArray(), this);
         }
 
-        public float VarianceG(IEnumerable<GenomeGroup<T>> genomes)
+        public float[][] Variance(Individual<T>[] pop)
         {
-            float v1 = genomes.Select(g => g.Size * 0.1F).Variance();
-            float v2 = VarianceT(genomes.Select(g => g.Genome));
-            return v1 + v2;
+            float VarianceG(IEnumerable<GenomeGroup<T>> genomes)
+            {
+                return VarianceT(genomes.Select(g => g.Genome)).Sum();
+            }
+
+            return Enumerable.Range(0, NumStages).Select(s => Enumerable.Range(0, NumTuples).Select(t => pop.Select(i => i.Genome[s][t])).Select(VarianceG).ToArray()).ToArray();
         }
 
-        public float Variance(Individual<T>[] pop)
+        public float[][][] Average(Individual<T>[] pop)
         {
-            return Enumerable.Range(0, NumStages).Select(s => Enumerable.Range(0, NumTuples).Select(t => pop.Select(i => i.Genome[s][t])).Select(VarianceG).Sum()).Sum();
+            float[] AverageG(IEnumerable<GenomeGroup<T>> genomes)
+            {
+                return AverageT(genomes.Select(g => g.Genome));
+            }
+
+            return Enumerable.Range(0, NumStages).Select(s => Enumerable.Range(0, NumTuples).Select(t => pop.Select(i => i.Genome[s][t])).Select(AverageG).ToArray()).ToArray();
         }
     }
 
@@ -161,7 +170,6 @@ namespace OthelloAI.GA
                 MaxNumWeights = (int)Math.Pow(3, 9),
                 GenomeGenerator = () => Program.Random.GenerateRegion(19, 7),
                 Decoder = (g, _) => g,
-                VarianceT = _ => 0,
             };
 
             var ga = new GA<ulong, Score<ulong>>()
@@ -238,9 +246,14 @@ namespace OthelloAI.GA
 
         public static void TestBRKGA()
         {
-            static float Variance(IEnumerable<float[]> g)
+            static float[] VarianceT(IEnumerable<float[]> g)
             {
-                return Enumerable.Range(0, 19).Select(i => g.Select(a => a[i]).Variance()).Sum();
+                return Enumerable.Range(0, 19).Select(i => g.Select(a => a[i]).Variance()).ToArray();
+            }
+
+            static float[] AverageT(IEnumerable<float[]> g)
+            {
+                return Enumerable.Range(0, 19).Select(i => g.Select(a => a[i]).Average()).ToArray();
             }
 
             static ulong Decode(float[] keys, int size)
@@ -290,7 +303,8 @@ namespace OthelloAI.GA
                 MaxNumWeights = (int)Math.Pow(3, 9),
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float) Program.Random.NextDouble()).ToArray(),
                 Decoder = Decode,
-                VarianceT = Variance,
+                VarianceT = VarianceT,
+                AverageT = AverageT,
             };
 
             var ga = new GA<float[], Score<float[]>>()
@@ -333,6 +347,11 @@ namespace OthelloAI.GA
             var log = $"G:/マイドライブ/Lab/test/ga/log_brkga_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
+            var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw_v = File.AppendText(log_v);
+
+            var variances = new List<float>();
+
             // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
             ga.Run(ga.Init(100), (n_gen, time, pop) =>
             {
@@ -370,8 +389,13 @@ namespace OthelloAI.GA
                     Console.WriteLine();
                 }
 
+                var pop_sub = pop.OrderBy(s => s.score).Select(s => s.ind).Take(10).ToArray();
+                float[][] avg = info.Average(pop_sub)[0];
+                float[] var = info.Variance(pop_sub)[0];
+                sw_v.WriteLine(string.Join(",,", avg.Zip(var, (a, v) => $"{string.Join(",", a)},{v}")));
+
                 Console.WriteLine($"Gen : {n_gen}, {time}");
-                Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+                Console.WriteLine(string.Join(",,", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
                 sw.Flush();
             });
