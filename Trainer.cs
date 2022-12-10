@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -92,7 +94,7 @@ namespace OthelloAI
 
                 return results;
             }).ToList();
-            
+
             return data.Select(d => new TrainingData(d)).ToArray();
         }
 
@@ -129,6 +131,20 @@ namespace OthelloAI
             }
 
             return results;
+        }
+    }
+
+    public class TrainingDataProvider
+    {
+        public void Run(PlayerAI player, int num_threads)
+        {
+            var queue = new ConcurrentQueue<TrainingDataElement>();
+
+            Parallel.For(0, num_threads, _ =>
+            {
+                var rand = new Random();
+                TrainerUtil.PlayForTraining(1, player, rand);
+            });
         }
     }
 
@@ -244,7 +260,7 @@ namespace OthelloAI
                 results.AddRange(data.Where(d => d.Count > 0).Select(d => d[^1].result > 0 ? 1 : 0));
                 Console.WriteLine($"{results.TakeLast(10000).Average():f3}, {trainer1.Log.TakeLast(1000000).Average():f2}, {trainer2.Log.TakeLast(1000000).Average():f2}");
 
-                if(i % 100 == 0)
+                if (i % 100 == 0)
                 {
                     weight1.Save("e1.dat");
                     weight2.Save("e2.dat");
