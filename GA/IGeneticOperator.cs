@@ -112,7 +112,10 @@ namespace OthelloAI.GA
             if (Variance > 0)
             {
                 for (int i = 0; i < g.Length; i++)
+                {
                     g[i] += (float)Normal.Sample(rand, 0, Variance);
+                    g[i] = Math.Clamp(g[i], 0, 1);
+                }
             }
 
             return new GenomeGroup<float[]>(g, size);

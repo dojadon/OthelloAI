@@ -45,9 +45,6 @@ namespace OthelloAI.GA
         public Func<T> GenomeGenerator { get; set; }
         public Func<T, int, ulong> Decoder { get; set; }
 
-        public Func<IEnumerable<T>, float[]> VarianceT { get; set; }
-        public Func<IEnumerable<T>, float[]> AverageT { get; set; }
-
         public int NumStages { get; set; }
         public int NumTuples { get; set; }
         public int SizeMax { get; set; }
@@ -65,26 +62,6 @@ namespace OthelloAI.GA
             }
 
             return new Individual<T>(Enumerable.Range(0, NumStages).Select(_ => Enumerable.Range(0, NumTuples).Select(_ => CreateGenome()).ToArray()).ToArray(), this);
-        }
-
-        public float[][] Variance(Individual<T>[] pop)
-        {
-            float VarianceG(IEnumerable<GenomeGroup<T>> genomes)
-            {
-                return VarianceT(genomes.Select(g => g.Genome)).Sum();
-            }
-
-            return Enumerable.Range(0, NumStages).Select(s => Enumerable.Range(0, NumTuples).Select(t => pop.Select(i => i.Genome[s][t])).Select(VarianceG).ToArray()).ToArray();
-        }
-
-        public float[][][] Average(Individual<T>[] pop)
-        {
-            float[] AverageG(IEnumerable<GenomeGroup<T>> genomes)
-            {
-                return AverageT(genomes.Select(g => g.Genome));
-            }
-
-            return Enumerable.Range(0, NumStages).Select(s => Enumerable.Range(0, NumTuples).Select(t => pop.Select(i => i.Genome[s][t])).Select(AverageG).ToArray()).ToArray();
         }
     }
 
@@ -246,16 +223,6 @@ namespace OthelloAI.GA
 
         public static void TestBRKGA()
         {
-            static float[] VarianceT(IEnumerable<float[]> g)
-            {
-                return Enumerable.Range(0, 19).Select(i => g.Select(a => a[i]).Variance()).ToArray();
-            }
-
-            static float[] AverageT(IEnumerable<float[]> g)
-            {
-                return Enumerable.Range(0, 19).Select(i => g.Select(a => a[i]).Average()).ToArray();
-            }
-
             static ulong Decode(float[] keys, int size)
             {
                 var indices = keys.Select((k, i) => (k, i)).OrderBy(t => t.k).Select(t => t.i).Take(size);
@@ -297,32 +264,30 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 3,
-                SizeMin = 8,
-                SizeMax = 8,
-                MaxNumWeights = (int)Math.Pow(3, 9),
+                NumTuples = 9,
+                SizeMin = 7,
+                SizeMax = 7,
+                MaxNumWeights = (int)Math.Pow(3, 7) * 9,
                 GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float) Program.Random.NextDouble()).ToArray(),
                 Decoder = Decode,
-                VarianceT = VarianceT,
-                AverageT = AverageT,
             };
 
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 6400, true), 2, 54, 100 * 400)
-                {
-                    GetDepthFraction = GetDepthFraction
-                },
-                // Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
+                //Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 6400, true), 2, 54, 100 * 400)
+                //{
+                //    GetDepthFraction = GetDepthFraction
+                //},
+                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(3, 52, 6400, true)),
                 Variator = new VariatorEliteArchive<float[]>()
                 {
                     NumElites = 20,
                     NumCx = 60,
-                    NumEliteMutants = 20,
-                    NumRandomMutants = 0,
+                    NumEliteMutants = 10,
+                    NumRandomMutants = 10,
                     Crossover = new CrossoverEliteBiased(0.7F),
-                    MutantElite = new MutantRandomKey(0.00F, 0.1F, 0.25F),
+                    MutantElite = new MutantRandomKey(0.08F, 0.1F, 0.01F),
                     Generator = info,
                 },
 
@@ -347,10 +312,8 @@ namespace OthelloAI.GA
             var log = $"G:/マイドライブ/Lab/test/ga/log_brkga_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
-            var log_v = $"ga/log_v_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw_v = File.AppendText(log_v);
-
-            var variances = new List<float>();
+            var log_inds = $"G:/マイドライブ/Lab/test/ga/log_brkga_inds_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            using StreamWriter sw_inds = File.AppendText(log_inds);
 
             // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
             ga.Run(ga.Init(100), (n_gen, time, pop) =>
@@ -366,6 +329,8 @@ namespace OthelloAI.GA
                         sw.Write(",," + string.Join(", ", t.Select(t => t.TupleBit)));
                     }
                     sw.WriteLine();
+
+                    sw_inds.WriteLine(string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
                 }
 
                 foreach (var t in score.ind.Tuples)
@@ -389,15 +354,11 @@ namespace OthelloAI.GA
                     Console.WriteLine();
                 }
 
-                var pop_sub = pop.OrderBy(s => s.score).Select(s => s.ind).Take(10).ToArray();
-                float[][] avg = info.Average(pop_sub)[0];
-                float[] var = info.Variance(pop_sub)[0];
-                sw_v.WriteLine(string.Join(",,", avg.Zip(var, (a, v) => $"{string.Join(",", a)},{v}")));
-
                 Console.WriteLine($"Gen : {n_gen}, {time}");
                 Console.WriteLine(string.Join(",,", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
                 sw.Flush();
+                sw_inds.Flush();
             });
         }
     }

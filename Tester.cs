@@ -476,16 +476,16 @@ namespace OthelloAI
 
         public static void TestGAResult()
         {
-            int n_elites_per_gen = 3;
+            int n_elites_per_gen = 1;
 
-            int n_games_training = 320000;
+            int n_games_training = 32000;
             int n_games_eval = 2000;
 
-            int[] gens = Enumerable.Range(0, 201).Select(i => i * 5).ToArray();
+            int[] gens = Enumerable.Range(0, 1001).Select(i => i * 1).ToArray();
 
             var log = $"G:/マイドライブ/Lab/test/ga/log_ga_test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_07_12_17.csv";
+            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_10_21_00.csv";
             var dir_path = $"e/{Path.GetFileNameWithoutExtension(ga_log1)}";
             // var ga_log2 = @"G:\マイドライブ\Lab\test\ga\log_es_2022_12_07_12_17.csv";
 
@@ -509,7 +509,7 @@ namespace OthelloAI
                     weights[i][j].Save($"{dir_path}/1_{gens[i]}_{j}");
                 }
 
-                float err = trainers[i].Select(t => t.Log.TakeLast(1200000).Average()).Average();
+                float err = trainers[i].Select(t => t.Log.TakeLast(240000).Average()).Average();
                 Console.WriteLine($"{gens[i]}, {err}");
             }
 
