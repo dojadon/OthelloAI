@@ -43,17 +43,17 @@ namespace OthelloAI
 
     public class TrainerUtil
     {
-        public static TrainingData PlayForTrainingParallel(int n_game, Player player)
+        public static TrainingData PlayForTrainingParallel(int n_game, Player player, int num_threads = -1)
         {
-            return new TrainingData(PlayForTrainingParallelSeparated(n_game, player).SelectMany(x => x));
+            return new TrainingData(PlayForTrainingParallelSeparated(n_game, player, num_threads).SelectMany(x => x));
         }
 
-        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player)
+        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player, int num_threads = -1)
         {
-            return PlayForTrainingParallelSeparated(n_game, player, player, rand => Tester.CreateRandomGame(6, rand));
+            return PlayForTrainingParallelSeparated(n_game, player, player, rand => Tester.CreateRandomGame(6, rand), num_threads);
         }
 
-        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player1, Player player2, Func<Random, Board> createInitBoard)
+        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player1, Player player2, Func<Random, Board> createInitBoard, int num_threads = -1)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -74,7 +74,12 @@ namespace OthelloAI
 
             int count = 0;
 
-            var data = Enumerable.Range(0, 16).AsParallel().Select(i =>
+            var range = Enumerable.Range(0, 16).AsParallel();
+
+            if (num_threads > 0)
+                range = range.WithDegreeOfParallelism(num_threads);
+
+            var data = range.Select(i =>
             {
                 var results = new TrainingData();
                 var rand = new Random();
@@ -168,7 +173,7 @@ namespace OthelloAI
 
             foreach (var b in boards)
             {
-                Weight.UpdataEvaluation(b, e * LearningRate, 6);
+                Weight.UpdataEvaluation(b, e * LearningRate, Weight.WEIGHT_RANGE);
             }
 
             Log.Add(e * e);

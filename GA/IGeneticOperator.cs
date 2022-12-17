@@ -40,6 +40,17 @@ namespace OthelloAI.GA
         }
     }
 
+    public abstract class MutantEachTuples<T> : IGeneticOperator1<T>
+    {
+        public abstract GenomeGroup<T> Operate(GenomeGroup<T> gene, GenomeInfo<T> info, Random rand);
+
+        public Individual<T> Operate(Individual<T> ind, Random rand)
+        {
+            var g = ind.Genome.Select(a => a.Select(g => Operate(g, ind.Info, rand)).ToArray()).ToArray();
+            return new Individual<T>(g, ind.Info);
+        }
+    }
+
     public class MutantBits : IGeneticOperator1<ulong>
     {
         public float Prob { get; set; }
@@ -78,59 +89,86 @@ namespace OthelloAI.GA
         }
     }
 
-    public class MutantRandomKey : IGeneticOperator1<float[]>
+    public class MutantGaussNoise : MutantEachTuples<float[]>
     {
-        public float ProbSwapping { get; }
-        public float ProbChangingSize { get; }
         public float Variance { get; }
 
-        public MutantRandomKey(float probSwapping, float probChangingSize, float variance)
+        public MutantGaussNoise(float variance)
         {
-            ProbSwapping = probSwapping;
-            ProbChangingSize = probChangingSize;
             Variance = variance;
         }
 
-        public GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
+        public override GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
         {
-            int size = gene.Size;
             float[] g = gene.Genome;
 
-            if (rand.NextDouble() < ProbChangingSize)
+            for (int i = 0; i < g.Length; i++)
             {
-                size = rand.Next(info.SizeMin, info.SizeMax + 1);
+                g[i] += (float)Normal.Sample(rand, 0, Variance);
+                g[i] = Math.Clamp(g[i], 0, 1);
             }
 
-            if (rand.NextDouble() < ProbSwapping)
-            {
-                int i1 = rand.Next(0, g.Length);
-                int i2 = rand.Next(0, g.Length);
-
-                (g[i2], g[i1]) = (g[i1], g[i2]);
-            }
-
-            if (Variance > 0)
-            {
-                for (int i = 0; i < g.Length; i++)
-                {
-                    g[i] += (float)Normal.Sample(rand, 0, Variance);
-                    g[i] = Math.Clamp(g[i], 0, 1);
-                }
-            }
-
-            return new GenomeGroup<float[]>(g, size);
+            return new GenomeGroup<float[]>(g, gene.Size);
         }
+    }
 
-        public Individual<float[]> Operate(Individual<float[]> ind, Random rand)
+    public class MutantRandomSize : MutantEachTuples<float[]>
+    {
+        public override GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
         {
-            var g = ind.Genome.Select(a => a.Select(g => Operate(g, ind.Info, rand)).ToArray()).ToArray();
-            return new Individual<float[]>(g, ind.Info);
+            int size = rand.Next(info.SizeMin, info.SizeMax + 1);
+            return new GenomeGroup<float[]>(gene.Genome, size);
+        }
+    }
+
+    public class MutantRandomGenerationOneTuple<T> : IGeneticOperator1<T>
+    {
+        public Individual<T> Operate(Individual<T> ind, Random rand)
+        {
+            int index = rand.Next(ind.Info.NumTuples);
+
+            var g = ind.Genome.Select(a => a.Select((g, i) =>
+            {
+                if (i != index)
+                    return g;
+
+                var gene = ind.Info.GenomeGenerator(rand);
+                int size = rand.Next(ind.Info.SizeMin, ind.Info.SizeMax + 1);
+
+                return new GenomeGroup<T>(gene, size);
+
+            }).ToArray()).ToArray();
+
+            return new Individual<T>(g, ind.Info);
+        }
+    }
+
+    public class MutantRandomGeneration<T> : IGeneticOperator1<T>
+    {
+        public Individual<T> Operate(Individual<T> ind, Random rand)
+        {
+            return ind.Info.Generate(rand);
         }
     }
 
     public interface IGeneticOperator2<T>
     {
         public Individual<T> Operate(Individual<T> ind1, Individual<T> ind2, Random rand);
+    }
+
+    public class CrossoverMutant<T> : IGeneticOperator2<T>
+    {
+        IGeneticOperator1<T> Operator { get; }
+
+        public CrossoverMutant(IGeneticOperator1<T> opt)
+        {
+            Operator = opt;
+        }
+
+        public Individual<T> Operate(Individual<T> ind1, Individual<T> ind2, Random rand)
+        {
+            return Operator.Operate(ind1, rand);
+        }
     }
 
     public class CrossoverExchange<T> : IGeneticOperator2<T>

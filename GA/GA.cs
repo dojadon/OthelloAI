@@ -42,7 +42,7 @@ namespace OthelloAI.GA
 
     public class GenomeInfo<T>
     {
-        public Func<T> GenomeGenerator { get; set; }
+        public Func<Random, T> GenomeGenerator { get; set; }
         public Func<T, int, ulong> Decoder { get; set; }
 
         public int NumStages { get; set; }
@@ -58,79 +58,10 @@ namespace OthelloAI.GA
 
             GenomeGroup<T> CreateGenome()
             {
-                return new GenomeGroup<T>(GenomeGenerator(), rand.Next(SizeMin, SizeMax + 1));
+                return new GenomeGroup<T>(GenomeGenerator(rand), rand.Next(SizeMin, SizeMax + 1));
             }
 
             return new Individual<T>(Enumerable.Range(0, NumStages).Select(_ => Enumerable.Range(0, NumTuples).Select(_ => CreateGenome()).ToArray()).ToArray(), this);
-        }
-    }
-
-    public class IndividualIO<T>
-    {
-        public Action<T, BinaryWriter> WriteGenome { get; set; }
-        public Func<BinaryReader, T> ReadGenome { get; set; }
-
-        public GenomeInfo<T> Info { get; set; }
-
-        public void Write(Individual<T> ind, BinaryWriter writer)
-        {
-            writer.Write(ind.Genome.Length);
-
-            foreach (var g1 in ind.Genome)
-            {
-                writer.Write(g1.Length);
-
-                foreach (var g2 in g1)
-                {
-                    WriteGenome(g2.Genome, writer);
-                    writer.Write(g2.Size);
-                }
-            }
-        }
-
-        public void Write(List<Individual<T>> pop, BinaryWriter writer)
-        {
-            writer.Write(pop.Count);
-
-            foreach (var ind in pop)
-                Write(ind, writer);
-        }
-
-        public List<Individual<T>> Read(BinaryReader reader)
-        {
-            return Enumerable.Range(0, reader.ReadInt32()).Select(_ => ReadIndividual(reader)).ToList();
-        }
-
-        public Individual<T> ReadIndividual(BinaryReader reader)
-        {
-            GenomeGroup<T>[][] gene = new GenomeGroup<T>[reader.ReadInt32()][];
-
-            for (int i = 0; i < gene.Length; i++)
-            {
-                gene[i] = new GenomeGroup<T>[reader.ReadInt32()];
-
-                for (int j = 0; j < gene[i].Length; j++)
-                {
-                    var g = ReadGenome(reader);
-                    int size = reader.ReadInt32();
-
-                    gene[i][j] = new GenomeGroup<T>(g, size);
-                }
-            }
-
-            return new Individual<T>(gene, Info);
-        }
-
-        public void Save(string file, List<Individual<T>> pop)
-        {
-            using var writer = new BinaryWriter(new FileStream(file, FileMode.Create));
-            Write(pop, writer);
-        }
-
-        public List<Individual<T>> Load(string file)
-        {
-            using var reader = new BinaryReader(new FileStream(file, FileMode.Open));
-            return Read(reader);
         }
     }
 
@@ -145,14 +76,14 @@ namespace OthelloAI.GA
                 SizeMin = 7,
                 SizeMax = 7,
                 MaxNumWeights = (int)Math.Pow(3, 9),
-                GenomeGenerator = () => Program.Random.GenerateRegion(19, 7),
+                GenomeGenerator = rand => rand.GenerateRegion(19, 7),
                 Decoder = (g, _) => g,
             };
 
             var ga = new GA<ulong, Score<ulong>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorRandomTournament<ulong>(new PopulationTrainerCoLearning(1, 54, 6400, true), 2, 54, 100 * 400)
+                Evaluator = new PopulationEvaluatorRandomTournament<ulong>(new PopulationTrainerCoLearning(1, 54, 160, 16000, -1), 2, 54, 100 * 400)
                 {
                     GetDepthFraction = (_, _, _) => (1, 1)
                 },
@@ -164,13 +95,6 @@ namespace OthelloAI.GA
                     LambdaCX = 10,
                     Mutant = new MutantBits(0.25F),
                     Crossover = new CrossoverExchange<ulong>(),
-                },
-
-                IO = new IndividualIO<ulong>()
-                {
-                    Info = info,
-                    ReadGenome = reader => reader.ReadUInt64(),
-                    WriteGenome = (gene, writer) => writer.Write(gene)
                 },
             };
 
@@ -264,13 +188,15 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 9,
-                SizeMin = 7,
-                SizeMax = 7,
-                MaxNumWeights = (int)Math.Pow(3, 7) * 9,
-                GenomeGenerator = () => Enumerable.Range(0, 19).Select(_ => (float) Program.Random.NextDouble()).ToArray(),
+                NumTuples = 2,
+                SizeMin = 8,
+                SizeMax = 8,
+                MaxNumWeights = (int)Math.Pow(3, 8) * 2,
+                GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
+
+            int pop_size = 400;
 
             var ga = new GA<float[], Score<float[]>>()
             {
@@ -279,59 +205,50 @@ namespace OthelloAI.GA
                 //{
                 //    GetDepthFraction = GetDepthFraction
                 //},
-                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(3, 52, 6400, true)),
-                Variator = new VariatorEliteArchive<float[]>()
+                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(2, 52, 6400, 6400, -1)),
+                //Variator = new VariatorEliteArchive<float[]>()
+                //{
+                //    NumElites = 20,
+                //    Groups = new [] { 
+                //        new VariationGroup<float[]>(new CrossoverEliteBiased(0.7F), 60, 6),
+                //        new VariationGroup<float[]>(new MutantGaussNoise(0.7F), 5, 1),
+                //        new VariationGroup<float[]>(new MutantRandomGenerationOneTuple<float[]>(), 5, 1),
+                //        new VariationGroup<float[]>(new MutantRandomGeneration<float[]>(), 10, 2),
+                //    },
+                //},
+                Variator = new VariatorEliteArchiveDistributed<float[]>()
                 {
+                    NumDime = 4,
+                    MigrationRate = 50,
                     NumElites = 20,
-                    NumCx = 60,
-                    NumEliteMutants = 10,
-                    NumRandomMutants = 10,
-                    Crossover = new CrossoverEliteBiased(0.7F),
-                    MutantElite = new MutantRandomKey(0.08F, 0.1F, 0.01F),
-                    Generator = info,
-                },
-
-                IO = new IndividualIO<float[]>()
-                {
-                    Info = info,
-                    ReadGenome = reader =>
-                    {
-                        var gene = new float[reader.ReadInt32()];
-                        for (int i = 0; i < gene.Length; i++)
-                            gene[i] = reader.ReadSingle();
-                        return gene;
+                    NumElitesMigration = 2,
+                    Groups = new[] {
+                        new VariationGroup<float[]>(new CrossoverEliteBiased(0.7F), 60, 8),
+                        // new VariationGroup<float[]>(new MutantGaussNoise(0.7F), 6, 2),
+                        // new VariationGroup<float[]>(new MutantRandomGenerationOneTuple<float[]>(), 10, 0),
+                        new VariationGroup<float[]>(new MutantRandomGeneration<float[]>(), 20, 0),
                     },
-                    WriteGenome = (gene, writer) =>
-                    {
-                        writer.Write(gene.Length);
-                        Array.ForEach(gene, writer.Write);
-                    }
                 },
             };
 
-            var log = $"G:/マイドライブ/Lab/test/ga/log_brkga_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw = File.AppendText(log);
+            string directory = $"ga/brkga_{DateTime.Now:yyyy_MM_dd_HH_mm}";
+            Directory.CreateDirectory(directory);
 
-            var log_inds = $"G:/マイドライブ/Lab/test/ga/log_brkga_inds_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw_inds = File.AppendText(log_inds);
+            var log_tuple = $"{directory}/tuple.csv";
+            using StreamWriter sw_tuple = File.AppendText(log_tuple);
 
-            // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
-            ga.Run(ga.Init(100), (n_gen, time, pop) =>
+            var log_gene = $"{directory}/gene.csv";
+            using StreamWriter sw_gene = File.AppendText(log_gene);
+
+            ga.Run(ga.Init(pop_size), (gen, time, pop) =>
             {
-                var score = pop.MinBy(ind => ind.score).First();
-
                 foreach (var s in pop.OrderBy(s => s.score))
                 {
-                    sw.Write(s.score + ",");
-
-                    foreach (var t in s.ind.Tuples)
-                    {
-                        sw.Write(",," + string.Join(", ", t.Select(t => t.TupleBit)));
-                    }
-                    sw.WriteLine();
-
-                    sw_inds.WriteLine(string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
+                    sw_tuple.WriteLine(gen + ", " + string.Join(",,", s.ind.Tuples.Select(t => string.Join(", ", t.Select(t => t.TupleBit)))));
+                    sw_gene.WriteLine(gen + ", " + string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
                 }
+
+                var score = pop.MinBy(ind => ind.score).First();
 
                 foreach (var t in score.ind.Tuples)
                 {
@@ -339,26 +256,18 @@ namespace OthelloAI.GA
 
                     for (int i = 0; i < tuples.Length / 2.0F; i++)
                     {
-                        var b1 = tuples[i * 2];
-
                         if (i * 2 + 1 < tuples.Length)
-                        {
-                            var b2 = tuples[i * 2 + 1];
-                            Console.WriteLine(new Board(b1, Board.HorizontalMirror(b2)));
-                        }
+                            Console.WriteLine(new Board(tuples[i * 2], Board.HorizontalMirror(tuples[i * 2 + 1])));
                         else
-                        {
-                            Console.WriteLine(new Board(b1, 0));
-                        }
+                            Console.WriteLine(new Board(tuples[i * 2], 0));
                     }
-                    Console.WriteLine();
                 }
 
-                Console.WriteLine($"Gen : {n_gen}, {time}");
-                Console.WriteLine(string.Join(",,", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+                Console.WriteLine($"Gen : {gen}, {time}");
+                Console.WriteLine(string.Join(",", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
-                sw.Flush();
-                sw_inds.Flush();
+                sw_tuple.Flush();
+                sw_gene.Flush();
             });
         }
     }
@@ -368,7 +277,6 @@ namespace OthelloAI.GA
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
 
         public GenomeInfo<T> Info { get; set; }
-        public IndividualIO<T> IO { get; set; }
 
         public IPopulationEvaluator<T, U> Evaluator { get; set; }
         public IVariator<T, U> Variator { get; set; }
@@ -401,9 +309,7 @@ namespace OthelloAI.GA
                 float time = (float)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
                 logger(i, time, scores);
 
-                pop = Variator.Vary(scores, Random);
-
-                IO.Save("ga/ind.dat", pop);
+                pop = Variator.Vary(scores, i, Random);
             }
         }
 

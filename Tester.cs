@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -433,22 +434,27 @@ namespace OthelloAI
             }
         }
 
-        public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int n_per_gen, int n)
+        public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int n_per_gen)
         {
             static Weight Create(string line)
             {
                 var tokens = line.Split(",").Where(s => s.Length > 0).Skip(1);
+                var masks = tokens.Select(ulong.Parse).ToArray();
+
+                for (int i = 0; i < masks.Length / 2.0F; i++)
+                {
+                    if (i * 2 + 1 < masks.Length)
+                        Console.WriteLine(new Board(masks[i * 2], Board.HorizontalMirror(masks[i * 2 + 1])));
+                    else
+                        Console.WriteLine(new Board(masks[i * 2], 0));
+                }
+                Console.WriteLine("------------------------------------------------------------");
+
                 return new WeightsSum(tokens.Select(ulong.Parse).Select(u => new WeightsArrayR(u)).ToArray());
             }
 
             int idx = gen * n_per_gen;
-
-            return lines[idx..(idx + n)].Select(Create).ToArray();
-        }
-
-        public static void Test()
-        {
-
+            return lines[idx..(idx + n_per_gen)].Select(Create).ToArray();
         }
 
         public static void TestGAResultTraining(Trainer[] trainers, int n_game)
@@ -485,12 +491,14 @@ namespace OthelloAI
 
             var log = $"G:/マイドライブ/Lab/test/ga/log_ga_test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
 
-            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_10_21_00.csv";
+            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_11_14_42.csv";
             var dir_path = $"e/{Path.GetFileNameWithoutExtension(ga_log1)}";
             // var ga_log2 = @"G:\マイドライブ\Lab\test\ga\log_es_2022_12_07_12_17.csv";
 
             var lines = File.ReadAllLines(ga_log1);
-            var weights = gens.Select(g => CreateNetworkFromLogFile(lines, g, 100, n_elites_per_gen)).ToArray();
+            CreateNetworkFromLogFile(lines, 1000, 100);
+            return;
+            var weights = gens.Select(g => CreateNetworkFromLogFile(lines, g, 100)[0..n_elites_per_gen]).ToArray();
 
             Directory.CreateDirectory(dir_path);
 

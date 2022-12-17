@@ -246,14 +246,15 @@ namespace OthelloAI.GA
         public int Depth { get; }
         public int EndStage { get; }
         public int NumGames { get; }
-        public bool IsParallel { get; }
 
-        public PopulationTrainer(int depth, int endStage, int numGames, bool isParallel)
+        public int NumThreads { get; }
+
+        public PopulationTrainer(int depth, int endStage, int numGames, int numThreads)
         {
             Depth = depth;
             EndStage = endStage;
             NumGames = numGames;
-            IsParallel = isParallel;
+            NumThreads = numThreads;
         }
 
         public PlayerAI CreatePlayer(Evaluator e)
@@ -276,8 +277,11 @@ namespace OthelloAI.GA
 
     public class PopulationTrainerCoLearning : PopulationTrainer
     {
-        public PopulationTrainerCoLearning(int depth, int endStage, int numGames, bool isParallel) : base(depth, endStage, numGames, isParallel)
+        public FixedQueue<TrainingData> TrainingData { get; } = new FixedQueue<TrainingData>(10000);
+
+        public PopulationTrainerCoLearning(int depth, int endStage, int numGames, int sizeExperiments, int numThreads) : base(depth, endStage, numGames, numThreads)
         {
+            TrainingData = new FixedQueue<TrainingData>(sizeExperiments);
         }
 
         public override List<float> Train(List<Weight> pop)
@@ -290,51 +294,32 @@ namespace OthelloAI.GA
 
             var trainers = pop.Select(p => new Trainer(p, 0.001F)).ToArray();
 
+            if(TrainingData.Count > 0)
+            {
+                Parallel.ForEach(trainers, trainer =>
+                {
+                    foreach (var t in TrainingData.SelectMany(x => x))
+                        trainer.Update(t.board, t.result);
+                });
+            }
+
             for (int i = 0; i < NumGames / 16; i++)
             {
-                var data = TrainerUtil.PlayForTrainingParallel(16, player);
+                var data = TrainerUtil.PlayForTrainingParallelSeparated(16, player, NumThreads);
 
-                Parallel.ForEach(trainers, trainer => data.ForEach(t => trainer.Update(t.board, t.result)));
+                foreach (var t in data)
+                    TrainingData.Enqueue(t);
+
+                Parallel.ForEach(trainers, trainer =>
+                {
+                    foreach (var t in data.SelectMany(x => x))
+                        trainer.Update(t.board, t.result);
+                });
 
                 // Console.WriteLine($"{i} / {NumGames / 16}");
             }
 
             return trainers.Select(trainer => trainer.Log.TakeLast(trainer.Log.Count / 4).Average()).ToList();
-        }
-    }
-
-    public class PopulationTrainerSelfPlay : PopulationTrainer
-    {
-        public PopulationTrainerSelfPlay(int depth, int endStage, int numGames, bool isParallel) : base(depth, endStage, numGames, isParallel)
-        {
-        }
-
-        public override List<float> Train(List<Weight> pop)
-        {
-            if (IsParallel)
-            {
-                return pop.AsParallel().Select(Train).ToList();
-            }
-            else
-            {
-
-                return pop.Select(Train).ToList();
-            }
-        }
-
-        public float Train(Weight w)
-        {
-            var rand = new Random();
-            var player = CreatePlayer(new EvaluatorWeightsBased(w));
-            var trainer = new Trainer(w, 0.002F);
-
-            for (int i = 0; i < NumGames / 16; i++)
-            {
-                var data = TrainerUtil.PlayForTraining(16, player, rand);
-                data.ForEach(t => trainer.Update(t.board, t.result));
-            }
-
-            return trainer.Log.TakeLast(trainer.Log.Count / 4).Average();
         }
     }
 }

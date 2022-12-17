@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -92,6 +93,36 @@ namespace OthelloAI
             while (e1.MoveNext() && e2.MoveNext() && e3.MoveNext())
                 yield return func(e1.Current, e2.Current, e3.Current);
         }
+    }
+
+    public class FixedQueue<T> : IEnumerable<T>
+    {
+        private Queue<T> _queue;
+
+        public int Count => _queue.Count;
+
+        public int Capacity { get; private set; }
+
+        public FixedQueue(int capacity)
+        {
+            Capacity = capacity;
+            _queue = new Queue<T>(capacity);
+        }
+
+        public void Enqueue(T item)
+        {
+            _queue.Enqueue(item);
+
+            if (Count > Capacity) Dequeue();
+        }
+
+        public T Dequeue() => _queue.Dequeue();
+
+        public T Peek() => _queue.Peek();
+
+        public IEnumerator<T> GetEnumerator() => _queue.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => _queue.GetEnumerator();
     }
 
     public static class RandomUtil
