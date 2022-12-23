@@ -37,42 +37,69 @@ namespace OthelloAI.GA
             };
         }
 
+        public int GetHashCode(Individual<T> ind)
+        {
+            static int GetHashCode(IEnumerable<TupleData<T>> tuples)
+            {
+                return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, Board.BitCount(next.TupleBit)));
+            }
+
+            return ind.Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, GetHashCode(next)));
+        }
+
+        public List<Individual<T>> SelectIndividualsToEvaluate(IEnumerable<(Individual<T> ind, float s)> pop, float rate)
+        {
+            IEnumerable<Individual<T>> SelectFromGroup(IEnumerable<(Individual<T> ind, float s)> group)
+            {
+                int n = (int)Math.Max(1, group.Count() * rate);
+                return group.OrderBy(t => t.s).Select(t => t.ind).Take(n);
+            }
+
+            var groups = pop.GroupBy(t => GetHashCode(t.ind));
+
+            return groups.Select(SelectFromGroup).SelectMany(x => x).ToList();
+        }
+
+        public List<Individual<T>> TrainAndSelectPop(List<Individual<T>> pop)
+        {
+            var set = pop.Distinct().ToArray();
+            var scores = Trainer.Train(set.Select(ind => ind.Weight).ToList());
+
+            return SelectIndividualsToEvaluate(set.Zip(scores, (ind, s) => (ind, s)), 0.5F);
+        }
+
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            Trainer.Train(pop.Select(ind => ind.Weights).ToList());
-
-            foreach (var ind in pop)
-            {
-                ind.Log.Clear();
-            }
+            var pop_to_evaluate = TrainAndSelectPop(pop);
+            var scores = new Dictionary<Individual<T>, List<float>>(pop_to_evaluate.Select(ind => new KeyValuePair<Individual<T>, List<float>>(ind, new List<float>())));
 
             Parallel.For(0, NumGames, i =>
             {
                 var rand = new Random();
-                var pair = rand.SamplePair(pop.Count);
+                var pair = rand.SamplePair(pop_to_evaluate.Count);
 
-                var ind1 = pop[pair.Item1];
-                var ind2 = pop[pair.Item2];
+                var ind1 = pop_to_evaluate[pair.Item1];
+                var ind2 = pop_to_evaluate[pair.Item2];
 
                 PlayerAI p1 = CreatePlayer(ind1, ind2);
                 PlayerAI p2 = CreatePlayer(ind2, ind1);
 
-                Board b = Tester.PlayGame(p1, p2, Tester.CreateRandomGame(6, rand));
+                Board b = Tester.PlayGame(p1, p2, Tester.CreateRandomGame(2, rand));
                 int result = b.GetStoneCountGap();
 
                 if (result > 0)
                 {
-                    ind1.Log.Add(1);
-                    ind2.Log.Add(0);
+                    scores[ind1].Add(1);
+                    scores[ind2].Add(0);
                 }
                 else if (result < 0)
                 {
-                    ind1.Log.Add(0);
-                    ind2.Log.Add(1);
+                    scores[ind1].Add(0);
+                    scores[ind2].Add(1);
                 }
             });
 
-            return pop.Select(ind => new Score<T>(ind, -ind.Log.Average())).ToList();
+            return pop.Select(ind => new Score<T>(ind, -scores[ind].Average())).ToList();
         }
     }
 
@@ -106,7 +133,7 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            Trainer.Train(pop.Select(ind => ind.Weights).ToList());
+            Trainer.Train(pop.Select(ind => ind.Weight).ToList());
 
             foreach (var ind in pop)
             {
@@ -154,19 +181,77 @@ namespace OthelloAI.GA
         }
     }
 
-    public class PopulationEvaluatorTrainingScore<T> : IPopulationEvaluator<T, Score<T>>
+    public class PopulationEvaluatorTrainingScorebySelfMatch<T> : IPopulationEvaluator<T, Score<T>>
     {
         PopulationTrainer Trainer { get; }
 
-        public PopulationEvaluatorTrainingScore(PopulationTrainer trainer)
+        public PopulationEvaluatorTrainingScorebySelfMatch(PopulationTrainer trainer)
         {
             Trainer = trainer;
         }
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            var scores = Trainer.Train(pop.Select(ind => ind.Weights).ToList());
+            var scores = Trainer.Train(pop.Select(ind => ind.Weight).ToList());
             return pop.Zip(scores, (ind, s) => new Score<T>(ind, s)).ToList();
+        }
+    }
+
+    public class PopulationEvaluatorTrainingScore<T> : IPopulationEvaluator<T, Score<T>>
+    {
+        TrainingData[] Data { get; }
+
+        public PopulationEvaluatorTrainingScore(TrainingData[] data)
+        {
+            Data = data;
+        }
+
+        public List<Score<T>> Evaluate(List<Individual<T>> pop)
+        {
+            //int index = Program.Random.Next(Data.Length);
+            int index = Data.Length - 1;
+
+            var train_data = Enumerable.Range(0, Data.Length).Where(i => i != index).OrderBy(_ => Program.Random.NextSingle()).SelectMany(i => Data[i]).ToArray();
+            var valid_data = Data[index];
+
+            return pop.AsParallel().Select(ind =>
+            {
+                var trainer = new Trainer(ind.Weight, 0.001F);
+
+                Array.ForEach(train_data, d => trainer.Update(d.board, d.result));
+
+                float score = valid_data.Select(d => trainer.TestError(d.board, d.result)).Average();
+
+                return new Score<T>(ind, score);
+            }).ToList();
+        }
+    }
+
+    public class PopulationEvaluatorTrainingScoreKFold<T> : IPopulationEvaluator<T, Score<T>>
+    {
+        TrainingData[] Data { get; }
+
+        public PopulationEvaluatorTrainingScoreKFold(TrainingData[] data)
+        {
+            Data = data;
+        }
+
+        public List<Score<T>> Evaluate(List<Individual<T>> pop)
+        {
+            int size = pop.Count / Data.Length;
+
+            return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads).Select((ind, i) =>
+            {
+                int index = i / size;
+
+                var train_data = Enumerable.Range(0, Data.Length).Where(i => i != index).SelectMany(i => Data[i]);
+                var valid_data = Data[index];
+
+                var trainer = new Trainer(ind.Weight, 0.001F);
+
+                float score = trainer.TrainAndTest(train_data, valid_data);
+                return new Score<T>(ind, score);
+            }).ToList();
         }
     }
 
@@ -294,7 +379,7 @@ namespace OthelloAI.GA
 
             var trainers = pop.Select(p => new Trainer(p, 0.001F)).ToArray();
 
-            if(TrainingData.Count > 0)
+            if (TrainingData.Count > 0)
             {
                 Parallel.ForEach(trainers, trainer =>
                 {
@@ -307,8 +392,8 @@ namespace OthelloAI.GA
             {
                 var data = TrainerUtil.PlayForTrainingParallelSeparated(16, player, NumThreads);
 
-                foreach (var t in data)
-                    TrainingData.Enqueue(t);
+                //foreach (var t in data)
+                //    TrainingData.Enqueue(t);
 
                 Parallel.ForEach(trainers, trainer =>
                 {

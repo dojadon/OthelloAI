@@ -223,6 +223,16 @@ namespace OthelloAI
         IterativeDeepening,
     }
 
+    public readonly struct SearchParameter
+    {
+        public readonly float depth;
+        public readonly bool depth_prob_cut;
+
+        public readonly float alpha, beta;
+
+        public readonly bool transposition_cut, store_transposition;
+    }
+
     public class SearchParameters
     {
         public readonly int stage;

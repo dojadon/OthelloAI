@@ -159,7 +159,7 @@ namespace OthelloAI.GA
 
             static float CalcExeCost(Individual<float[]> ind, int n_dsics)
             {
-                return ind.Weights.NumOfEvaluation(n_dsics);
+                return ind.Weight.NumOfEvaluation(n_dsics);
             }
 
             static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2, int n_dsics)
@@ -188,45 +188,45 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 2,
+                NumTuples = 4,
                 SizeMin = 8,
                 SizeMax = 8,
-                MaxNumWeights = (int)Math.Pow(3, 8) * 2,
+                MaxNumWeights = (int)Math.Pow(3, 8) * 4,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
 
-            int pop_size = 400;
+            int pop_size = 800;
+
+            static bool p(TrainingDataElement t) => 36 <= t.board.n_stone && t.board.n_stone < 42;
+            var data = Enumerable.Range(2001, 15).Select(i => new TrainingData(WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p))).ToArray();
 
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                //Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 6400, true), 2, 54, 100 * 400)
+                //Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 6400, 6400, 30), 1, 54, 200 * 400)
                 //{
                 //    GetDepthFraction = GetDepthFraction
                 //},
-                Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(2, 52, 6400, 6400, -1)),
+                // Evaluator = new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainerCoLearning(4, 48, 9600, 9600, -1)),
+                Evaluator = new PopulationEvaluatorTrainingScoreKFold<float[]>(data),
                 //Variator = new VariatorEliteArchive<float[]>()
                 //{
-                //    NumElites = 20,
-                //    Groups = new [] { 
-                //        new VariationGroup<float[]>(new CrossoverEliteBiased(0.7F), 60, 6),
-                //        new VariationGroup<float[]>(new MutantGaussNoise(0.7F), 5, 1),
-                //        new VariationGroup<float[]>(new MutantRandomGenerationOneTuple<float[]>(), 5, 1),
-                //        new VariationGroup<float[]>(new MutantRandomGeneration<float[]>(), 10, 2),
+                //    NumElites = 20 * 1,
+                //    Groups = new VariationGroup<float[]>[] {
+                //        new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 60 * 1, 8),
+                //        new VariationGroupRandom<float[]>(20 * 1, 0),
                 //    },
                 //},
                 Variator = new VariatorEliteArchiveDistributed<float[]>()
                 {
-                    NumDime = 4,
+                    NumDime = 8,
                     MigrationRate = 50,
                     NumElites = 20,
                     NumElitesMigration = 2,
-                    Groups = new[] {
-                        new VariationGroup<float[]>(new CrossoverEliteBiased(0.7F), 60, 8),
-                        // new VariationGroup<float[]>(new MutantGaussNoise(0.7F), 6, 2),
-                        // new VariationGroup<float[]>(new MutantRandomGenerationOneTuple<float[]>(), 10, 0),
-                        new VariationGroup<float[]>(new MutantRandomGeneration<float[]>(), 20, 0),
+                    Groups = new VariationGroup<float[]>[] {
+                        new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 65, 8),
+                        new VariationGroupRandom<float[]>(15, 0),
                     },
                 },
             };
@@ -240,12 +240,26 @@ namespace OthelloAI.GA
             var log_gene = $"{directory}/gene.csv";
             using StreamWriter sw_gene = File.AppendText(log_gene);
 
+            var log_score = $"{directory}/score.csv";
+            using StreamWriter sw_score = File.AppendText(log_score);
+
             ga.Run(ga.Init(pop_size), (gen, time, pop) =>
             {
-                foreach (var s in pop.OrderBy(s => s.score))
+                foreach (var t in pop.Select((s, i) => (s, i)).OrderBy(t => t.i / 100).ThenBy(t => t.s.score))
                 {
-                    sw_tuple.WriteLine(gen + ", " + string.Join(",,", s.ind.Tuples.Select(t => string.Join(", ", t.Select(t => t.TupleBit)))));
-                    sw_gene.WriteLine(gen + ", " + string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
+                    var s = t.s;
+                    int id = t.i / 100;
+                    int rank = t.i % 100;
+
+                    sw_tuple.WriteLine($"{gen},{id}," + string.Join(",,", s.ind.Tuples.Select(t => string.Join(", ", t.Select(t => t.TupleBit)))));
+                    sw_gene.WriteLine($"{gen},{id}," + string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
+
+                    if(rank == 0)
+                    {
+                        var trainer = new Trainer(s.ind.Weight, 0.001F);
+                        float kfold_score = trainer.KFoldTest(data);
+                        sw_score.WriteLine($"{gen},{id},{s.score},{kfold_score}");
+                    }
                 }
 
                 var score = pop.MinBy(ind => ind.score).First();
@@ -268,6 +282,7 @@ namespace OthelloAI.GA
 
                 sw_tuple.Flush();
                 sw_gene.Flush();
+                sw_score.Flush();
             });
         }
     }
@@ -377,7 +392,7 @@ namespace OthelloAI.GA
         public GenomeGroup<T>[][] Genome { get; }
         public TupleData<T>[][] Tuples { get; }
 
-        public Weight Weights { get; }
+        public Weight Weight { get; }
 
         public GenomeInfo<T> Info { get; }
 
@@ -409,10 +424,10 @@ namespace OthelloAI.GA
                 weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t.TupleBit)).ToArray());
             }
 
-            Weights = new WeightsStagebased(weights);
+            Weight = new WeightsStagebased(weights);
         }
 
-        public Evaluator CreateEvaluator() => new EvaluatorWeightsBased(Weights);
+        public Evaluator CreateEvaluator() => new EvaluatorWeightsBased(Weight);
 
         public override bool Equals(object obj)
         {

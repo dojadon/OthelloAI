@@ -7,21 +7,10 @@ namespace OthelloAI
 {
     public static class ArrayUtil
     {
-        public static float[][] AverageAxis3(float[][][] a)
+        public static T[][] Divide<T>(T[] a, int n)
         {
-            int l1 = a[0].Length;
-            int l2 = a[0][0].Length;
-
-            float[][] result = new float[l1][];
-            for(int i = 0; i < result.Length; i++)
-            {
-                result[i] = new float[l2];
-
-                for (int j = 0; j < result[i].Length; j++)
-                    result[i][j] = a.Select(aa => aa[i][j]).Average();
-            }
-
-            return result;
+            int len = a.Length / n;
+            return Enumerable.Range(0, n).Select(i => a.Skip(i * len).Take(len).ToArray()).ToArray();
         }
     }
 

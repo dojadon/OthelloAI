@@ -69,29 +69,42 @@ namespace OthelloAI.GA
 
     public abstract class VariationGroup<T>
     {
-        public IGeneticOperator2<T> Operator { get; }
         public int Size { get; }
         public int MigrationSize { get; }
 
-        public VariationGroup(IGeneticOperator2<T> opt, int size, int migrationSize)
+        protected VariationGroup(int size, int migrationSize)
         {
-            Operator = opt;
             Size = size;
             MigrationSize = migrationSize;
         }
 
-        public VariationGroup(IGeneticOperator1<T> opt, int size, int migrationSize) : this(new CrossoverMutant<T>(opt), size, migrationSize)
+        public abstract Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites, Random rand);
+    }
+
+    public class VariationGroupOperation<T> : VariationGroup<T>
+    {
+        public IGeneticOperator2<T> Operator { get; }
+
+        public VariationGroupOperation(IGeneticOperator2<T> opt, int size, int migrationSize) : base(size, migrationSize)
+        {
+            Operator = opt;
+        }
+
+        public override Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites, Random rand)
+        {
+            return Operator.Operate(rand.Choice(elites), rand.Choice(non_elites), rand);
+        }
+    }
+
+    public class VariationGroupRandom<T> : VariationGroup<T>
+    {
+        public VariationGroupRandom(int size, int migrationSize) : base(size, migrationSize)
         {
         }
 
-        public abstract Individual<T>[] Generate(Individual<T>[] elites, Individual<T>[] non_elites);
-    }
-
-    public class VariationGroupElite<T> : VariationGroup<T>
-    {
-        public override Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites)
+        public override Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites, Random rand)
         {
-            throw new NotImplementedException();
+            return elites[0].Info.Generate(rand);
         }
     }
 
@@ -105,8 +118,8 @@ namespace OthelloAI.GA
         {
             var ordered = score.OrderBy(s => s.score).Select(s => s.ind).ToArray();
 
-            var elites = ordered.Take(NumElites).ToList();
-            var non_elites = ordered.Skip(NumElites).ToList();
+            var elites = ordered.Take(NumElites).ToArray();
+            var non_elites = ordered.Skip(NumElites).ToArray();
 
             var result = new HashSet<Individual<T>>(elites);
 
@@ -115,7 +128,7 @@ namespace OthelloAI.GA
                 int n_init = result.Count;
 
                 while (result.Count - n_init < group.Size)
-                    result.Add(group.Operator.Operate(rand.Choice(elites), rand.Choice(non_elites), rand));
+                    result.Add(group.Generate(elites, non_elites, rand));
             }
 
             return result.ToList();
@@ -137,13 +150,14 @@ namespace OthelloAI.GA
         {
             var result = new List<Individual<T>>();
 
-            var dimes = Enumerable.Range(0, NumDime).AsParallel().Select(i => VaryDime(score.Skip(i * DimeSize).Take(DimeSize), rand)).ToArray();
+            var dimes = Enumerable.Range(0, NumDime).AsParallel().WithDegreeOfParallelism(Program.NumThreads)
+                .Select(i => VaryDime(score.Skip(i * DimeSize).Take(DimeSize), rand)).ToArray();
 
             for (int i = 0; i < NumDime; i++)
             {
                 IEnumerable<Individual<T>> next;
 
-                if(gen % MigrationRate == 0)
+                if(gen % MigrationRate == 0 && gen > 0)
                 {
                     var migrations = dimes[(i + 1) % NumDime].migrations;
                     next = dimes[i].next_gen.Take(DimeSize - migrations.Count).Concat(migrations);
@@ -168,31 +182,27 @@ namespace OthelloAI.GA
         {
             var ordered = score.OrderBy(s => s.score).Select(s => s.ind).ToArray();
 
-            var elites = ordered.Take(NumElites).ToList();
-            var non_elites = ordered.Skip(NumElites).ToList();
-
-            var set = new HashSet<Individual<T>>(elites);
+            var elites = ordered.Take(NumElites).ToArray();
+            var non_elites = ordered.Skip(NumElites).ToArray();
 
             var result = new List<Individual<T>>(elites);
             var migrations = new List<Individual<T>>(elites.Take(NumElitesMigration));
 
             foreach (var group in Groups)
             {
-                var list = new List<Individual<T>>();
+                int n = result.Count;
 
-                while (list.Count < group.Size)
+                while (result.Count - n < group.Size)
                 {
-                    var ind = group.Operator.Operate(rand.Choice(elites), rand.Choice(non_elites), rand);
+                    var ind = group.Generate(elites, non_elites, rand);
 
-                    if (set.Contains(ind))
+                    if (result.Contains(ind))
                         continue;
 
-                    set.Add(ind);
                     result.Add(ind);
-                    list.Add(ind);
                 }
 
-                migrations.AddRange(list.Take(group.MigrationSize));
+                migrations.AddRange(result.TakeLast(group.MigrationSize));
             }
 
             return (result.ToList(), migrations);

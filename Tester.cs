@@ -356,7 +356,7 @@ namespace OthelloAI
         public static void TestError2()
         {
             var weight = Program.WEIGHT;
-            var depths = Enumerable.Range(0, 6).Select(i => i * 2);
+            var depths = Enumerable.Range(0, 8).Select(i => i * 1);
 
             weight.Load(@"G:\マイドライブ\Lab\e\e.dat");
 
@@ -368,12 +368,10 @@ namespace OthelloAI
                 PrintInfo = false,
             }).ToArray();
 
-            var e = WthorRecordReader.Read(@"G:\マイドライブ\Lab\WTH\WTH_2001.wtb").AsParallel().Where(t => t.boards.Count > 35).Select(t =>
+            var e = WthorRecordReader.Read(@"G:\マイドライブ\Lab\WTH\WTH_2001.wtb").AsParallel().SelectMany(x => x).Where(x => x.board.n_stone == 40).Select(t =>
             {
                 float Err(float e) => (e - t.result) * (e - t.result);
-
-                var b = t.boards[35];
-                return players.Select(p => p.DecideMoveWithEvaluation(b, 1).e).Select(Err).ToArray();
+                return players.Select(p => p.DecideMoveWithEvaluation(t.board, 1).e).Select(Err).ToArray();
             }).ToArray();
 
             var ee = Enumerable.Range(0, players.Length).Select(i => e.Select(a => a[i]).Average());
@@ -434,7 +432,7 @@ namespace OthelloAI
             }
         }
 
-        public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int n_per_gen)
+        public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int pop_size, int n_top)
         {
             static Weight Create(string line)
             {
@@ -453,8 +451,8 @@ namespace OthelloAI
                 return new WeightsSum(tokens.Select(ulong.Parse).Select(u => new WeightsArrayR(u)).ToArray());
             }
 
-            int idx = gen * n_per_gen;
-            return lines[idx..(idx + n_per_gen)].Select(Create).ToArray();
+            int idx = gen * pop_size;
+            return lines[idx..(idx + n_top)].Select(Create).ToArray();
         }
 
         public static void TestGAResultTraining(Trainer[] trainers, int n_game)
@@ -489,16 +487,13 @@ namespace OthelloAI
 
             int[] gens = Enumerable.Range(0, 1001).Select(i => i * 1).ToArray();
 
-            var log = $"G:/マイドライブ/Lab/test/ga/log_ga_test_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"ga/brkga_2022_12_18_21_14/test.csv";
 
-            var ga_log1 = @"G:\マイドライブ\Lab\test\ga\log_brkga_2022_12_11_14_42.csv";
+            var ga_log1 = "ga/brkga_2022_12_18_21_14/tuple.csv";
             var dir_path = $"e/{Path.GetFileNameWithoutExtension(ga_log1)}";
-            // var ga_log2 = @"G:\マイドライブ\Lab\test\ga\log_es_2022_12_07_12_17.csv";
 
             var lines = File.ReadAllLines(ga_log1);
-            CreateNetworkFromLogFile(lines, 1000, 100);
-            return;
-            var weights = gens.Select(g => CreateNetworkFromLogFile(lines, g, 100)[0..n_elites_per_gen]).ToArray();
+            var weights = gens.Select(g => CreateNetworkFromLogFile(lines, g, 400, n_elites_per_gen)).ToArray();
 
             Directory.CreateDirectory(dir_path);
 
@@ -514,7 +509,7 @@ namespace OthelloAI
             {
                 for (int j = 0; j < n_elites_per_gen; j++)
                 {
-                    weights[i][j].Save($"{dir_path}/1_{gens[i]}_{j}");
+                    // weights[i][j].Save($"{dir_path}/1_{gens[i]}_{j}");
                 }
 
                 float err = trainers[i].Select(t => t.Log.TakeLast(240000).Average()).Average();

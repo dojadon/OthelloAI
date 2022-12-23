@@ -9,6 +9,8 @@ namespace OthelloAI
 {
     public static class Program
     {
+        public const int NumThreads = 24;
+
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
 
@@ -23,10 +25,10 @@ namespace OthelloAI
 
         static void Main()
         {
-            GATest.TestBRKGA();
+            //GATest.TestBRKGA();
 
-            // Tester.TestGAResult();
-            return;
+            //Tester.TestGAResult();
+            //return;
 
             Tester.TestError2();
             return;

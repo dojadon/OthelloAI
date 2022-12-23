@@ -166,6 +166,32 @@ namespace OthelloAI
             LearningRate = lr;
         }
 
+        public float TestError(TrainingDataElement d)
+        {
+            return TestError(d.board, d.result);
+        }
+
+        public float TestError(Board board, float result)
+        {
+            var boards = new RotatedAndMirroredBoards(board);
+            float e = result - Weight.EvalTraining(boards);
+            return e;
+        }
+
+        public float UpdateWithBatch(TrainingData data)
+        {
+            float e = data.Select(TestError).Average();
+
+            foreach (var b in data.SelectMany(d => new RotatedAndMirroredBoards(d.board)))
+            {
+                Weight.UpdataEvaluation(b, e * LearningRate, Weight.WEIGHT_RANGE);
+            }
+
+            Log.Add(e * e);
+
+            return e;
+        }
+
         public float Update(Board board, float result)
         {
             var boards = new RotatedAndMirroredBoards(board);
@@ -179,6 +205,27 @@ namespace OthelloAI
             Log.Add(e * e);
 
             return e;
+        }
+
+        public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data)
+        {
+            foreach (var d in train_data)
+                Update(d.board, d.result);
+
+            return valid_data.Select(d => TestError(d.board, d.result)).Select(x => x * x).Average();
+        }
+
+        public float KFoldTest(TrainingData[] data)
+        {
+            return Enumerable.Range(0, data.Length).Select(i =>
+            {
+                Weight.Reset();
+
+                var train_data = Enumerable.Range(0, data.Length).Where(j => i != j).SelectMany(j => data[j]);
+                var valid_data = data[i];
+
+                return TrainAndTest(train_data, valid_data);
+            }).Average();
         }
 
         public static List<float> Train(Weight weight, int depth, int n_games, string path = "")

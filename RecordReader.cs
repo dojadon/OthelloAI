@@ -9,7 +9,7 @@ namespace OthelloAI
 {
     class WthorRecordReader
     {
-        public static IEnumerable<(List<Board> boards, int result)> Read(string path)
+        public static IEnumerable<TrainingData> Read(string path)
         {
             using var reader = new BinaryReader(new FileStream(path, FileMode.Open));
 
@@ -58,7 +58,7 @@ namespace OthelloAI
                     }
                 }
 
-                yield return (boards, result);
+                yield return new TrainingData(boards.Select(b => new TrainingDataElement(b, result)));
             }
         }
     }
