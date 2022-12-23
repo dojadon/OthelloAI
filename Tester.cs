@@ -136,7 +136,7 @@ namespace OthelloAI
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                p.SolveEndGame(board, p.Params[^1].CreateCutoffParameters(board.n_stone));
+                p.SolveRoot(new Search(), board, p.Params[^1].CreateSearchParameter(board.n_stone));
                 sw.Stop();
                 float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
