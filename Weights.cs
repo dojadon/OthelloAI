@@ -26,6 +26,8 @@ namespace OthelloAI
         public abstract void Read(BinaryReader reader);
         public abstract void Write(BinaryWriter writer);
 
+        public abstract Weight Copy();
+
         public static byte ConvertToInt8(float x, float range)
         {
             return (byte)Math.Clamp(x / range * 127 + 128, 0, 255);
@@ -102,6 +104,11 @@ namespace OthelloAI
             foreach (var w in Weights)
                 w.Write(writer);
         }
+
+        public override Weight Copy()
+        {
+            return new WeightsSum(Weights.Select(w => w.Copy()).ToArray());
+        }
     }
 
     public class WeightsStagebased : Weight
@@ -176,11 +183,18 @@ namespace OthelloAI
             foreach (var w in Weights)
                 w.Write(writer);
         }
+
+        public override Weight Copy()
+        {
+            return new WeightsStagebased(Weights.Select(w => w.Copy()).ToArray());
+        }
     }
 
     public class WeightsArrayS : Weight
     {
         public BoardHasher Hasher { get; }
+
+        public ulong Mask { get; }
 
         public float[] weights;
         byte[] weights_b;
@@ -193,13 +207,20 @@ namespace OthelloAI
 
         public WeightsArrayS(ulong m)
         {
+            Mask = m;
+
             pos = BoardHasherMask.MaskToPositions(m);
             Hasher = new BoardHasherScanning(pos);
             NumOfStates = Hasher.NumOfStates;
 
             Reset();
         }
-         
+
+        public override Weight Copy()
+        {
+            return new WeightsArrayS(Mask);
+        }
+
         public override void Reset()
         {
             weights = new float[Hasher.ArrayLength];
@@ -312,6 +333,11 @@ namespace OthelloAI
             Hasher = new BoardHasherMask(mask);
 
             Reset();
+        }
+
+        public override Weight Copy()
+        {
+            return new WeightsArrayR(mask);
         }
 
         public override void Reset()

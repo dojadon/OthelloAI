@@ -25,12 +25,12 @@ namespace OthelloAI
 
         static void Main()
         {
-            //GATest.TestBRKGA();
+            GATest.TestBRKGA();
 
-            //Tester.TestGAResult();
+            Tester.TestGAResult();
             //return;
 
-            Tester.TestError2();
+           // Tester.TestError3();
             return;
 
             WEIGHT.Load("e.dat");
@@ -52,8 +52,8 @@ namespace OthelloAI
         {
             PlayerAI p = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 9),
-                                              new SearchParameters(stage: 44, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: 9),
+                                              new SearchParameterFactory(stage: 44, type: SearchType.Normal, depth: 64)},
             };
 
             Client client = new Client(p);
@@ -64,8 +64,8 @@ namespace OthelloAI
         {
             PlayerAI p = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 11),
-                new SearchParameters(stage: 44, type: SearchType.Normal, depth: 64) },
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: 11),
+                new SearchParameterFactory(stage: 44, type: SearchType.Normal, depth: 64) },
                 PrintInfo = true
             };
 

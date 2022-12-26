@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -162,15 +161,15 @@ namespace OthelloAI
 
             PlayerAI p1 = new PlayerAI(e1)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 4),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: 4),
+                                              new SearchParameterFactory(stage: 50, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
 
             PlayerAI p2 = new PlayerAI(e2)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 6),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: 6),
+                                              new SearchParameterFactory(stage: 50, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
 
@@ -213,15 +212,15 @@ namespace OthelloAI
                 {
                     PlayerAI p1 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
-                        Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: i),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                        Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: i),
+                                              new SearchParameterFactory(stage: 48, type: SearchType.Normal, depth: 64)},
                         PrintInfo = false,
                     };
 
                     PlayerAI p2 = new PlayerAI(new EvaluatorWeightsBased(weight))
                     {
-                        Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: j),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
+                        Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: j),
+                                              new SearchParameterFactory(stage: 48, type: SearchType.Normal, depth: 64)},
                         PrintInfo = false,
                     };
 
@@ -244,7 +243,7 @@ namespace OthelloAI
         {
             var player = new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: depth),
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: depth),
                                               // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
                 },
                 PrintInfo = false,
@@ -257,7 +256,7 @@ namespace OthelloAI
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: d),
                                               // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
                 },
                 PrintInfo = false,
@@ -277,7 +276,7 @@ namespace OthelloAI
         {
             var player = new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: depth),
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: depth),
                                               // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
                 },
                 PrintInfo = false,
@@ -290,7 +289,7 @@ namespace OthelloAI
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: d),
                                               // new SearchParameters(stage: 60, type: SearchType.Normal, depth: 64)
                 },
                 PrintInfo = false,
@@ -325,8 +324,8 @@ namespace OthelloAI
         {
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: d),
+                                              new SearchParameterFactory(stage: 50, type: SearchType.Normal, depth: 64)
                 },
                 PrintInfo = false,
             }).ToArray();
@@ -353,6 +352,30 @@ namespace OthelloAI
             }, () => new float[players.Length]);
         }
 
+        public static (float[][] eval, float[][] time, float[][] nodes) TestPerformance(PlayerAI[] players, IEnumerable<TrainingDataElement> data)
+        {
+            var result = data.Select(t =>
+            {
+                float Err(float e) => (e - t.result) * (e - t.result);
+
+                return players.Select(p =>
+                {
+                    p.SearchedNodeCount = 0;
+                    var timer = Stopwatch.StartNew();
+                    float eval = p.Evaluate(t.board);
+                    timer.Stop();
+
+                    float time = (float)timer.ElapsedTicks / Stopwatch.Frequency;
+                    return new float[] { Err(eval), time, p.SearchedNodeCount };
+                }).ToArray();
+
+            }).ToArray();
+
+            var a = Enumerable.Range(0, 3).Select(i => Enumerable.Range(0, players.Length).Select(j => result.Select(a => a[j][i]).ToArray()).ToArray()).ToArray();
+
+            return (a[0], a[1], a[2]);
+        }
+
         public static void TestError2()
         {
             var weight = Program.WEIGHT;
@@ -362,21 +385,68 @@ namespace OthelloAI
 
             var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(weight))
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: d),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)
+                Params = new[] {
+                    new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: d),
                 },
                 PrintInfo = false,
             }).ToArray();
 
-            var e = WthorRecordReader.Read(@"G:\マイドライブ\Lab\WTH\WTH_2001.wtb").AsParallel().SelectMany(x => x).Where(x => x.board.n_stone == 40).Select(t =>
+            static bool Within(TrainingDataElement d) => 39 <= d.board.n_stone && d.board.n_stone <= 40;
+
+            var data = WthorRecordReader.Read(@"G:\マイドライブ\Lab\WTH\WTH_2001.wtb").SelectMany(x => x).Where(Within);
+
+            (float[][] eval, float[][] time, float[][] nodes) = TestPerformance(players, data);
+
+            var f1 = Regression.Exponential(depths.Select(d => d * 1F), eval.Select(a => a.Average()));
+            Console.WriteLine($"{f1}");
+
+            Console.WriteLine(string.Join(", ", eval.Select(a => a.Average())));
+            Console.WriteLine(string.Join(", ", time.Select(a => a.Average())));
+            Console.WriteLine(string.Join(", ", nodes.Select(a => a.Average())));
+        }
+
+        public static void TestError3()
+        {
+            Console.WriteLine("Loading Train Data");
+
+            static bool Within(TrainingDataElement d) => 39 <= d.board.n_stone && d.board.n_stone <= 40;
+            var data = Enumerable.Range(2001, 15).Select(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(Within).ToArray()).ToArray();
+
+            Console.WriteLine("Loading Tuples");
+
+            var lines = File.ReadAllLines("ga/log_ga_2022_12_07_01_55_01_01_02.csv");
+            var weights = CreateNetworkFromLogFile(lines, 0, 400, 20);
+
+            var trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
+
+            Console.WriteLine("Training");
+
+            float e = trainers.AsParallel().Select(t => t.TrainAndTest(data[1..^2].SelectMany(x => x), data[^1])).Average();
+
+            Console.WriteLine($"Avg Err: {e}");
+
+            Console.WriteLine("Testing");
+
+            var depths = Enumerable.Range(0, 8).Select(i => i * 1);
+
+            var results = weights.AsParallel().WithDegreeOfParallelism(20).Select(w =>
             {
-                float Err(float e) => (e - t.result) * (e - t.result);
-                return players.Select(p => p.DecideMoveWithEvaluation(t.board, 1).e).Select(Err).ToArray();
+                var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(w))
+                {
+                    Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: d), },
+                    PrintInfo = false,
+                }).ToArray();
+
+                (float[][] eval, float[][] time, float[][] nodes) = TestPerformance(players, data[0]);
+
+                string line = string.Join(", ", eval.Select(a => a.Average())) + ",," + string.Join(", ", time.Select(a => a.Average())) + ",," + string.Join(", ", nodes.Select(a => a.Average()));
+                var f1 = Regression.Exponential(depths.Select(d => d * 1F), eval.Select(a => a.Average()));
+                Console.WriteLine($"{f1}");
+
+                return line;
             }).ToArray();
 
-            var ee = Enumerable.Range(0, players.Length).Select(i => e.Select(a => a[i]).Average());
-
-            Console.WriteLine(string.Join(", ", ee));
+            File.WriteAllLines($"test/test_performance_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv", results);
         }
 
         public static double[] TestEvaluationTime(int n_times, IEnumerable<int> sizes, string type)
@@ -402,9 +472,10 @@ namespace OthelloAI
                     for (int j = 0; j < n_times / n; j++)
                     {
                         var b = rand.NextBoard();
+                        var bb = new RotatedAndMirroredBoards(b);
 
                         timer.Start();
-                        weight.Eval(new RotatedAndMirroredBoards(b));
+                        weight.Eval(bb);
                         timer.Stop();
                     }
                 }
@@ -419,7 +490,7 @@ namespace OthelloAI
             int n = 10000000;
             var sizes = Enumerable.Range(2, 10).ToArray();
 
-            var log = $"G:/マイドライブ/Lab/test/log_e_time_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
+            var log = $"test/log_e_time_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
             using StreamWriter sw = File.AppendText(log);
 
             double[] t1 = Tester.TestEvaluationTime(n, sizes, "pext");
@@ -432,148 +503,64 @@ namespace OthelloAI
             }
         }
 
-        public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int pop_size, int n_top)
+        public static Weight CreateNetworkFromLine(string line)
         {
-            static Weight Create(string line)
-            {
-                var tokens = line.Split(",").Where(s => s.Length > 0).Skip(1);
-                var masks = tokens.Select(ulong.Parse).ToArray();
+            var tokens = line.Split(",").Where(s => s.Length > 0).Skip(1);
+            var masks = tokens.Select(ulong.Parse).ToArray();
 
-                for (int i = 0; i < masks.Length / 2.0F; i++)
-                {
-                    if (i * 2 + 1 < masks.Length)
-                        Console.WriteLine(new Board(masks[i * 2], Board.HorizontalMirror(masks[i * 2 + 1])));
-                    else
-                        Console.WriteLine(new Board(masks[i * 2], 0));
-                }
-                Console.WriteLine("------------------------------------------------------------");
-
-                return new WeightsSum(tokens.Select(ulong.Parse).Select(u => new WeightsArrayR(u)).ToArray());
-            }
-
-            int idx = gen * pop_size;
-            return lines[idx..(idx + n_top)].Select(Create).ToArray();
+            return new WeightsSum(masks.Select(u => new WeightsArrayR(u)).ToArray());
         }
 
-        public static void TestGAResultTraining(Trainer[] trainers, int n_game)
+        public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int pop_size, int n_top)
         {
-            var evaluator = new EvaluatorRandomChoice(trainers.Select(t => new EvaluatorWeightsBased(t.Weight)).ToArray());
-
-            Player player = new PlayerAI(evaluator)
-            {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 4),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
-                PrintInfo = false,
-            };
-
-            int steps = n_game / 16;
-
-            for (int i = 0; i < steps; i++)
-            {
-                var data = TrainerUtil.PlayForTrainingParallel(16, player);
-                Parallel.ForEach(trainers, t => data.ForEach(d => t.Update(d.board, d.result)));
-
-                if (i % 10 == 0)
-                    Console.WriteLine($"{i}/{steps}, {trainers.Select(t => t.Log.TakeLast(100000).Average()).Average()}");
-            }
+            int idx = gen * pop_size;
+            return lines[idx..(idx + n_top)].Select(CreateNetworkFromLine).ToArray();
         }
 
         public static void TestGAResult()
         {
-            int n_elites_per_gen = 1;
-
-            int n_games_training = 32000;
-            int n_games_eval = 2000;
-
-            int[] gens = Enumerable.Range(0, 1001).Select(i => i * 1).ToArray();
-
-            var log = $"ga/brkga_2022_12_18_21_14/test.csv";
-
-            var ga_log1 = "ga/brkga_2022_12_18_21_14/tuple.csv";
-            var dir_path = $"e/{Path.GetFileNameWithoutExtension(ga_log1)}";
-
-            var lines = File.ReadAllLines(ga_log1);
-            var weights = gens.Select(g => CreateNetworkFromLogFile(lines, g, 400, n_elites_per_gen)).ToArray();
-
-            Directory.CreateDirectory(dir_path);
-
-            //for (int i = 0; i < gens.Length; i++)
-            //    for (int j = 0; j < n_elites_per_gen; j++)
-            //        weights[i][j].Load($"{dir_path}/1_{gens[i]}_{j}");
-
-            var trainers = weights.Select(a => a.Select(w => new Trainer(w, 0.001F)).ToArray()).ToArray();
-
-            TestGAResultTraining(trainers.SelectMany(w => w).ToArray(), n_games_training);
-
-            for (int i = 0; i < gens.Length; i++)
+            static float CalcExeCost(Weight weight, int n_dsics)
             {
-                for (int j = 0; j < n_elites_per_gen; j++)
-                {
-                    // weights[i][j].Save($"{dir_path}/1_{gens[i]}_{j}");
-                }
+                float t_factor = 2.5F;
+                float cost_per_node = 480F;
 
-                float err = trainers[i].Select(t => t.Log.TakeLast(240000).Average()).Average();
-                Console.WriteLine($"{gens[i]}, {err}");
+                return cost_per_node + weight.NumOfEvaluation(n_dsics) * t_factor;
             }
 
-            return;
-
-            using StreamWriter sw = File.AppendText(log);
-
-            for (int i = 0; i < gens.Length; i++)
+            static float GetDepth(Weight weight, int n_dsics)
             {
-                int gen = gens[i];
+                float min_depth = 1;
+                float max_t = 20 * 9 + 480F;
 
-                float rate1 = TestGAResult(weights[i], weights[^1], n_games_eval);
-                //float rate2 = TestGAResult(w2, w1000, n_games_eval);
+                float t = CalcExeCost(weight, n_dsics);
 
-                sw.WriteLine($"{gen}, {rate1}");
-                sw.Flush();
+                return (float)Math.Log(max_t / t) / 1.1F + min_depth;
+            }
+
+            int num_dimes = 8;
+            int size_dime = 100;
+
+            static bool p(TrainingDataElement t) => 38 <= t.board.n_stone && t.board.n_stone <= 40;
+            var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
+            var data_splited = ArrayUtil.Divide(data, 8).Select(a => new TrainingData(a)).ToArray();
+
+            int[] gens = Enumerable.Range(0, 2501).Select(i => i * 1).ToArray();
+
+            string log_dir = $"ga/brkga_2022_12_26_01_54";
+
+            var lines = File.ReadAllLines(log_dir + "/tuple.csv");
+
+            using StreamWriter sw = File.CreateText(log_dir + "/test.csv");
+
+            for (int gen = 0; gen < 2500; gen++)
+            {
+                var weights = num_dimes.Loop(i => lines[(gen * num_dimes + i) * size_dime]).Select(CreateNetworkFromLine);
+                var scores = weights.AsParallel().Select(w => Trainer.KFoldTest(w, GetDepth(w, 40), data_splited)).ToArray();
+
+                Console.WriteLine($"{gen}: " + string.Join(",", scores));
+                sw.WriteLine(string.Join(",", scores));
             }
         }
 
-        public static float TestGAResult(Weight[] weights1, Weight[] weights2, int n_game)
-        {
-            static PlayerAI CreatePlayer(Weight weight, Random rand)
-            {
-                var e = new EvaluatorRandomize(new EvaluatorWeightsBased(weight), 36);
-
-                return new PlayerAI(e)
-                {
-                    Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 5),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
-                    PrintInfo = false,
-                };
-            }
-
-            return Enumerable.Range(0, n_game).AsParallel().Select(_ =>
-             {
-                 Random rand = new Random();
-
-                 var p1 = CreatePlayer(rand.Choice(weights1), rand);
-                 var p2 = CreatePlayer(rand.Choice(weights2), rand);
-
-                 Board board = Board.Init;
-
-                 if (rand.NextDouble() > 0.5)
-                 {
-                     board = PlayGame(p1, p2, board);
-                 }
-                 else
-                 {
-                     board = PlayGame(p2, p1, board).ColorFliped();
-                 }
-
-                 int result = board.GetStoneCountGap();
-                 Console.WriteLine(result);
-
-                 if (result > 0)
-                     return 1;
-                 else if (result < 0)
-                     return 0;
-                 else
-                     return 0.5F;
-             }).Average();
-        }
     }
 }

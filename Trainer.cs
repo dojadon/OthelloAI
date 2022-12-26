@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -139,20 +141,6 @@ namespace OthelloAI
         }
     }
 
-    public class TrainingDataProvider
-    {
-        public void Run(PlayerAI player, int num_threads)
-        {
-            var queue = new ConcurrentQueue<TrainingDataElement>();
-
-            Parallel.For(0, num_threads, _ =>
-            {
-                var rand = new Random();
-                TrainerUtil.PlayForTraining(1, player, rand);
-            });
-        }
-    }
-
     public class Trainer
     {
         public Weight Weight { get; }
@@ -192,6 +180,11 @@ namespace OthelloAI
             return e;
         }
 
+        public float Update(TrainingDataElement d)
+        {
+            return Update(d.board, d.result);
+        }
+
         public float Update(Board board, float result)
         {
             var boards = new RotatedAndMirroredBoards(board);
@@ -207,119 +200,53 @@ namespace OthelloAI
             return e;
         }
 
-        public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data)
+        public void Train(IEnumerable<TrainingDataElement> train_data)
+        {
+            foreach (var d in train_data)
+                Update(d.board, d.result);
+        }
+
+        public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data, float depth=0)
         {
             foreach (var d in train_data)
                 Update(d.board, d.result);
 
-            return valid_data.Select(d => TestError(d.board, d.result)).Select(x => x * x).Average();
+            if(depth > 0)
+                return TestError(depth, valid_data);
+            else
+                return valid_data.Select(d => TestError(d.board, d.result)).Select(x => x * x).Average();
         }
 
-        public float KFoldTest(TrainingData[] data)
+        public float TestError(float depth, IEnumerable<TrainingDataElement> valid_data)
         {
-            return Enumerable.Range(0, data.Length).Select(i =>
+            var player = new PlayerAI(new EvaluatorWeightsBased(Weight))
             {
-                Weight.Reset();
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: depth), },
+                PrintInfo = false,
+            };
 
-                var train_data = Enumerable.Range(0, data.Length).Where(j => i != j).SelectMany(j => data[j]);
+            float EvalError(TrainingDataElement t)
+            {
+                float eval = player.Evaluate(t.board);
+                return (eval - t.result) * (eval - t.result);
+            }
+
+            return valid_data.Select(EvalError).Average();
+        }
+
+        public static float KFoldTest(Weight weight, float depth, TrainingData[] data)
+        {
+            return Enumerable.Range(0, data.Length).AsParallel().Select(i =>
+            {
+                var trainer = new Trainer(weight.Copy(), 0.001F);
+
+                var train_data = data.Length.Loop().Where(j => i != j).SelectMany(j => data[j]);
                 var valid_data = data[i];
 
-                return TrainAndTest(train_data, valid_data);
+                trainer.Train(train_data);
+
+                return trainer.TestError(depth, valid_data);
             }).Average();
-        }
-
-        public static List<float> Train(Weight weight, int depth, int n_games, string path = "")
-        {
-            var evaluator = new EvaluatorWeightsBased(weight);
-            Player player = new PlayerAI(evaluator)
-            {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: depth),
-                                              new SearchParameters(stage: 50, type: SearchType.Normal, depth: 64)},
-                PrintInfo = false,
-            };
-
-            var trainer = new Trainer(weight, 0.001F);
-
-            for (int i = 0; i < n_games / 16; i++)
-            {
-                var data = TrainerUtil.PlayForTrainingParallel(16, player);
-                data.ForEach(t => trainer.Update(t.board, t.result));
-
-                Console.WriteLine($"{i} / {n_games / 16}");
-                Console.WriteLine(trainer.Log.TakeLast(10000).Average());
-
-                if (i % 100 == 0 && path != "")
-                    weight.Save(path);
-            }
-
-            return trainer.Log;
-        }
-
-        public static List<int> Train(int n_games)
-        {
-            //ulong[] masks = new[] {
-            //    0b11000011_01111110UL,
-            //    0b00000001_00000111_00000111_00001110UL,
-            //    0b00000001_00000001_00000001_00000011_00011110UL,
-            //    0b00111100_01111110UL,
-            //    0b11111111_00000000UL };
-
-            ulong[] masks = new[] {
-                0b01000010_11111111UL,
-                0b00000111_00000111_00000111UL,
-                0b00000001_00000001_00000001_00000011_00011111UL,
-                0b11111111UL,
-                0b11111111_00000000UL };
-
-            Weight weight1 = new WeightsSum(masks.Select(m => new WeightsArrayR(m)).ToArray());
-            Weight weight2 = new WeightsSum(masks.Select(m => new WeightsStagebased(Enumerable.Range(0, 4).Select(_ => new WeightsArrayR(m)).ToArray())).ToArray());
-
-            Player player1 = new PlayerAI(new EvaluatorWeightsBased(weight1))
-            {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: 2),
-                                              new SearchParameters(stage: 56, type: SearchType.Normal, depth: 64)},
-                PrintInfo = false,
-            };
-
-            Player player2 = new PlayerAI(new EvaluatorWeightsBased(weight2))
-            {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.IterativeDeepening, depth: 6),
-                                              new SearchParameters(stage: 48, type: SearchType.Normal, depth: 64)},
-                PrintInfo = false,
-            };
-
-            weight1.Load("e1.dat");
-            weight2.Load("e2.dat");
-
-            var trainer1 = new Trainer(weight1, 0.001F);
-            var trainer2 = new Trainer(weight2, 0.001F);
-
-            Board init = new Board(Board.InitB | 0b10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000001UL, Board.InitW);
-            // Board init = new Board(Board.InitB | 0b10000001_00000000_00000000_00000000_00000000_00000000_00000000_10000001UL, Board.InitW);
-
-            var results = new List<int>();
-
-            for (int i = 0; i < n_games / 16; i++)
-            {
-                var data = TrainerUtil.PlayForTrainingParallelSeparated(16, player1, player2, rand => Tester.CreateRandomGame(6, rand, init));
-
-                foreach (var t in data.SelectMany(d => d))
-                {
-                    trainer1.Update(t.board, t.result);
-                    trainer2.Update(t.board, t.result);
-                }
-
-                results.AddRange(data.Where(d => d.Count > 0).Select(d => d[^1].result > 0 ? 1 : 0));
-                Console.WriteLine($"{results.TakeLast(10000).Average():f3}, {trainer1.Log.TakeLast(1000000).Average():f2}, {trainer2.Log.TakeLast(1000000).Average():f2}");
-
-                if (i % 100 == 0)
-                {
-                    weight1.Save("e1.dat");
-                    weight2.Save("e2.dat");
-                }
-            }
-
-            return results;
         }
     }
 }

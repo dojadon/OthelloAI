@@ -16,6 +16,42 @@ namespace OthelloAI
 
     public static class LinqUtil
     {
+        public static IEnumerable<int> Loop(this int i)
+        {
+            return Enumerable.Range(0, i);
+        }
+
+        public static IEnumerable<int> Loop(this int i, int start)
+        {
+            return Enumerable.Range(start, i);
+        }
+
+        public static IEnumerable<T> Loop<T>(this int i, Func<int, T> selector)
+        {
+            return i.Loop().Select(selector);
+        }
+
+        public static IEnumerable<T> Loop<T>(this int i, int start, Func<int, T> selector)
+        {
+            return i.Loop(start).Select(selector);
+        }
+
+        public static IEnumerable<T> ConcatOne<T>(this IEnumerable<T> first, T item)
+        {
+            return first.Concat(new[] { item });
+        }
+
+        public static IEnumerable<T> AsParallel<T>(this IEnumerable<T> first, bool is_parallel, int num_threads = -1)
+        {
+            if (is_parallel)
+                if (num_threads > 0)
+                    return first.AsParallel().WithDegreeOfParallelism(num_threads);
+                else
+                    return first.AsParallel();
+            else
+                return first;
+        }
+
         public static IEnumerable<T> MultiConcat<T>(this IEnumerable<T> first, params IEnumerable<T>[] secondAndAfter)
         {
             return first.Concat(secondAndAfter.SelectMany(_ => _));

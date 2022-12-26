@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 
 namespace OthelloAI.GA
@@ -123,7 +122,7 @@ namespace OthelloAI.GA
 
             var result = new HashSet<Individual<T>>(elites);
 
-            foreach(var group in Groups)
+            foreach (var group in Groups)
             {
                 int n_init = result.Count;
 
@@ -157,9 +156,20 @@ namespace OthelloAI.GA
             {
                 IEnumerable<Individual<T>> next;
 
-                if(gen % MigrationRate == 0 && gen > 0)
+                if (gen % MigrationRate == 0 && gen > 0)
                 {
-                    var migrations = dimes[(i + 1) % NumDime].migrations;
+                    List<Individual<T>> migrations;
+                    if(false)
+                    {
+                        migrations = dimes[(i + 1) % NumDime].migrations;
+                    }
+                    else
+                    {
+                        if (i == 0)
+                            migrations = dimes[1..].SelectMany(t => t.migrations).ToList();
+                        else
+                            migrations = dimes[1 + (i % NumDime)].migrations;
+                    }
                     next = dimes[i].next_gen.Take(DimeSize - migrations.Count).Concat(migrations);
                 }
                 else
@@ -170,7 +180,7 @@ namespace OthelloAI.GA
                 result.AddRange(next);
             }
 
-            if(result.Count < DimeSize * NumDime)
+            if (result.Count < DimeSize * NumDime)
             {
                 result.AddRange(result.TakeLast(DimeSize * NumDime - result.Count));
             }

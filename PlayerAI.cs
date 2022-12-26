@@ -168,9 +168,9 @@ namespace OthelloAI
             this.store_transposition = store_transposition;
         }
 
-        public static SearchParameter CreateInitParam(float depth, bool transposition_cut, bool store_transposition)
+        public static SearchParameter CreateInitParam(float depth, bool depth_prob_cut, bool transposition_cut, bool store_transposition)
         {
-            return new SearchParameter(depth, true, -PlayerAI.INF, PlayerAI.INF, transposition_cut, store_transposition);
+            return new SearchParameter(depth, depth_prob_cut, -PlayerAI.INF, PlayerAI.INF, transposition_cut, store_transposition);
         }
 
         public SearchParameter Deepen()
@@ -206,7 +206,7 @@ namespace OthelloAI
         }
     }
 
-    public class SearchParameters
+    public class SearchParameterFactory
     {
         public readonly int stage;
         public readonly SearchType type;
@@ -214,27 +214,22 @@ namespace OthelloAI
         public Func<int, float> Depth { get; set; } = _ => 0;
         public Func<int, bool> ShouldTranspositionCut { get; set; } = _ => true;
         public Func<int, bool> ShouldStoreTranspositionTable { get; set; } = _ => true;
-        public Func<int, bool> ShouldProbCut { get; set; } = _ => false;
 
-        public SearchParameters(int stage, SearchType type, Func<int, float> depth)
+        public SearchParameterFactory(int stage, SearchType type, Func<int, float> depth)
         {
             this.stage = stage;
             this.type = type;
             Depth = depth;
         }
 
-        public SearchParameters(int stage, SearchType type, float depth) : this(stage, type, _ => depth)
+        public SearchParameterFactory(int stage, SearchType type, float depth) : this(stage, type, _ => depth)
         {
         }
 
         public SearchParameter CreateSearchParameter(int n)
         {
-            return SearchParameter.CreateInitParam(Depth(n), ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n));
-        }
-
-        public CutoffParameters CreateCutoffParameters(int n)
-        {
-            return new CutoffParameters(ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n), ShouldProbCut(n));
+            float d = Depth(n);
+            return SearchParameter.CreateInitParam(d, (n + d) % 2 == 1, ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n));
         }
     }
 
@@ -258,14 +253,11 @@ namespace OthelloAI
     {
         public const int INF = 10000000;
 
-        public SearchParameters[] Params { get; set; }
+        public SearchParameterFactory[] Params { get; set; }
         public Evaluator Evaluator { get; set; }
 
-        public List<float> Times { get; } = new List<float>();
         public long SearchedNodeCount { get; set; }
         public double TakenTime { get; set; }
-        public int[] NodeCount { get; } = new int[10];
-        public int[] PrunedNodeCount { get; } = new int[10];
 
         public delegate void SearcehdOneMoveEventHandler(object sender, SearcehdOneMoveEventArg e);
         public event SearcehdOneMoveEventHandler SearcehdOneMoveEvent;
@@ -285,7 +277,7 @@ namespace OthelloAI
         {
             SearchedNodeCount++;
 
-            //if (color == 0 ^ board.n_stone % 2 == 0)
+            //if (color == 1 ^ board.n_stone % 2 == 0)
             //{
             //    return -Evaluator.Eval(board.ColorFliped());
             //}
@@ -309,6 +301,8 @@ namespace OthelloAI
             return (x, y, move);
         }
 
+        int color;
+
         public (int x, int y, ulong move, float e) DecideMoveWithEvaluation(Board board, int stone)
         {
             SearchedNodeCount = 0;
@@ -316,6 +310,7 @@ namespace OthelloAI
             if (stone == -1)
                 board = board.ColorFliped();
 
+            color = stone;
             Evaluator.StartSearch(stone);
 
             ulong result = 0;
@@ -343,7 +338,7 @@ namespace OthelloAI
             return (x, y, result, CorrectEvaluation(e));
         }
 
-        public (ulong, float) SolveRoot(Board board, SearchParameters param) => param.type switch
+        public (ulong, float) SolveRoot(Board board, SearchParameterFactory param) => param.type switch
         {
             SearchType.Normal => SolveRoot(new Search(), board, param.CreateSearchParameter(board.n_stone)),
             SearchType.IterativeDeepening => SolveIterativeDeepening(board, param.CreateSearchParameter(board.n_stone), 2, 3),
@@ -372,6 +367,20 @@ namespace OthelloAI
                 search = new SearchIterativeDeepening(search.Table, interval);
                 p.depth += interval;
             }
+        }
+
+        public float Evaluate(Board board)
+        {
+            foreach (var param in Params.OrderByDescending(p => p.stage))
+            {
+                if (board.n_stone < param.stage)
+                    continue;
+
+                float e = Solve(new Search(), new Move(board), param.CreateSearchParameter(board.n_stone));
+                return CorrectEvaluation(e);
+            }
+
+            return 0;
         }
 
         public (ulong, float) SolveRoot(Search search, Board board, SearchParameter p)
@@ -552,7 +561,9 @@ namespace OthelloAI
                 return -1000000;
 
             if(p.ShouldObserve())
+            {
                 p = p.ObserveDepth(Program.Random);
+            }
 
             if (p.depth <= 0)
                 return Eval(move.reversed);

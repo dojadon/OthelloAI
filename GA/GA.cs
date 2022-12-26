@@ -40,31 +40,6 @@ namespace OthelloAI.GA
         }
     }
 
-    public class GenomeInfo<T>
-    {
-        public Func<Random, T> GenomeGenerator { get; set; }
-        public Func<T, int, ulong> Decoder { get; set; }
-
-        public int NumStages { get; set; }
-        public int NumTuples { get; set; }
-        public int SizeMax { get; set; }
-        public int SizeMin { get; set; }
-
-        public int MaxNumWeights { get; set; }
-
-        public Individual<T> Generate(Random rand)
-        {
-            int n = (int)Math.Pow(3, SizeMax - SizeMin);
-
-            GenomeGroup<T> CreateGenome()
-            {
-                return new GenomeGroup<T>(GenomeGenerator(rand), rand.Next(SizeMin, SizeMax + 1));
-            }
-
-            return new Individual<T>(Enumerable.Range(0, NumStages).Select(_ => Enumerable.Range(0, NumTuples).Select(_ => CreateGenome()).ToArray()).ToArray(), this);
-        }
-    }
-
     public class GATest
     {
         public static void TestES()
@@ -157,70 +132,51 @@ namespace OthelloAI.GA
                 return g;
             }
 
-            static float CalcExeCost(Individual<float[]> ind, int n_dsics)
-            {
-                return ind.Weight.NumOfEvaluation(n_dsics);
-            }
-
-            static (float, float) GetDepthFraction(Individual<float[]> ind1, Individual<float[]> ind2, int n_dsics)
-            {
-                float t1 = CalcExeCost(ind1, n_dsics);
-                float t2 = CalcExeCost(ind2, n_dsics);
-
-                int n1 = 12;
-                int n2 = 54;
-
-                if (Math.Abs(t1 - t2) < 1E-3)
-                    return (0, 0);
-
-                if (t1 > t2)
-                {
-                    float f = n1 * (t1 - t2) / (t2 * (n2 - n1));
-                    return (1, 1 + f);
-                }
-                else
-                {
-                    float f = n1 * (t2 - t1) / (t1 * (n2 - n1));
-                    return (1 + f, 1);
-                }
-            }
-
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 4,
-                SizeMin = 8,
-                SizeMax = 8,
-                MaxNumWeights = (int)Math.Pow(3, 8) * 4,
+                NumTuples = 12,
+                SizeMin = 7,
+                SizeMax = 9,
+                MaxNumWeights = (int)Math.Pow(3, 10) * 1,
+                MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
 
-            int pop_size = 800;
+            int n_dimes = 8;
+            int dime_size = 100;
 
-            static bool p(TrainingDataElement t) => 36 <= t.board.n_stone && t.board.n_stone < 42;
-            var data = Enumerable.Range(2001, 15).Select(i => new TrainingData(WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p))).ToArray();
+            static bool p(TrainingDataElement t) => 38 <= t.board.n_stone && t.board.n_stone <= 40;
+            var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
+            var data_splited = ArrayUtil.Divide(data, n_dimes - 1).Select(a => new TrainingData(a)).ToArray();
+
+            IEnumerable<TrainingDataElement> GetTrainingData(int index)
+            {
+                return data_splited.Length.Loop().Where(i => i != index).SelectMany(i => data_splited[i]);
+            }
 
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                //Evaluator = new PopulationEvaluatorRandomTournament<float[]>(new PopulationTrainerCoLearning(1, 54, 6400, 6400, 30), 1, 54, 200 * 400)
-                //{
-                //    GetDepthFraction = GetDepthFraction
-                //},
                 // Evaluator = new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainerCoLearning(4, 48, 9600, 9600, -1)),
-                Evaluator = new PopulationEvaluatorTrainingScoreKFold<float[]>(data),
+                //Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
+                //{
+                //    Evaluators = (n_dimes - 1).Loop(i => new PopulationEvaluatorTrainingScore<float[]>(GetTrainingData(i), data_splited[i]))
+                //        .ConcatOne<IPopulationEvaluator<float[], Score<float[]>>>(new PopulationEvaluatorTrainingScoreKFold<float[]>(data_splited)).ToArray(),
+                //},
+                Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
                 //Variator = new VariatorEliteArchive<float[]>()
                 //{
-                //    NumElites = 20 * 1,
+                //    NumElites = 20 * pop_size / 100,
                 //    Groups = new VariationGroup<float[]>[] {
-                //        new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 60 * 1, 8),
-                //        new VariationGroupRandom<float[]>(20 * 1, 0),
+                //        new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 60 *  pop_size / 100, 8),
+                //        new VariationGroupRandom<float[]>(20 * pop_size / 100, 0),
                 //    },
                 //},
                 Variator = new VariatorEliteArchiveDistributed<float[]>()
                 {
-                    NumDime = 8,
+                    NumDime = n_dimes,
                     MigrationRate = 50,
                     NumElites = 20,
                     NumElitesMigration = 2,
@@ -243,7 +199,7 @@ namespace OthelloAI.GA
             var log_score = $"{directory}/score.csv";
             using StreamWriter sw_score = File.AppendText(log_score);
 
-            ga.Run(ga.Init(pop_size), (gen, time, pop) =>
+            ga.Run(ga.Init(n_dimes * dime_size), (gen, time, pop) =>
             {
                 foreach (var t in pop.Select((s, i) => (s, i)).OrderBy(t => t.i / 100).ThenBy(t => t.s.score))
                 {
@@ -253,31 +209,38 @@ namespace OthelloAI.GA
 
                     sw_tuple.WriteLine($"{gen},{id}," + string.Join(",,", s.ind.Tuples.Select(t => string.Join(", ", t.Select(t => t.TupleBit)))));
                     sw_gene.WriteLine($"{gen},{id}," + string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
-
-                    if(rank == 0)
-                    {
-                        var trainer = new Trainer(s.ind.Weight, 0.001F);
-                        float kfold_score = trainer.KFoldTest(data);
-                        sw_score.WriteLine($"{gen},{id},{s.score},{kfold_score}");
-                    }
                 }
 
-                var score = pop.MinBy(ind => ind.score).First();
+                //var top_scores = Enumerable.Range(0, pop.Count / 100).AsParallel().Select(i =>
+                //{
+                //    var s = pop[i * 100];
+
+                //    return data_splited.Length.Loop().AsParallel().Select(j =>
+                //    {
+                //        var trainer = new Trainer(s.ind.Weight.Copy(), 0.001F);
+
+                //        var train_data = Enumerable.Range(0, data_splited.Length).Where(x => x != j).SelectMany(i => data_splited[i]);
+                //        var valid_data = data_splited[j];
+
+                //        return trainer.TrainAndTest(train_data, valid_data);
+                //    }).Average();
+                //}).ToArray();
+
+                var top_scores = Enumerable.Range(0, pop.Count / 100).Select(i => pop[i * 100].score).ToArray();
+                sw_score.WriteLine(string.Join(",", top_scores));
+
+                var score = pop.Take(100).MinBy(ind => ind.score).First();
 
                 foreach (var t in score.ind.Tuples)
                 {
-                    ulong[] tuples = t.Select(t => t.TupleBit).ToArray();
-
-                    for (int i = 0; i < tuples.Length / 2.0F; i++)
+                    foreach (var tt in t)
                     {
-                        if (i * 2 + 1 < tuples.Length)
-                            Console.WriteLine(new Board(tuples[i * 2], Board.HorizontalMirror(tuples[i * 2 + 1])));
-                        else
-                            Console.WriteLine(new Board(tuples[i * 2], 0));
+                        Console.WriteLine(tt);
+                        Console.WriteLine();
                     }
                 }
 
-                Console.WriteLine($"Gen : {gen}, {time}");
+                Console.WriteLine($"Gen {gen}, {time:f1}s, score {score.score}");
                 Console.WriteLine(string.Join(",", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
                 sw_tuple.Flush();
@@ -317,7 +280,6 @@ namespace OthelloAI.GA
             {
                 timer.Restart();
 
-                Console.WriteLine("Evaluate");
                 var scores = Evaluator.Evaluate(pop);
 
                 timer.Stop();
@@ -330,141 +292,8 @@ namespace OthelloAI.GA
 
         public List<Individual<T>> Init(int n_pop)
         {
+            Info.Init();
             return Enumerable.Range(0, n_pop).Select(_ => Info.Generate(Random)).ToList();
-        }
-    }
-
-    public class GenomeGroup<T>
-    {
-        public T Genome { get; }
-        public int Size { get; }
-        public int NumWeights { get; }
-
-        public GenomeGroup(T genome, int size)
-        {
-            Genome = genome;
-            Size = size;
-            NumWeights = (int)Math.Pow(3, Size);
-        }
-    }
-
-    public class TupleData<T>
-    {
-        public T Genome { get; }
-        public ulong TupleBit { get; }
-        public GenomeInfo<T> Info { get; }
-
-        public int Size { get; }
-
-        public TupleData(T genome, int size, GenomeInfo<T> info)
-        {
-            Genome = genome;
-            Size = size;
-            Info = info;
-
-            TupleBit = info.Decoder(genome, Size);
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is TupleData<T> t)
-                return Equals(t);
-
-            return false;
-        }
-
-        public bool Equals(TupleData<T> y)
-        {
-            if (ReferenceEquals(this, y))
-                return true;
-
-            return Size == y.Size && TupleBit == y.TupleBit;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Size, TupleBit);
-        }
-    }
-
-    public class Individual<T>
-    {
-        public GenomeGroup<T>[][] Genome { get; }
-        public TupleData<T>[][] Tuples { get; }
-
-        public Weight Weight { get; }
-
-        public GenomeInfo<T> Info { get; }
-
-        public List<float> Log { get; } = new List<float>();
-
-        public Individual(GenomeGroup<T>[][] genome, GenomeInfo<T> info)
-        {
-            Genome = genome;
-            Info = info;
-
-            Tuples = new TupleData<T>[info.NumStages][];
-            var weights = new Weight[info.NumStages];
-
-            for (int i = 0; i < genome.Length; i++)
-            {
-                var list = new List<TupleData<T>>();
-
-                int n_weights = 0;
-                foreach (var g in Genome[i])
-                {
-                    if (n_weights + g.NumWeights > info.MaxNumWeights)
-                        continue;
-
-                    n_weights += g.NumWeights;
-
-                    list.Add(new TupleData<T>(g.Genome, g.Size, info));
-                }
-                Tuples[i] = list.OrderBy(t => t.TupleBit).ToArray();
-                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t.TupleBit)).ToArray());
-            }
-
-            Weight = new WeightsStagebased(weights);
-        }
-
-        public Evaluator CreateEvaluator() => new EvaluatorWeightsBased(Weight);
-
-        public override bool Equals(object obj)
-        {
-            if (obj is Individual<T> ind)
-                return Equals(ind);
-
-            return false;
-        }
-
-        public bool Equals(Individual<T> y)
-        {
-            if (ReferenceEquals(this, y))
-                return true;
-
-            if (Tuples.Length != y.Tuples.Length)
-                return false;
-
-            for (int i = 0; i < Tuples.Length; i++)
-            {
-                if (Tuples[i].Length != y.Tuples[i].Length)
-                    return false;
-
-                for (int j = 0; j < Tuples[i].Length; j++)
-                    if (Tuples[i][j].TupleBit != y.Tuples[i][j].TupleBit)
-                        return false;
-            }
-            return true;
-        }
-
-        public int GetHashCode(IEnumerable<TupleData<T>> tuples)
-        {
-            return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next.TupleBit));
-        }
-
-        public override int GetHashCode()
-        {
-            return Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, GetHashCode(next)));
         }
     }
 }

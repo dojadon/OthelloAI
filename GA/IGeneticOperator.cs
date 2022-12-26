@@ -42,7 +42,7 @@ namespace OthelloAI.GA
 
     public abstract class MutantEachTuples<T> : IGeneticOperator1<T>
     {
-        public abstract GenomeGroup<T> Operate(GenomeGroup<T> gene, GenomeInfo<T> info, Random rand);
+        public abstract GenomeTuple<T> Operate(GenomeTuple<T> gene, GenomeInfo<T> info, Random rand);
 
         public Individual<T> Operate(Individual<T> ind, Random rand)
         {
@@ -72,10 +72,10 @@ namespace OthelloAI.GA
             return dist;
         }
 
-        public static GenomeGroup<ulong> Mutant(GenomeGroup<ulong> gene, Random rand)
+        public static GenomeTuple<ulong> Mutant(GenomeTuple<ulong> gene, Random rand)
         {
             ulong mask = (2UL << gene.Size) - 1;
-            return new GenomeGroup<ulong>(Mutant(gene.Genome, mask, rand), gene.Size);
+            return new GenomeTuple<ulong>(Mutant(gene.Genome, mask, rand), gene.Size);
         }
 
         public Individual<ulong> Operate(Individual<ulong> ind, Random rand)
@@ -98,7 +98,7 @@ namespace OthelloAI.GA
             Variance = variance;
         }
 
-        public override GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
+        public override GenomeTuple<float[]> Operate(GenomeTuple<float[]> gene, GenomeInfo<float[]> info, Random rand)
         {
             float[] g = gene.Genome;
 
@@ -108,16 +108,16 @@ namespace OthelloAI.GA
                 g[i] = Math.Clamp(g[i], 0, 1);
             }
 
-            return new GenomeGroup<float[]>(g, gene.Size);
+            return new GenomeTuple<float[]>(g, gene.Size);
         }
     }
 
     public class MutantRandomSize : MutantEachTuples<float[]>
     {
-        public override GenomeGroup<float[]> Operate(GenomeGroup<float[]> gene, GenomeInfo<float[]> info, Random rand)
+        public override GenomeTuple<float[]> Operate(GenomeTuple<float[]> gene, GenomeInfo<float[]> info, Random rand)
         {
             int size = rand.Next(info.SizeMin, info.SizeMax + 1);
-            return new GenomeGroup<float[]>(gene.Genome, size);
+            return new GenomeTuple<float[]>(gene.Genome, size);
         }
     }
 
@@ -135,7 +135,7 @@ namespace OthelloAI.GA
                 var gene = ind.Info.GenomeGenerator(rand);
                 int size = rand.Next(ind.Info.SizeMin, ind.Info.SizeMax + 1);
 
-                return new GenomeGroup<T>(gene, size);
+                return new GenomeTuple<T>(gene, size);
 
             }).ToArray()).ToArray();
 
@@ -173,7 +173,7 @@ namespace OthelloAI.GA
 
     public class CrossoverExchange<T> : IGeneticOperator2<T>
     {
-        public GenomeGroup<T>[] Cx(GenomeGroup<T>[] g1, GenomeGroup<T>[] g2, Random rand)
+        public GenomeTuple<T>[] Cx(GenomeTuple<T>[] g1, GenomeTuple<T>[] g2, Random rand)
         {
             var randoms = Enumerable.Range(0, g1.Length).Select(_ => rand.Next(2)).ToArray();
 
@@ -212,17 +212,19 @@ namespace OthelloAI.GA
             return g1.Zip(g2, (a1, a2) => Cx(a1, a2, rand)).ToArray();
         }
 
-        public GenomeGroup<float[]> Cx2(GenomeGroup<float[]> g1, GenomeGroup<float[]> g2, Random rand)
+        public GenomeTuple<float[]> Cx2(int size, GenomeTuple<float[]> g1, GenomeTuple<float[]> g2, Random rand)
         {
             var gene = CxArray(g1.Genome, g2.Genome, rand);
-            int size = Cx(g1.Size, g2.Size, rand);
 
-            return new GenomeGroup<float[]>(gene, size);
+            return new GenomeTuple<float[]>(gene, size);
         }
 
-        public GenomeGroup<float[]>[] Cx1(GenomeGroup<float[]>[] g1, GenomeGroup<float[]>[] g2, Random rand)
+        public GenomeTuple<float[]>[] Cx1(GenomeTuple<float[]>[] g1, GenomeTuple<float[]>[] g2, Random rand)
         {
-            return g1.Zip(g2, (g11, g22) => Cx2(g11, g22, rand)).ToArray();
+            int[] size = Cx(g1.Select(g => g.Size), g2.Select(g => g.Size), rand).ToArray();
+
+            return size.ZipThree(g1, g2, (s, g11, g22) => Cx2(s, g11, g22, rand)).ToArray();
+            // return g1.Zip(g2, (g11, g22) => Cx2(g11, g22, rand)).ToArray();
         }
 
         public Individual<float[]> Operate(Individual<float[]> ind1, Individual<float[]> ind2, Random rand)

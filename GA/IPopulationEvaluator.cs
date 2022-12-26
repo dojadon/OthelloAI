@@ -31,8 +31,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind1.CreateEvaluator())
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: i => GetDepthFraction(ind1, ind2, i).Item1),
-                                              new SearchParameters(stage: EndStage, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: i => GetDepthFraction(ind1, ind2, i).Item1),
+                                              new SearchParameterFactory(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
         }
@@ -120,8 +120,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(ind.CreateEvaluator())
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: Depth),
-                                              new SearchParameters(stage: EndStage, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: Depth),
+                                              new SearchParameterFactory(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
         }
@@ -197,30 +197,35 @@ namespace OthelloAI.GA
         }
     }
 
+    public class PopulationEvaluatorDistributed<T, U> : IPopulationEvaluator<T, U> where U : Score<T>
+    {
+        public IPopulationEvaluator<T, U>[] Evaluators { get; init; }
+
+        public List<U> Evaluate(List<Individual<T>> pop)
+        {
+            int size = pop.Count / Evaluators.Length;
+            return Evaluators.SelectMany((e, i) => e.Evaluate(pop.Skip(size * i).Take(size).ToList())).ToList();
+        }
+    }
+
     public class PopulationEvaluatorTrainingScore<T> : IPopulationEvaluator<T, Score<T>>
     {
-        TrainingData[] Data { get; }
+        TrainingData TrainingData { get; }
+        TrainingData ValidationData { get; }
 
-        public PopulationEvaluatorTrainingScore(TrainingData[] data)
+        public PopulationEvaluatorTrainingScore(IEnumerable<TrainingDataElement> train, IEnumerable<TrainingDataElement> valid)
         {
-            Data = data;
+            TrainingData = new TrainingData(train);
+            ValidationData = new TrainingData(valid);
         }
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            //int index = Program.Random.Next(Data.Length);
-            int index = Data.Length - 1;
-
-            var train_data = Enumerable.Range(0, Data.Length).Where(i => i != index).OrderBy(_ => Program.Random.NextSingle()).SelectMany(i => Data[i]).ToArray();
-            var valid_data = Data[index];
-
-            return pop.AsParallel().Select(ind =>
+            return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads).Select(ind =>
             {
                 var trainer = new Trainer(ind.Weight, 0.001F);
 
-                Array.ForEach(train_data, d => trainer.Update(d.board, d.result));
-
-                float score = valid_data.Select(d => trainer.TestError(d.board, d.result)).Average();
+                float score = trainer.TrainAndTest(TrainingData, ValidationData, ind.GetDepth());
 
                 return new Score<T>(ind, score);
             }).ToList();
@@ -238,20 +243,46 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            int size = pop.Count / Data.Length;
+            float Eval(Individual<T> ind) => Trainer.KFoldTest(ind.Weight, ind.GetDepth(), Data);
 
-            return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads).Select((ind, i) =>
-            {
-                int index = i / size;
+            return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads).Select(ind => new Score<T>(ind, Eval(ind))).ToList();
+        }
+    }
 
-                var train_data = Enumerable.Range(0, Data.Length).Where(i => i != index).SelectMany(i => Data[i]);
-                var valid_data = Data[index];
+    public class PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<T> : IPopulationEvaluator<T, Score<T>>
+    {
+        TrainingData[] Data { get; }
 
-                var trainer = new Trainer(ind.Weight, 0.001F);
+        public PopulationEvaluatorTrainingScoreKFoldWithVariableDepth(TrainingData[] data)
+        {
+            Data = data;
+        }
 
-                float score = trainer.TrainAndTest(train_data, valid_data);
-                return new Score<T>(ind, score);
-            }).ToList();
+        public Score<T> TrainAndTest(Individual<T> ind, float depth, int index)
+        {
+            var train_data = Enumerable.Range(0, Data.Length).Where(i => i != index).SelectMany(i => Data[i]);
+            var valid_data = Data[index];
+
+            var trainer = new Trainer(ind.Weight, 0.001F);
+            trainer.Train(train_data);
+
+            float score = trainer.TestError(depth, valid_data);
+
+            return new Score<T>(ind, score);
+        }
+
+        public List<Score<T>> Evaluate(List<Individual<T>> pop)
+        {
+            return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads)
+                .Select((ind, i) =>
+                {
+                    int index = i / 100;
+
+                    if (index == 0)
+                        return new Score<T>(ind, Trainer.KFoldTest(ind.Weight, ind.GetDepth(), Data));
+                    else
+                        return TrainAndTest(ind, ind.GetDepth(), index - 1);
+                }).ToList();
         }
     }
 
@@ -346,8 +377,8 @@ namespace OthelloAI.GA
         {
             return new PlayerAI(e)
             {
-                Params = new[] { new SearchParameters(stage: 0, type: SearchType.Normal, depth: Depth),
-                                              new SearchParameters(stage: EndStage, type: SearchType.Normal, depth: 64)},
+                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: Depth),
+                                              new SearchParameterFactory(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
             };
         }
