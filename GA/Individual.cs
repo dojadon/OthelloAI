@@ -20,68 +20,10 @@ namespace OthelloAI.GA
         }
     }
 
-    public class TupleData<T>
-    {
-        public T Genome { get; }
-        public ulong TupleBit { get; }
-        public GenomeInfo<T> Info { get; }
-
-        public int Size { get; }
-
-        public TupleData(T genome, int size, GenomeInfo<T> info)
-        {
-            Genome = genome;
-            Size = size;
-            Info = info;
-
-            TupleBit = info.Decoder(genome, Size);
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is TupleData<T> t)
-                return Equals(t);
-
-            return false;
-        }
-
-        public bool Equals(TupleData<T> y)
-        {
-            if (ReferenceEquals(this, y))
-                return true;
-
-            return Size == y.Size && TupleBit == y.TupleBit;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Size, TupleBit);
-        }
-
-        public override string ToString()
-        {
-            Board b = new Board(TupleBit, 0);
-            string Disc(int i)
-            {
-                if ((TupleBit & (1ul << i)) != 0)
-                    return "X";
-                else
-                    return "-";
-            }
-
-            string Line(int y)
-            {
-                return "| " + string.Join(" | ", 8.Loop(i => Disc(y * 8 + i))) + " |";
-            }
-
-            return string.Join(Environment.NewLine, Line(0), Line(1), Line(2));
-        }
-    }
-
     public class Individual<T>
     {
         public GenomeTuple<T>[][] Genome { get; }
-        public TupleData<T>[][] Tuples { get; }
+        public ulong[][] Tuples { get; }
 
         public Weight Weight { get; }
 
@@ -94,12 +36,12 @@ namespace OthelloAI.GA
             Genome = genome;
             Info = info;
 
-            Tuples = new TupleData<T>[info.NumStages][];
+            Tuples = new ulong[info.NumStages][];
             var weights = new Weight[info.NumStages];
 
             for (int i = 0; i < genome.Length; i++)
             {
-                var list = new List<TupleData<T>>();
+                var list = new List<ulong>();
 
                 int n_weights = 0;
                 foreach (var g in Genome[i])
@@ -109,10 +51,11 @@ namespace OthelloAI.GA
 
                     n_weights += g.NumWeights;
 
-                    list.Add(new TupleData<T>(g.Genome, g.Size, info));
+                    ulong t = info.Decoder(g.Genome, g.Size);
+                    list.Add(t);
                 }
-                Tuples[i] = list.OrderBy(t => t.TupleBit).ToArray();
-                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t.TupleBit)).ToArray());
+                Tuples[i] = list.OrderBy(x => x).ToArray();
+                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t)).ToArray());
             }
 
             Weight = new WeightsStagebased(weights);
@@ -144,15 +87,15 @@ namespace OthelloAI.GA
                     return false;
 
                 for (int j = 0; j < Tuples[i].Length; j++)
-                    if (Tuples[i][j].TupleBit != y.Tuples[i][j].TupleBit)
+                    if (Tuples[i][j] != y.Tuples[i][j])
                         return false;
             }
             return true;
         }
 
-        public int GetHashCode(IEnumerable<TupleData<T>> tuples)
+        public int GetHashCode(IEnumerable<ulong> tuples)
         {
-            return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next.TupleBit));
+            return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, next));
         }
 
         public override int GetHashCode()

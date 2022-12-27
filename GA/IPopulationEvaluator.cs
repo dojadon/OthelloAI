@@ -39,9 +39,9 @@ namespace OthelloAI.GA
 
         public int GetHashCode(Individual<T> ind)
         {
-            static int GetHashCode(IEnumerable<TupleData<T>> tuples)
+            static int GetHashCode(IEnumerable<ulong> tuples)
             {
-                return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, Board.BitCount(next.TupleBit)));
+                return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, Board.BitCount(next)));
             }
 
             return ind.Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, GetHashCode(next)));

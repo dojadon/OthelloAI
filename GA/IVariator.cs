@@ -143,6 +143,8 @@ namespace OthelloAI.GA
 
         public VariationGroup<T>[] Groups { get; set; }
 
+        public int[][] MigrationTable { get; init; }
+
         public int DimeSize => NumElites + Groups.Sum(g => g.Size);
 
         public List<Individual<T>> Vary(List<Score<T>> score, int gen, Random rand)
@@ -168,7 +170,7 @@ namespace OthelloAI.GA
                         if (i == 0)
                             migrations = dimes[1..].SelectMany(t => t.migrations).ToList();
                         else
-                            migrations = dimes[1 + (i % NumDime)].migrations;
+                            migrations = dimes[1 + (i % (NumDime - 1))].migrations;
                     }
                     next = dimes[i].next_gen.Take(DimeSize - migrations.Count).Concat(migrations);
                 }

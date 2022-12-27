@@ -544,15 +544,13 @@ namespace OthelloAI
             var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
             var data_splited = ArrayUtil.Divide(data, 8).Select(a => new TrainingData(a)).ToArray();
 
-            int[] gens = Enumerable.Range(0, 2501).Select(i => i * 1).ToArray();
-
-            string log_dir = $"ga/brkga_2022_12_26_01_54";
+            string log_dir = $"ga/brkga_2022_12_27_01_52";
 
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
             using StreamWriter sw = File.CreateText(log_dir + "/test.csv");
 
-            for (int gen = 0; gen < 2500; gen++)
+            for (int gen = 0; gen <= 2500; gen++)
             {
                 var weights = num_dimes.Loop(i => lines[(gen * num_dimes + i) * size_dime]).Select(CreateNetworkFromLine);
                 var scores = weights.AsParallel().Select(w => Trainer.KFoldTest(w, GetDepth(w, 40), data_splited)).ToArray();

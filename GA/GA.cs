@@ -87,14 +87,14 @@ namespace OthelloAI.GA
 
                     foreach (var t in s.ind.Tuples)
                     {
-                        sw.Write(",," + string.Join(", ", t.Select(t => t.TupleBit)));
+                        sw.Write(",," + string.Join(", ", t.Select(t => t)));
                     }
                     sw.WriteLine();
                 }
 
                 foreach (var t in score.ind.Tuples)
                 {
-                    ulong[] tuples = t.Select(t => t.TupleBit).ToArray();
+                    ulong[] tuples = t.Select(t => t).ToArray();
 
                     for (int i = 0; i < tuples.Length / 2.0F; i++)
                     {
@@ -114,7 +114,7 @@ namespace OthelloAI.GA
                 }
 
                 Console.WriteLine($"Gen : {n_gen}, {time}");
-                Console.WriteLine(string.Join(", ", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+                Console.WriteLine(string.Join(", ", score.ind.Genome.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
                 sw.Flush();
             });
@@ -147,8 +147,8 @@ namespace OthelloAI.GA
             int n_dimes = 8;
             int dime_size = 100;
 
-            static bool p(TrainingDataElement t) => 38 <= t.board.n_stone && t.board.n_stone <= 40;
-            var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
+            static bool p(TrainingDataElement t) => 36 < t.board.n_stone && t.board.n_stone <= 40;
+            var data = Enumerable.Range(2001, 14).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
             var data_splited = ArrayUtil.Divide(data, n_dimes - 1).Select(a => new TrainingData(a)).ToArray();
 
             IEnumerable<TrainingDataElement> GetTrainingData(int index)
@@ -193,9 +193,6 @@ namespace OthelloAI.GA
             var log_tuple = $"{directory}/tuple.csv";
             using StreamWriter sw_tuple = File.AppendText(log_tuple);
 
-            var log_gene = $"{directory}/gene.csv";
-            using StreamWriter sw_gene = File.AppendText(log_gene);
-
             var log_score = $"{directory}/score.csv";
             using StreamWriter sw_score = File.AppendText(log_score);
 
@@ -207,8 +204,7 @@ namespace OthelloAI.GA
                     int id = t.i / 100;
                     int rank = t.i % 100;
 
-                    sw_tuple.WriteLine($"{gen},{id}," + string.Join(",,", s.ind.Tuples.Select(t => string.Join(", ", t.Select(t => t.TupleBit)))));
-                    sw_gene.WriteLine($"{gen},{id}," + string.Join(",", s.ind.Tuples[0].Select(t => string.Join(",", t.Genome))));
+                    sw_tuple.WriteLine($"{gen},{id},{s.score}," + string.Join(", ", s.ind.Tuples[0].Select(t => t)));
                 }
 
                 //var top_scores = Enumerable.Range(0, pop.Count / 100).AsParallel().Select(i =>
@@ -235,42 +231,42 @@ namespace OthelloAI.GA
                 {
                     foreach (var tt in t)
                     {
-                        Console.WriteLine(tt);
+                        Console.WriteLine(TupleToString(tt));
                         Console.WriteLine();
                     }
                 }
 
                 Console.WriteLine($"Gen {gen}, {time:f1}s, score {score.score}");
-                Console.WriteLine(string.Join(",", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+                Console.WriteLine(string.Join(",", score.ind.Genome.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
 
                 sw_tuple.Flush();
-                sw_gene.Flush();
                 sw_score.Flush();
             });
+        }
+
+        public static string TupleToString(ulong mask)
+        {
+            Board b = new Board(mask, 0);
+            string Disc(int i)
+            {
+                if ((mask & (1ul << i)) != 0)
+                    return "X";
+                else
+                    return "-";
+            }
+
+            string Line(int y) => "| " + string.Join(" | ", 8.Loop(i => Disc(y * 8 + i))) + " |";
+
+            return string.Join(Environment.NewLine, Line(0), Line(1), Line(2));
         }
     }
 
     public class GA<T, U> where U : Score<T>
     {
-        private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
-
         public GenomeInfo<T> Info { get; set; }
 
         public IPopulationEvaluator<T, U> Evaluator { get; set; }
         public IVariator<T, U> Variator { get; set; }
-
-        public static Random Random => ThreadLocalRandom.Value;
-
-        public static string ConcatHorizontal(string s1, string s2, int margin)
-        {
-            var a1 = s1.Split(Environment.NewLine);
-            var a2 = s2.Split(Environment.NewLine);
-
-            int max = a1.Concat(a2).Max(s => s.Length);
-            int len = max + margin;
-
-            return a1.Zip(a2, (b1, b2) => b1.PadRight(len) + b2).Aggregate((b1, b2) => b1 + Environment.NewLine + b2);
-        }
 
         public void Run(List<Individual<T>> pop, Action<int, float, List<U>> logger)
         {
@@ -286,14 +282,14 @@ namespace OthelloAI.GA
                 float time = (float)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
                 logger(i, time, scores);
 
-                pop = Variator.Vary(scores, i, Random);
+                pop = Variator.Vary(scores, i, Program.Random);
             }
         }
 
         public List<Individual<T>> Init(int n_pop)
         {
             Info.Init();
-            return Enumerable.Range(0, n_pop).Select(_ => Info.Generate(Random)).ToList();
+            return Enumerable.Range(0, n_pop).Select(_ => Info.Generate(Program.Random)).ToList();
         }
     }
 }
