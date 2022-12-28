@@ -208,6 +208,8 @@ namespace OthelloAI
 
         public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data, float depth=0)
         {
+            Weight.Reset();
+
             foreach (var d in train_data)
                 Update(d.board, d.result);
 

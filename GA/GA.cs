@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
 namespace OthelloAI.GA
 {
@@ -144,12 +143,14 @@ namespace OthelloAI.GA
                 Decoder = Decode,
             };
 
-            int n_dimes = 8;
+            int n_dimes = 4;
             int dime_size = 100;
 
             static bool p(TrainingDataElement t) => 36 < t.board.n_stone && t.board.n_stone <= 40;
             var data = Enumerable.Range(2001, 14).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
-            var data_splited = ArrayUtil.Divide(data, n_dimes - 1).Select(a => new TrainingData(a)).ToArray();
+            var data_splited = ArrayUtil.Divide(data, n_dimes).Select(a => new TrainingData(a)).ToArray();
+
+            var test_data = WthorRecordReader.Read($"WTH/WTH_2015.wtb").SelectMany(x => x).Where(p).ToArray();
 
             IEnumerable<TrainingDataElement> GetTrainingData(int index)
             {
@@ -174,16 +175,19 @@ namespace OthelloAI.GA
                 //        new VariationGroupRandom<float[]>(20 * pop_size / 100, 0),
                 //    },
                 //},
-                Variator = new VariatorEliteArchiveDistributed<float[]>()
+                Variator = new VariatorDistributed<float[]>()
                 {
                     NumDime = n_dimes,
                     MigrationRate = 50,
-                    NumElites = 20,
-                    NumElitesMigration = 2,
-                    Groups = new VariationGroup<float[]>[] {
-                        new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 65, 8),
-                        new VariationGroupRandom<float[]>(15, 0),
+                    Variator = new VariatorEliteArchive<float[]>()
+                    {
+                        NumElites = 20,
+                        Groups = new VariationGroup<float[]>[] {
+                            new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 65),
+                            new VariationGroupRandom<float[]>(15),
+                        },
                     },
+                    MigrationTable = n_dimes.Loop(i => n_dimes.Loop(j => (i + 1) % n_dimes == j ? 10 : 0).ToArray()).ToArray(),
                 },
             };
 
@@ -207,25 +211,17 @@ namespace OthelloAI.GA
                     sw_tuple.WriteLine($"{gen},{id},{s.score}," + string.Join(", ", s.ind.Tuples[0].Select(t => t)));
                 }
 
-                //var top_scores = Enumerable.Range(0, pop.Count / 100).AsParallel().Select(i =>
-                //{
-                //    var s = pop[i * 100];
+                var top_scores = Enumerable.Range(0, pop.Count / 100).AsParallel().Select(i =>
+                {
+                    var s = pop[i * 100];
+                    var trainer = new Trainer(s.ind.Weight, 0.001F);
+                    return trainer.TrainAndTest(data, test_data, s.ind.GetDepth());
+                }).ToArray();
 
-                //    return data_splited.Length.Loop().AsParallel().Select(j =>
-                //    {
-                //        var trainer = new Trainer(s.ind.Weight.Copy(), 0.001F);
-
-                //        var train_data = Enumerable.Range(0, data_splited.Length).Where(x => x != j).SelectMany(i => data_splited[i]);
-                //        var valid_data = data_splited[j];
-
-                //        return trainer.TrainAndTest(train_data, valid_data);
-                //    }).Average();
-                //}).ToArray();
-
-                var top_scores = Enumerable.Range(0, pop.Count / 100).Select(i => pop[i * 100].score).ToArray();
+                // var top_scores = Enumerable.Range(0, pop.Count / 100).Select(i => pop[i * 100].score).ToArray();
                 sw_score.WriteLine(string.Join(",", top_scores));
 
-                var score = pop.Take(100).MinBy(ind => ind.score).First();
+                var score = pop.MinBy(ind => ind.score).First();
 
                 foreach (var t in score.ind.Tuples)
                 {
@@ -237,10 +233,12 @@ namespace OthelloAI.GA
                 }
 
                 Console.WriteLine($"Gen {gen}, {time:f1}s, score {score.score}");
-                Console.WriteLine(string.Join(",", score.ind.Genome.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
+                Console.WriteLine(string.Join(",", score.ind.Tuples.Select(t => $"({string.Join(", ", t.Select(Board.BitCount))})")));
 
                 sw_tuple.Flush();
                 sw_score.Flush();
+
+                GC.Collect();
             });
         }
 
@@ -276,12 +274,16 @@ namespace OthelloAI.GA
             {
                 timer.Restart();
 
+                Console.WriteLine("Evaluating");
                 var scores = Evaluator.Evaluate(pop);
 
                 timer.Stop();
                 float time = (float)timer.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
+
+                Console.WriteLine("Logging");
                 logger(i, time, scores);
 
+                Console.WriteLine("Varying");
                 pop = Variator.Vary(scores, i, Program.Random);
             }
         }

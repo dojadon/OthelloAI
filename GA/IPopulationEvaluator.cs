@@ -278,10 +278,12 @@ namespace OthelloAI.GA
                 {
                     int index = i / 100;
 
-                    if (index == 0)
-                        return new Score<T>(ind, Trainer.KFoldTest(ind.Weight, ind.GetDepth(), Data));
-                    else
-                        return TrainAndTest(ind, ind.GetDepth(), index - 1);
+                    //if (index == 0)
+                    //    return new Score<T>(ind, Trainer.KFoldTest(ind.Weight, ind.GetDepth(), Data));
+                    //else
+                    //    return TrainAndTest(ind, ind.GetDepth(), index - 1);
+
+                    return TrainAndTest(ind, ind.GetDepth(), index);
                 }).ToList();
         }
     }

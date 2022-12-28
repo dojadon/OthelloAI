@@ -69,12 +69,10 @@ namespace OthelloAI.GA
     public abstract class VariationGroup<T>
     {
         public int Size { get; }
-        public int MigrationSize { get; }
 
-        protected VariationGroup(int size, int migrationSize)
+        protected VariationGroup(int size)
         {
             Size = size;
-            MigrationSize = migrationSize;
         }
 
         public abstract Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites, Random rand);
@@ -84,7 +82,7 @@ namespace OthelloAI.GA
     {
         public IGeneticOperator2<T> Operator { get; }
 
-        public VariationGroupOperation(IGeneticOperator2<T> opt, int size, int migrationSize) : base(size, migrationSize)
+        public VariationGroupOperation(IGeneticOperator2<T> opt, int size) : base(size)
         {
             Operator = opt;
         }
@@ -97,7 +95,7 @@ namespace OthelloAI.GA
 
     public class VariationGroupRandom<T> : VariationGroup<T>
     {
-        public VariationGroupRandom(int size, int migrationSize) : base(size, migrationSize)
+        public VariationGroupRandom(int size) : base(size)
         {
         }
 
@@ -134,25 +132,28 @@ namespace OthelloAI.GA
         }
     }
 
-    public class VariatorEliteArchiveDistributed<T> : IVariator<T, Score<T>>
+    public class VariatorDistributed<T> : IVariator<T, Score<T>>
     {
-        public int MigrationRate { get; set; }
-        public int NumDime { get; set; }
-        public int NumElites { get; set; }
-        public int NumElitesMigration { get; set; }
+        public int MigrationRate { get; init; }
+        public int NumDime { get; init; }
 
-        public VariationGroup<T>[] Groups { get; set; }
+        public IVariator<T, Score<T>> Variator { get; init; }
 
         public int[][] MigrationTable { get; init; }
-
-        public int DimeSize => NumElites + Groups.Sum(g => g.Size);
 
         public List<Individual<T>> Vary(List<Score<T>> score, int gen, Random rand)
         {
             var result = new List<Individual<T>>();
 
-            var dimes = Enumerable.Range(0, NumDime).AsParallel().WithDegreeOfParallelism(Program.NumThreads)
-                .Select(i => VaryDime(score.Skip(i * DimeSize).Take(DimeSize), rand)).ToArray();
+            int size = score.Count / NumDime;
+
+            Console.WriteLine("step 1");
+
+            var dimes = Enumerable.Range(0, NumDime)
+                // .AsParallel().WithDegreeOfParallelism(Program.NumThreads)
+                .Select(i => Variator.Vary(score.Skip(i * size).Take(size).ToList(), gen, rand)).ToArray();
+
+            Console.WriteLine("step 2");
 
             for (int i = 0; i < NumDime; i++)
             {
@@ -160,64 +161,27 @@ namespace OthelloAI.GA
 
                 if (gen % MigrationRate == 0 && gen > 0)
                 {
-                    List<Individual<T>> migrations;
-                    if(false)
-                    {
-                        migrations = dimes[(i + 1) % NumDime].migrations;
-                    }
-                    else
-                    {
-                        if (i == 0)
-                            migrations = dimes[1..].SelectMany(t => t.migrations).ToList();
-                        else
-                            migrations = dimes[1 + (i % (NumDime - 1))].migrations;
-                    }
-                    next = dimes[i].next_gen.Take(DimeSize - migrations.Count).Concat(migrations);
+                    var migrations = MigrationTable[i].SelectMany((n, index) => dimes[index].Take(n)).ToList();
+                    next = dimes[i].Take(dimes[i].Count - migrations.Count).Concat(migrations).ToList();
                 }
                 else
                 {
-                    next = dimes[i].next_gen;
+                    next = dimes[i];
                 }
 
                 result.AddRange(next);
             }
 
-            if (result.Count < DimeSize * NumDime)
+            Console.WriteLine($"step 3, {result.Count}, {size}, {NumDime}");
+
+            if (result.Count < size * NumDime)
             {
-                result.AddRange(result.TakeLast(DimeSize * NumDime - result.Count));
+                result.AddRange(result.Take(size * NumDime - result.Count));
             }
+
+            Console.WriteLine("step 4");
 
             return result.ToList();
-        }
-
-        public (List<Individual<T>> next_gen, List<Individual<T>> migrations) VaryDime(IEnumerable<Score<T>> score, Random rand)
-        {
-            var ordered = score.OrderBy(s => s.score).Select(s => s.ind).ToArray();
-
-            var elites = ordered.Take(NumElites).ToArray();
-            var non_elites = ordered.Skip(NumElites).ToArray();
-
-            var result = new List<Individual<T>>(elites);
-            var migrations = new List<Individual<T>>(elites.Take(NumElitesMigration));
-
-            foreach (var group in Groups)
-            {
-                int n = result.Count;
-
-                while (result.Count - n < group.Size)
-                {
-                    var ind = group.Generate(elites, non_elites, rand);
-
-                    if (result.Contains(ind))
-                        continue;
-
-                    result.Add(ind);
-                }
-
-                migrations.AddRange(result.TakeLast(group.MigrationSize));
-            }
-
-            return (result.ToList(), migrations);
         }
     }
 }

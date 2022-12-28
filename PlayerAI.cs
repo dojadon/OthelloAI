@@ -256,6 +256,8 @@ namespace OthelloAI
         public SearchParameterFactory[] Params { get; set; }
         public Evaluator Evaluator { get; set; }
 
+        public Random Random { get; init; } = new Random();
+
         public long SearchedNodeCount { get; set; }
         public double TakenTime { get; set; }
 
