@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -8,177 +9,6 @@ namespace OthelloAI.GA
     public interface IPopulationEvaluator<T, U> where U : Score<T>
     {
         public List<U> Evaluate(List<Individual<T>> pop);
-    }
-
-    public class PopulationEvaluatorRandomTournament<T> : IPopulationEvaluator<T, Score<T>>
-    {
-        public PopulationTrainer Trainer { get; }
-        public int Depth { get; }
-        public int EndStage { get; }
-        public int NumGames { get; }
-
-        public Func<Individual<T>, Individual<T>, int, (float, float)> GetDepthFraction { get; set; } = (_, _, _) => (0, 0);
-
-        public PopulationEvaluatorRandomTournament(PopulationTrainer trainer, int depth, int endStage, int n_games)
-        {
-            Trainer = trainer;
-            Depth = depth;
-            EndStage = endStage;
-            NumGames = n_games;
-        }
-
-        public PlayerAI CreatePlayer(Individual<T> ind1, Individual<T> ind2)
-        {
-            return new PlayerAI(ind1.CreateEvaluator())
-            {
-                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: i => GetDepthFraction(ind1, ind2, i).Item1),
-                                              new SearchParameterFactory(stage: EndStage, type: SearchType.Normal, depth: 64)},
-                PrintInfo = false,
-            };
-        }
-
-        public int GetHashCode(Individual<T> ind)
-        {
-            static int GetHashCode(IEnumerable<ulong> tuples)
-            {
-                return tuples.Aggregate(0, (total, next) => HashCode.Combine(total, Board.BitCount(next)));
-            }
-
-            return ind.Tuples.Aggregate(0, (total, next) => HashCode.Combine(total, GetHashCode(next)));
-        }
-
-        public List<Individual<T>> SelectIndividualsToEvaluate(IEnumerable<(Individual<T> ind, float s)> pop, float rate)
-        {
-            IEnumerable<Individual<T>> SelectFromGroup(IEnumerable<(Individual<T> ind, float s)> group)
-            {
-                int n = (int)Math.Max(1, group.Count() * rate);
-                return group.OrderBy(t => t.s).Select(t => t.ind).Take(n);
-            }
-
-            var groups = pop.GroupBy(t => GetHashCode(t.ind));
-
-            return groups.Select(SelectFromGroup).SelectMany(x => x).ToList();
-        }
-
-        public List<Individual<T>> TrainAndSelectPop(List<Individual<T>> pop)
-        {
-            var set = pop.Distinct().ToArray();
-            var scores = Trainer.Train(set.Select(ind => ind.Weight).ToList());
-
-            return SelectIndividualsToEvaluate(set.Zip(scores, (ind, s) => (ind, s)), 0.5F);
-        }
-
-        public List<Score<T>> Evaluate(List<Individual<T>> pop)
-        {
-            var pop_to_evaluate = TrainAndSelectPop(pop);
-            var scores = new Dictionary<Individual<T>, List<float>>(pop_to_evaluate.Select(ind => new KeyValuePair<Individual<T>, List<float>>(ind, new List<float>())));
-
-            Parallel.For(0, NumGames, i =>
-            {
-                var rand = new Random();
-                var pair = rand.SamplePair(pop_to_evaluate.Count);
-
-                var ind1 = pop_to_evaluate[pair.Item1];
-                var ind2 = pop_to_evaluate[pair.Item2];
-
-                PlayerAI p1 = CreatePlayer(ind1, ind2);
-                PlayerAI p2 = CreatePlayer(ind2, ind1);
-
-                Board b = Tester.PlayGame(p1, p2, Tester.CreateRandomGame(2, rand));
-                int result = b.GetStoneCountGap();
-
-                if (result > 0)
-                {
-                    scores[ind1].Add(1);
-                    scores[ind2].Add(0);
-                }
-                else if (result < 0)
-                {
-                    scores[ind1].Add(0);
-                    scores[ind2].Add(1);
-                }
-            });
-
-            return pop.Select(ind => new Score<T>(ind, -scores[ind].Average())).ToList();
-        }
-    }
-
-    public class PopulationEvaluatorTournament<T> : IPopulationEvaluator<T, Score<T>>
-    {
-        public PopulationTrainer Trainer { get; }
-        public int Depth { get; }
-        public int EndStage { get; }
-
-        public PopulationEvaluatorTournament(PopulationTrainer trainer, int depth, int endStage)
-        {
-            Trainer = trainer;
-            Depth = depth;
-            EndStage = endStage;
-        }
-
-        public PlayerAI CreatePlayer(Individual<T> ind)
-        {
-            return new PlayerAI(ind.CreateEvaluator())
-            {
-                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: Depth),
-                                              new SearchParameterFactory(stage: EndStage, type: SearchType.Normal, depth: 64)},
-                PrintInfo = false,
-            };
-        }
-
-        public static (int, int)[] Combinations(int n)
-        {
-            return Enumerable.Range(0, n - 1).SelectMany(i => Enumerable.Range(i + 1, n - i - 1).Select(j => (i, j))).ToArray();
-        }
-
-        public List<Score<T>> Evaluate(List<Individual<T>> pop)
-        {
-            Trainer.Train(pop.Select(ind => ind.Weight).ToList());
-
-            foreach (var ind in pop)
-            {
-                ind.Log.Clear();
-            }
-
-            Parallel.ForEach(Combinations(pop.Count), pair =>
-            {
-                var ind1 = pop[pair.Item1];
-                var ind2 = pop[pair.Item2];
-
-                PlayerAI p1 = CreatePlayer(ind1);
-                PlayerAI p2 = CreatePlayer(ind2);
-
-                for (int k = 0; k < 2; k++)
-                {
-                    Board b;
-                    int result;
-
-                    if (k == 0)
-                    {
-                        b = Tester.PlayGame(p1, p2, Board.Init);
-                        result = b.GetStoneCountGap();
-                    }
-                    else
-                    {
-                        b = Tester.PlayGame(p2, p1, Board.Init);
-                        result = -b.GetStoneCountGap();
-                    }
-
-                    if (result > 0)
-                    {
-                        ind1.Log.Add(1);
-                        ind2.Log.Add(0);
-                    }
-                    else if (result < 0)
-                    {
-                        ind1.Log.Add(0);
-                        ind2.Log.Add(1);
-                    }
-                }
-            });
-
-            return pop.Select(ind => new Score<T>(ind, ind.Log.Average())).ToList();
-        }
     }
 
     public class PopulationEvaluatorTrainingScorebySelfMatch<T> : IPopulationEvaluator<T, Score<T>>
@@ -192,7 +22,7 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            var scores = Trainer.Train(pop.Select(ind => ind.Weight).ToList());
+            var scores = Trainer.Train(pop.Select(ind => ind.CreateWeight()).ToList());
             return pop.Zip(scores, (ind, s) => new Score<T>(ind, s)).ToList();
         }
     }
@@ -204,7 +34,7 @@ namespace OthelloAI.GA
         public List<U> Evaluate(List<Individual<T>> pop)
         {
             int size = pop.Count / Evaluators.Length;
-            return Evaluators.SelectMany((e, i) => e.Evaluate(pop.Skip(size * i).Take(size).ToList())).ToList();
+            return Evaluators.AsParallel().SelectMany((e, i) => e.Evaluate(pop.Skip(size * i).Take(size).ToList())).ToList();
         }
     }
 
@@ -223,7 +53,7 @@ namespace OthelloAI.GA
         {
             return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads).Select(ind =>
             {
-                var trainer = new Trainer(ind.Weight, 0.001F);
+                var trainer = new Trainer(ind.CreateWeight(), 0.001F);
 
                 float score = trainer.TrainAndTest(TrainingData, ValidationData, ind.GetDepth());
 
@@ -243,7 +73,7 @@ namespace OthelloAI.GA
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            float Eval(Individual<T> ind) => Trainer.KFoldTest(ind.Weight, ind.GetDepth(), Data);
+            float Eval(Individual<T> ind) => Trainer.KFoldTest(ind.CreateWeight(), ind.GetDepth(), Data);
 
             return pop.AsParallel().WithDegreeOfParallelism(Program.NumThreads).Select(ind => new Score<T>(ind, Eval(ind))).ToList();
         }
@@ -263,10 +93,10 @@ namespace OthelloAI.GA
             var train_data = Enumerable.Range(0, Data.Length).Where(i => i != index).SelectMany(i => Data[i]);
             var valid_data = Data[index];
 
-            var trainer = new Trainer(ind.Weight, 0.001F);
+            var trainer = new Trainer(ind.CreateWeight(), 0.001F);
             trainer.Train(train_data);
 
-            float score = trainer.TestError(depth, valid_data);
+            float score = 2.Loop(_ => trainer.TestError(valid_data, depth)).Average();
 
             return new Score<T>(ind, score);
         }
@@ -285,6 +115,41 @@ namespace OthelloAI.GA
 
                     return TrainAndTest(ind, ind.GetDepth(), index);
                 }).ToList();
+        }
+    }
+
+    public class PopulationEvaluatorTrainingScoreShuffleKFold<T> : IPopulationEvaluator<T, Score<T>>
+    {
+        TrainingData Data { get; }
+        public int NumSamples { get; }
+
+        public PopulationEvaluatorTrainingScoreShuffleKFold(TrainingData data, float r)
+        {
+            Data = data;
+            NumSamples = (int)(data.Count * r);
+        }
+
+        public Score<T> TrainAndTest(Individual<T> ind, float depth)
+        {
+            var rand = new Random();
+            var indices = new HashSet<int>(rand.Sample(Data.Count.Loop(), NumSamples));
+
+            var train_data = Enumerable.Range(0, Data.Count).Where(i => !indices.Contains(i)).Select(i => Data[i]);
+            var valid_data = Enumerable.Range(0, Data.Count).Where(indices.Contains).Select(i => Data[i]);
+
+            var trainer = new Trainer(ind.CreateWeight(), 0.001F);
+            trainer.Train(train_data);
+
+            float score = trainer.TestError(valid_data, depth);
+
+            return new Score<T>(ind, score);
+        }
+
+        public List<Score<T>> Evaluate(List<Individual<T>> pop)
+        {
+            return pop
+                .AsParallel().WithDegreeOfParallelism(Program.NumThreads)
+                .Select(ind => TrainAndTest(ind, ind.GetDepth())).ToList();
         }
     }
 
@@ -359,85 +224,50 @@ namespace OthelloAI.GA
         }
     }
 
-    public abstract class PopulationTrainer
+    public class PopulationTrainer
     {
         public int Depth { get; }
         public int EndStage { get; }
-        public int NumGames { get; }
+        public int NumTrainingGames { get; }
+        public int NumTestGames { get; }
 
-        public int NumThreads { get; }
+        public int StartNumDiscs { get; } = 30;
+        public int EndNumDiscs { get; } = 54;
 
-        public PopulationTrainer(int depth, int endStage, int numGames, int numThreads)
+        public PopulationTrainer(int depth, int endStage, int numTrainingGames, int numTestGames)
         {
             Depth = depth;
             EndStage = endStage;
-            NumGames = numGames;
-            NumThreads = numThreads;
+            NumTrainingGames = numTrainingGames;
+            NumTestGames = numTestGames;
         }
 
-        public PlayerAI CreatePlayer(Evaluator e)
+        public List<float> Train(IEnumerable<Weight> pop)
         {
-            return new PlayerAI(e)
+            var evaluator = new EvaluatorRandomize(new EvaluatorRandomChoice(pop.Select(p => new EvaluatorWeightsBased(p)).ToArray()), v: 5F);
+            Player player = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: Depth),
-                                              new SearchParameterFactory(stage: EndStage, type: SearchType.Normal, depth: 64)},
                 PrintInfo = false,
+                Params = new[] {
+                    new SearchParameterFactory(stage: 0, SearchType.Normal, Depth),
+                    new SearchParameterFactory(stage: EndStage, SearchType.Normal, 64),
+                },
             };
-        }
+            var trainers = pop.Select(w => new Trainer(w, 0.001F)).ToArray();
 
-        public PlayerAI CreatePlayer(Weight p)
-        {
-            return CreatePlayer(new EvaluatorWeightsBased(p));
-        }
+            bool Within(TrainingDataElement d) => StartNumDiscs <= d.board.n_stone && d.board.n_stone <= EndNumDiscs;
 
-        public abstract List<float> Train(List<Weight> pop);
-    }
-
-    public class PopulationTrainerCoLearning : PopulationTrainer
-    {
-        public FixedQueue<TrainingData> TrainingData { get; } = new FixedQueue<TrainingData>(10000);
-
-        public PopulationTrainerCoLearning(int depth, int endStage, int numGames, int sizeExperiments, int numThreads) : base(depth, endStage, numGames, numThreads)
-        {
-            TrainingData = new FixedQueue<TrainingData>(sizeExperiments);
-        }
-
-        public override List<float> Train(List<Weight> pop)
-        {
-            var evaluator = new EvaluatorRandomChoice(pop.Select(p => new EvaluatorWeightsBased(p)).ToArray());
-            Player player = CreatePlayer(evaluator);
-
-            foreach (var w in pop)
-                w.Reset();
-
-            var trainers = pop.Select(p => new Trainer(p, 0.001F)).ToArray();
-
-            if (TrainingData.Count > 0)
+            for (int i = 0; i < NumTrainingGames / 16; i++)
             {
-                Parallel.ForEach(trainers, trainer =>
-                {
-                    foreach (var t in TrainingData.SelectMany(x => x))
-                        trainer.Update(t.board, t.result);
-                });
+                var data = TrainerUtil.PlayForTrainingParallel(16, player).Where(Within).ToArray();
+                Parallel.ForEach(trainers, t => t.Train(data));
+
+                // Console.WriteLine($"{i} / {NumTrainingGames / 16}");
             }
 
-            for (int i = 0; i < NumGames / 16; i++)
-            {
-                var data = TrainerUtil.PlayForTrainingParallelSeparated(16, player, NumThreads);
+            var test_data = TrainerUtil.PlayForTrainingParallel(NumTestGames, player).Where(Within).ToArray();
 
-                //foreach (var t in data)
-                //    TrainingData.Enqueue(t);
-
-                Parallel.ForEach(trainers, trainer =>
-                {
-                    foreach (var t in data.SelectMany(x => x))
-                        trainer.Update(t.board, t.result);
-                });
-
-                // Console.WriteLine($"{i} / {NumGames / 16}");
-            }
-
-            return trainers.Select(trainer => trainer.Log.TakeLast(trainer.Log.Count / 4).Average()).ToList();
+            return trainers.AsParallel().Select(t => t.TestError(test_data, 1)).ToList();
         }
     }
 }

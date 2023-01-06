@@ -1,4 +1,5 @@
 ﻿using NumSharp;
+using OthelloAI.GA;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -409,7 +410,7 @@ namespace OthelloAI
         {
             Console.WriteLine("Loading Train Data");
 
-            static bool Within(TrainingDataElement d) => 39 <= d.board.n_stone && d.board.n_stone <= 40;
+            static bool Within(TrainingDataElement d) => 40 <= d.board.n_stone && d.board.n_stone <= 40;
             var data = Enumerable.Range(2001, 15).Select(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(Within).ToArray()).ToArray();
 
             Console.WriteLine("Loading Tuples");
@@ -427,9 +428,9 @@ namespace OthelloAI
 
             Console.WriteLine("Testing");
 
-            var depths = Enumerable.Range(0, 8).Select(i => i * 1);
+            var depths = Enumerable.Range(0, 6).Select(i => i * 0.25F);
 
-            var results = weights.AsParallel().WithDegreeOfParallelism(20).Select(w =>
+            var results = weights.AsParallel().Select(w =>
             {
                 var players = depths.Select(d => new PlayerAI(new EvaluatorWeightsBased(w))
                 {
@@ -437,11 +438,9 @@ namespace OthelloAI
                     PrintInfo = false,
                 }).ToArray();
 
-                (float[][] eval, float[][] time, float[][] nodes) = TestPerformance(players, data[0]);
+                (float[][] eval, float[][] time, float[][] nodes) = TestPerformance(players, data[^1]);
 
                 string line = string.Join(", ", eval.Select(a => a.Average())) + ",," + string.Join(", ", time.Select(a => a.Average())) + ",," + string.Join(", ", nodes.Select(a => a.Average()));
-                var f1 = Regression.Exponential(depths.Select(d => d * 1F), eval.Select(a => a.Average()));
-                Console.WriteLine($"{f1}");
 
                 return line;
             }).ToArray();
@@ -505,7 +504,7 @@ namespace OthelloAI
 
         public static Weight CreateNetworkFromLine(string line)
         {
-            var tokens = line.Split(",").Where(s => s.Length > 0).Skip(1);
+            var tokens = line.Split(",").Where(s => s.Length > 0).Skip(3);
             var masks = tokens.Select(ulong.Parse).ToArray();
 
             return new WeightsSum(masks.Select(u => new WeightsArrayR(u)).ToArray());
@@ -540,25 +539,83 @@ namespace OthelloAI
             int num_dimes = 8;
             int size_dime = 100;
 
-            static bool p(TrainingDataElement t) => 38 <= t.board.n_stone && t.board.n_stone <= 40;
-            var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
+            static bool p1(TrainingDataElement t) => 34 <= t.board.n_stone && t.board.n_stone <= 40;
+            static bool p2(TrainingDataElement t) => 32 <= t.board.n_stone && t.board.n_stone <= 34;
+
+            var data = Enumerable.Range(2001, 13).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p1)).OrderBy(i => Guid.NewGuid()).ToArray();
             var data_splited = ArrayUtil.Divide(data, 8).Select(a => new TrainingData(a)).ToArray();
 
-            string log_dir = $"ga/brkga_2022_12_27_01_52";
+            // var test_data = WthorRecordReader.Read($"WTH/WTH_2015.wtb").SelectMany(x => x).Where(p2).ToArray();
+            var test_data = Enumerable.Range(2014, 2).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p1)).OrderBy(i => Guid.NewGuid()).ToArray(); ;
+
+            string log_dir = $"ga/brkga_2022_12_28_18_14";
 
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
             using StreamWriter sw = File.CreateText(log_dir + "/test.csv");
 
+            ulong[] masks = new[] {
+                0b01000010_11111111U,
+            0b00000111_00000111_00000111UL,
+            0b00000001_00000001_00000001_00000011_00011111UL,
+            //0b11111111_00000000UL,
+            //0b11111111_00000000_00000000UL,
+            //0x8040201008040201UL,
+            //0x1020408102040UL,
+            //0x10204081020UL,
+            //0x102040810UL,
+        };
+
+            Weight weight = new WeightsSum(masks.Select(m => new WeightsArrayR(m)).ToArray());
+            var trainer = new Trainer(weight, 0.001F);
+
+            trainer.Train(data.OrderBy(i => Guid.NewGuid()).ToArray());
+
+            Console.WriteLine(GetDepth(weight, 40));
+
+            var depths = 6.Loop(1, i => i * 1F);
+
+            var es = new List<float>();
+
+            for (int i = 0; i < 100; i++)
+            {
+                float d = 1F;
+                var e = trainer.TestError(test_data, d);
+                es.Add(e);
+                (float avg, float var) = es.AverageAndVariance();
+                Console.WriteLine($"{d}, {avg}, {var}");
+            }
+            return;
+
             for (int gen = 0; gen <= 2500; gen++)
             {
                 var weights = num_dimes.Loop(i => lines[(gen * num_dimes + i) * size_dime]).Select(CreateNetworkFromLine);
-                var scores = weights.AsParallel().Select(w => Trainer.KFoldTest(w, GetDepth(w, 40), data_splited)).ToArray();
+                // var scores = weights.AsParallel().Select(w => Trainer.KFoldTest(w, GetDepth(w, 40), data_splited)).ToArray();
+                var scores = weights.AsParallel().Select(w => new Trainer(w, 0.001F).TrainAndTest(data, test_data)).ToArray();
 
                 Console.WriteLine($"{gen}: " + string.Join(",", scores));
                 sw.WriteLine(string.Join(",", scores));
             }
         }
 
+        public static void TestWeights()
+        {
+            string log_dir = "ga/brkga_2023_01_06_13_45";
+
+            int num_dimes = 4;
+            int size_dime = 100;
+
+            var gens = 90.Loop(i => i * 10);
+
+            var lines = File.ReadAllLines(log_dir + "/tuple.csv");
+
+            var weights = gens.SelectMany(g => num_dimes.Loop(d => lines[(g * num_dimes + d) * size_dime])).Select(CreateNetworkFromLine);
+
+            var trainer = new PopulationTrainer(2, 50, 20000, 1000);
+            var scores = trainer.Train(weights);
+
+            Console.WriteLine(string.Join(",", scores));
+            File.WriteAllText(log_dir + "/test.csv", string.Join(",", scores));
+        }
     }
 }

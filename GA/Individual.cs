@@ -25,8 +25,6 @@ namespace OthelloAI.GA
         public GenomeTuple<T>[][] Genome { get; }
         public ulong[][] Tuples { get; }
 
-        public Weight Weight { get; }
-
         public GenomeInfo<T> Info { get; }
 
         public List<float> Log { get; } = new List<float>();
@@ -55,15 +53,15 @@ namespace OthelloAI.GA
                     list.Add(t);
                 }
                 Tuples[i] = list.OrderBy(x => x).ToArray();
-                weights[i] = new WeightsSum(Tuples[i].Select(t => new WeightsArrayR(t)).ToArray());
             }
-
-            Weight = new WeightsStagebased(weights);
         }
 
-        public float GetDepth() => Info.GetDepth(Weight, 40);
+        public Weight CreateWeight()
+        {
+            return new WeightsSum(Tuples[0].Select(t => new WeightsArrayR(t)).ToArray());
+        }
 
-        public Evaluator CreateEvaluator() => new EvaluatorWeightsBased(Weight);
+        public float GetDepth() => Info.GetDepth(Tuples[0].Length);
 
         public override bool Equals(object obj)
         {

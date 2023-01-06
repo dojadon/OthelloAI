@@ -1,9 +1,8 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using NumSharp;
+﻿using NumSharp;
 using OthelloAI.GA;
+using System;
+using System.IO;
+using System.Threading;
 
 namespace OthelloAI
 {
@@ -13,6 +12,20 @@ namespace OthelloAI
 
         private static ThreadLocal<Random> ThreadLocalRandom { get; } = new ThreadLocal<Random>(() => new Random());
         public static Random Random => ThreadLocalRandom.Value;
+
+        public static readonly ulong[] MASKS = new[] {
+            0b01000010_11111111U,
+            0b00000111_00000111_00000111UL,
+            0b00000001_00000001_00000001_00000011_00011111UL,
+            0b01000010_11111111UL,
+            0b11111111UL,
+            0b11111111_00000000UL,
+            0b11111111_00000000_00000000UL,
+            0x8040201008040201UL,
+            0x1020408102040UL,
+            0x10204081020UL,
+            0x102040810UL,
+        };
 
         public static readonly Weight WEIGHT_EDGE2X = new WeightsArrayR(0b01000010_11111111UL);
         public static readonly Weight WEIGHT_EDGE_BLOCK = new WeightsArrayR(0b00000111_00000111_00000111UL);
@@ -27,25 +40,9 @@ namespace OthelloAI
         {
             GATest.TestBRKGA();
 
-            Tester.TestGAResult();
-            //return;
+            Tester.TestWeights();
 
-           // Tester.TestError3();
-            return;
-
-            WEIGHT.Load("e.dat");
-
-            var t = Tester.TestError(WEIGHT, new [] { 4F, 6F }, 0, 1000);
-            var a = np.array(t).mean(0);
-
-            var log = $"G:/マイドライブ/Lab/test/log_s_err_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw = File.AppendText(log);
-
-            for (int i = 0; i < a.shape[0]; i++)
-            {
-                Console.WriteLine(string.Join(", ", a[i].ToArray<float>()));
-                sw.WriteLine(string.Join(", ", a[i].ToArray<float>()));
-            }
+            //Tester.TestError3();
         }
 
         static void StartClient(Evaluator evaluator)

@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -74,35 +70,18 @@ namespace OthelloAI
                 return b.GetStoneCountGap();
             }
 
-            int count = 0;
-
-            var range = Enumerable.Range(0, 16).AsParallel();
-
-            if (num_threads > 0)
-                range = range.WithDegreeOfParallelism(num_threads);
-
-            var data = range.Select(i =>
+            return n_game.Loop().AsParallel().Select(i =>
             {
-                var results = new TrainingData();
                 var rand = new Random();
+                Board board = createInitBoard(rand);
+                List<Board> boards = new List<Board>();
 
-                while (count < n_game)
+                while (Step(ref board, boards, player1, 1) | Step(ref board, boards, player2, -1))
                 {
-                    Board board = createInitBoard(rand);
-                    List<Board> boards = new List<Board>();
-
-                    while (Step(ref board, boards, player1, 1) | Step(ref board, boards, player2, -1))
-                    {
-                    }
-                    results.Add(boards, GetResult(board));
-
-                    Interlocked.Increment(ref count);
                 }
 
-                return results;
-            }).ToList();
-
-            return data.Select(d => new TrainingData(d)).ToArray();
+                return new TrainingData() { { boards, GetResult(board) } };
+            }).ToArray();
         }
 
         public static TrainingData PlayForTraining(int n_game, Player player, Random rand)
@@ -206,25 +185,26 @@ namespace OthelloAI
                 Update(d.board, d.result);
         }
 
-        public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data, float depth=0)
+        public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data, float depth = 0)
         {
             Weight.Reset();
 
             foreach (var d in train_data)
                 Update(d.board, d.result);
 
-            if(depth > 0)
-                return TestError(depth, valid_data);
+            if (depth > 0)
+                return TestError(valid_data, depth);
             else
                 return valid_data.Select(d => TestError(d.board, d.result)).Select(x => x * x).Average();
         }
 
-        public float TestError(float depth, IEnumerable<TrainingDataElement> valid_data)
+        public float TestError(IEnumerable<TrainingDataElement> valid_data, float depth = 0)
         {
             var player = new PlayerAI(new EvaluatorWeightsBased(Weight))
             {
                 Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: depth), },
                 PrintInfo = false,
+                Random = new Random(),
             };
 
             float EvalError(TrainingDataElement t)
@@ -247,7 +227,7 @@ namespace OthelloAI
 
                 trainer.Train(train_data);
 
-                return trainer.TestError(depth, valid_data);
+                return trainer.TestError(valid_data, depth);
             }).Average();
         }
     }

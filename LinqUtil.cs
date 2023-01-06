@@ -12,6 +12,18 @@ namespace OthelloAI
             int len = a.Length / n;
             return Enumerable.Range(0, n).Select(i => a.Skip(i * len).Take(len).ToArray()).ToArray();
         }
+
+        public static T[] PadLeft<T>(this T[] a, int length, T padding)
+        {
+            if(a.Length < length)
+            {
+                return a.Concat((length - a.Length).Loop(_ => padding)).ToArray();
+            }
+            else
+            {
+                return a.ToArray();
+            }
+        }
     }
 
     public static class LinqUtil
@@ -152,6 +164,25 @@ namespace OthelloAI
 
     public static class RandomUtil
     {
+        public static IEnumerable<T> Sample<T>(this Random random, IEnumerable<T> collection, int take)
+        {
+            var available = collection.Count();
+            var needed = take;
+            foreach (var item in collection)
+            {
+                if (random.Next(available) < needed)
+                {
+                    needed--;
+                    yield return item;
+                    if (needed == 0)
+                    {
+                        break;
+                    }
+                }
+                available--;
+            }
+        }
+
         public static ulong NextUInt64(this Random rand)
         {
             byte[] buf = new byte[8];

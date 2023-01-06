@@ -147,13 +147,9 @@ namespace OthelloAI.GA
 
             int size = score.Count / NumDime;
 
-            Console.WriteLine("step 1");
-
             var dimes = Enumerable.Range(0, NumDime)
                 // .AsParallel().WithDegreeOfParallelism(Program.NumThreads)
                 .Select(i => Variator.Vary(score.Skip(i * size).Take(size).ToList(), gen, rand)).ToArray();
-
-            Console.WriteLine("step 2");
 
             for (int i = 0; i < NumDime; i++)
             {
@@ -172,14 +168,10 @@ namespace OthelloAI.GA
                 result.AddRange(next);
             }
 
-            Console.WriteLine($"step 3, {result.Count}, {size}, {NumDime}");
-
             if (result.Count < size * NumDime)
             {
-                result.AddRange(result.Take(size * NumDime - result.Count));
+                result.AddRange(result.TakeLast(size * NumDime - result.Count).ToList());
             }
-
-            Console.WriteLine("step 4");
 
             return result.ToList();
         }

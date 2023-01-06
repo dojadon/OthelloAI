@@ -57,10 +57,10 @@ namespace OthelloAI.GA
             var ga = new GA<ulong, Score<ulong>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorRandomTournament<ulong>(new PopulationTrainerCoLearning(1, 54, 160, 16000, -1), 2, 54, 100 * 400)
-                {
-                    GetDepthFraction = (_, _, _) => (1, 1)
-                },
+                //Evaluator = new PopulationEvaluatorRandomTournament<ulong>(new PopulationTrainerCoLearning(1, 54, 160, 16000, -1), 2, 54, 100 * 400)
+                //{
+                //    GetDepthFraction = (_, _, _) => (1, 1)
+                //},
                 // Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
                 Variator = new VariatorES<ulong>()
                 {
@@ -134,9 +134,9 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 12,
-                SizeMin = 7,
-                SizeMax = 9,
+                NumTuples = 9,
+                SizeMin = 8,
+                SizeMax = 8,
                 MaxNumWeights = (int)Math.Pow(3, 10) * 1,
                 MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
@@ -146,27 +146,25 @@ namespace OthelloAI.GA
             int n_dimes = 4;
             int dime_size = 100;
 
-            static bool p(TrainingDataElement t) => 36 < t.board.n_stone && t.board.n_stone <= 40;
+            int n_start = 32;
+            int n_end = 40;
+
+            bool p(TrainingDataElement t) => n_start < t.board.n_stone && t.board.n_stone <= n_end;
             var data = Enumerable.Range(2001, 14).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
             var data_splited = ArrayUtil.Divide(data, n_dimes).Select(a => new TrainingData(a)).ToArray();
 
-            var test_data = WthorRecordReader.Read($"WTH/WTH_2015.wtb").SelectMany(x => x).Where(p).ToArray();
-
-            IEnumerable<TrainingDataElement> GetTrainingData(int index)
-            {
-                return data_splited.Length.Loop().Where(i => i != index).SelectMany(i => data_splited[i]);
-            }
+            var test_data = Enumerable.Range(2015, 1).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).ToArray();
 
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
                 // Evaluator = new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainerCoLearning(4, 48, 9600, 9600, -1)),
-                //Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
-                //{
-                //    Evaluators = (n_dimes - 1).Loop(i => new PopulationEvaluatorTrainingScore<float[]>(GetTrainingData(i), data_splited[i]))
-                //        .ConcatOne<IPopulationEvaluator<float[], Score<float[]>>>(new PopulationEvaluatorTrainingScoreKFold<float[]>(data_splited)).ToArray(),
-                //},
-                Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
+                Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
+                {
+                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(2, 50, 4800, 800))).ToArray(),
+                },
+                // Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
+                //Evaluator = new PopulationEvaluatorTrainingScoreShuffleKFold<float[]>(new TrainingData(data), 1F / 8),
                 //Variator = new VariatorEliteArchive<float[]>()
                 //{
                 //    NumElites = 20 * pop_size / 100,
@@ -178,7 +176,7 @@ namespace OthelloAI.GA
                 Variator = new VariatorDistributed<float[]>()
                 {
                     NumDime = n_dimes,
-                    MigrationRate = 50,
+                    MigrationRate = 25,
                     Variator = new VariatorEliteArchive<float[]>()
                     {
                         NumElites = 20,
@@ -211,15 +209,19 @@ namespace OthelloAI.GA
                     sw_tuple.WriteLine($"{gen},{id},{s.score}," + string.Join(", ", s.ind.Tuples[0].Select(t => t)));
                 }
 
-                var top_scores = Enumerable.Range(0, pop.Count / 100).AsParallel().Select(i =>
+                var top_inds = Enumerable.Range(0, pop.Count / 100).Select(i => pop.Skip(100 * i).Take(100).MinBy(s => s.score).First()).ToArray();
+
+                var train_scores = top_inds.Select(s => s.score);
+
+                var test_scores = top_inds.Select(s =>
                 {
-                    var s = pop[i * 100];
-                    var trainer = new Trainer(s.ind.Weight, 0.001F);
+                    var w = s.ind.CreateWeight();
+                    var trainer = new Trainer(w, 0.001F);
                     return trainer.TrainAndTest(data, test_data, s.ind.GetDepth());
                 }).ToArray();
 
                 // var top_scores = Enumerable.Range(0, pop.Count / 100).Select(i => pop[i * 100].score).ToArray();
-                sw_score.WriteLine(string.Join(",", top_scores));
+                sw_score.WriteLine(string.Join(",", train_scores) + "," + string.Join(",", test_scores));
 
                 var score = pop.MinBy(ind => ind.score).First();
 

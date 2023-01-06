@@ -152,52 +152,48 @@ namespace OthelloAI
     public struct SearchParameter
     {
         public float depth;
-        public bool depth_prob_cut;
-
         public float alpha, beta;
-
         public readonly bool transposition_cut, store_transposition;
 
-        public SearchParameter(float depth, bool depth_prob_cut, float alpha, float beta, bool transposition_cut, bool store_transposition)
+        public SearchParameter(float depth, float alpha, float beta, bool transposition_cut, bool store_transposition)
         {
             this.depth = depth;
-            this.depth_prob_cut = depth_prob_cut;
             this.alpha = alpha;
             this.beta = beta;
             this.transposition_cut = transposition_cut;
             this.store_transposition = store_transposition;
         }
 
-        public static SearchParameter CreateInitParam(float depth, bool depth_prob_cut, bool transposition_cut, bool store_transposition)
+        public static SearchParameter CreateInitParam(float depth, bool transposition_cut, bool store_transposition)
         {
-            return new SearchParameter(depth, depth_prob_cut, -PlayerAI.INF, PlayerAI.INF, transposition_cut, store_transposition);
+            return new SearchParameter(depth, -PlayerAI.INF, PlayerAI.INF, transposition_cut, store_transposition);
         }
 
         public SearchParameter Deepen()
         {
-            return new SearchParameter(depth - 1, depth_prob_cut, -beta, -alpha, transposition_cut, store_transposition);
+            return new SearchParameter(depth - 1, -beta, -alpha, transposition_cut, store_transposition);
         }
-
+        
         public SearchParameter SwapAlphaBeta()
         {
-            return new SearchParameter(depth, depth_prob_cut, -beta, -alpha, transposition_cut, store_transposition);
+            return new SearchParameter(depth, -beta, -alpha, transposition_cut, store_transposition);
         }
 
         public SearchParameter CreateNullWindowParam()
         {
-            return new SearchParameter(depth - 1, depth_prob_cut , -alpha - 1, -alpha, transposition_cut, store_transposition);
+            return new SearchParameter(depth - 1, -alpha - 1, -alpha, transposition_cut, store_transposition);
         }
 
-        public bool ShouldObserve()
+        public bool ShouldObserve(Board b)
         {
-            return depth_prob_cut && 0 < depth && depth < 2;
+            return 0 < depth && depth < 2 && (b.n_stone % 2 == 0);
         }
 
         public SearchParameter ObserveDepth(Random rand)
         {
-            depth_prob_cut = false;
+            float p = depth * 0.5F;
 
-            if (depth * 0.5 < rand.NextDouble())
+            if (p < rand.NextDouble())
                 depth = 0;
             else
                 depth = 2;
@@ -229,7 +225,7 @@ namespace OthelloAI
         public SearchParameter CreateSearchParameter(int n)
         {
             float d = Depth(n);
-            return SearchParameter.CreateInitParam(d, (n + d) % 2 == 1, ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n));
+            return SearchParameter.CreateInitParam(d, ShouldTranspositionCut(n), ShouldStoreTranspositionTable(n));
         }
     }
 
@@ -278,6 +274,11 @@ namespace OthelloAI
         public float Eval(Board board)
         {
             SearchedNodeCount++;
+
+            if (board.n_stone % 2 != 0)
+            {
+                Console.WriteLine(board.n_stone);
+            }
 
             //if (color == 1 ^ board.n_stone % 2 == 0)
             //{
@@ -562,9 +563,9 @@ namespace OthelloAI
             if (search.IsCanceled)
                 return -1000000;
 
-            if(p.ShouldObserve())
+            if(p.ShouldObserve(move.reversed))
             {
-                p = p.ObserveDepth(Program.Random);
+                p = p.ObserveDepth(Random);
             }
 
             if (p.depth <= 0)

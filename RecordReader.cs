@@ -7,11 +7,53 @@ using System.Threading.Tasks;
 
 namespace OthelloAI
 {
-    class WthorRecordReader
+    interface IGameProvider
     {
+        IEnumerable<TrainingData> Read();
+    }
+
+    class GameProviderSelfMatching : IGameProvider
+    {
+        PlayerAI Player { get; }
+        int NumGames { get; }
+
+        public IEnumerable<TrainingData> Read()
+        {
+            for(int i = 0; i < NumGames; i++)
+            {
+                yield return CreateGame();
+            }
+        }
+
+        public TrainingData CreateGame()
+        {
+            (var _, var boards) = Tester.PlayGame(Player, Player, Board.Init, r => r.next_board);
+
+            var data = new TrainingData
+            {
+                { boards, boards[^1].GetStoneCountGap() }
+            };
+            return data;
+        }
+    }
+
+    class WthorRecordReader : IGameProvider
+    {
+        public string Path { get; }
+
+        public WthorRecordReader(string path)
+        {
+            Path = path;
+        }
+
         public static IEnumerable<TrainingData> Read(string path)
         {
-            using var reader = new BinaryReader(new FileStream(path, FileMode.Open));
+            return new WthorRecordReader(path).Read();
+        }
+
+        public IEnumerable<TrainingData> Read()
+        {
+            using var reader = new BinaryReader(new FileStream(Path, FileMode.Open));
 
             byte[] data = reader.ReadBytes(4);
 

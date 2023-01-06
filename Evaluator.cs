@@ -58,6 +58,11 @@ namespace OthelloAI
         {
             return Evaluator.EvalTraining(board);
         }
+
+        public override void StartSearch(int stone)
+        {
+            Evaluator.StartSearch(stone);
+        }
     }
 
     public class EvaluatorBiasedRandomChoice : Evaluator

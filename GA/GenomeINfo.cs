@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MathNet.Numerics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,6 +7,13 @@ using System.Threading.Tasks;
 
 namespace OthelloAI.GA
 {
+    public interface IGenomeGenerator<T>
+    {
+        GenomeTuple<T>[][] Generate(GenomeInfo<T> info, Random rand);
+    }
+
+
+
     public class GenomeInfo<T>
     {
         public Func<Random, T> GenomeGenerator { get; init; }
@@ -18,7 +26,7 @@ namespace OthelloAI.GA
 
         public int MaxNumWeights { get; init; }
 
-        public int MinDepth { get; init; }
+        public float MinDepth { get; init; }
 
         public int[][] TupleSizeCombinations { get; set; }
 
@@ -61,7 +69,7 @@ namespace OthelloAI.GA
                 return TupleSizeCombinations.Count(s2 => IsDominated(s, s2)) > 1;
             }
 
-            TupleSizeCombinations = Func(new int[] { }).ToArray();
+            TupleSizeCombinations = Func(Array.Empty<int>()).ToArray();
             TupleSizeCombinations = TupleSizeCombinations.Where(s => !IsDominatedAny(s)).ToArray();
 
             //foreach (var s in TupleSizeCombinations)
@@ -81,19 +89,20 @@ namespace OthelloAI.GA
             return new Individual<T>(Enumerable.Range(0, NumStages).Select(_ => Enumerable.Range(0, NumTuples).Select(i => CreateGenome(i)).ToArray()).ToArray(), this);
         }
 
-        public float CalcExeCost(Weight weight, int n_dsics)
+        public float CalcExeCost(int n_tuples)
         {
-            float t_factor = 2.5F;
+            float t_factor = 20F;
             float cost_per_node = 480F;
 
-            return cost_per_node + weight.NumOfEvaluation(n_dsics) * t_factor;
+            return cost_per_node + n_tuples * t_factor;
         }
 
-        public float GetDepth(Weight weight, int n_dsics)
-        {
-            float max_t = 20 * 9 + 480F;
+        public const int MAX_NUM_TUPLES = 9;
 
-            float t = CalcExeCost(weight, n_dsics);
+        public float GetDepth(int n_tuples)
+        {
+            float max_t = CalcExeCost(MAX_NUM_TUPLES);
+            float t = CalcExeCost(n_tuples);
 
             return (float)Math.Log(max_t / t) / 1.1F + MinDepth;
         }
