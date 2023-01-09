@@ -137,7 +137,7 @@ namespace OthelloAI.GA
                 NumTuples = 9,
                 SizeMin = 8,
                 SizeMax = 8,
-                MaxNumWeights = (int)Math.Pow(3, 10) * 1,
+                MaxNumWeights = (int)Math.Pow(3, 11) * 1,
                 MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
@@ -146,7 +146,7 @@ namespace OthelloAI.GA
             int n_dimes = 4;
             int dime_size = 100;
 
-            int n_start = 32;
+            int n_start = 30;
             int n_end = 40;
 
             bool p(TrainingDataElement t) => n_start < t.board.n_stone && t.board.n_stone <= n_end;
@@ -158,31 +158,22 @@ namespace OthelloAI.GA
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                // Evaluator = new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainerCoLearning(4, 48, 9600, 9600, -1)),
                 Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
                 {
-                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(2, 50, 4800, 800))).ToArray(),
+                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(2, 50, 9600, 1200))).ToArray(),
                 },
                 // Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
-                //Evaluator = new PopulationEvaluatorTrainingScoreShuffleKFold<float[]>(new TrainingData(data), 1F / 8),
-                //Variator = new VariatorEliteArchive<float[]>()
-                //{
-                //    NumElites = 20 * pop_size / 100,
-                //    Groups = new VariationGroup<float[]>[] {
-                //        new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 60 *  pop_size / 100, 8),
-                //        new VariationGroupRandom<float[]>(20 * pop_size / 100, 0),
-                //    },
-                //},
+                // Evaluator = new PopulationEvaluatorTrainingScoreShuffledKFold<float[]>(new TrainingData(data), 9600 * 24, 1200 * 24),
                 Variator = new VariatorDistributed<float[]>()
                 {
                     NumDime = n_dimes,
                     MigrationRate = 25,
                     Variator = new VariatorEliteArchive<float[]>()
                     {
-                        NumElites = 20,
+                        NumElites = 20 * (dime_size / 100),
                         Groups = new VariationGroup<float[]>[] {
-                            new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 65),
-                            new VariationGroupRandom<float[]>(15),
+                            new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 65  * (dime_size / 100)),
+                            new VariationGroupRandom<float[]>(15  * (dime_size / 100)),
                         },
                     },
                     MigrationTable = n_dimes.Loop(i => n_dimes.Loop(j => (i + 1) % n_dimes == j ? 10 : 0).ToArray()).ToArray(),
@@ -200,7 +191,7 @@ namespace OthelloAI.GA
 
             ga.Run(ga.Init(n_dimes * dime_size), (gen, time, pop) =>
             {
-                foreach (var t in pop.Select((s, i) => (s, i)).OrderBy(t => t.i / 100).ThenBy(t => t.s.score))
+                foreach (var t in pop.Select((s, i) => (s, i)).OrderBy(t => t.i / dime_size).ThenBy(t => t.s.score))
                 {
                     var s = t.s;
                     int id = t.i / 100;
@@ -209,7 +200,7 @@ namespace OthelloAI.GA
                     sw_tuple.WriteLine($"{gen},{id},{s.score}," + string.Join(", ", s.ind.Tuples[0].Select(t => t)));
                 }
 
-                var top_inds = Enumerable.Range(0, pop.Count / 100).Select(i => pop.Skip(100 * i).Take(100).MinBy(s => s.score).First()).ToArray();
+                var top_inds = n_dimes.Loop(i => pop.Skip(dime_size * i).Take(dime_size).MinBy(s => s.score).First()).ToArray();
 
                 var train_scores = top_inds.Select(s => s.score);
 

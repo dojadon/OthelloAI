@@ -41,6 +41,7 @@ namespace OthelloAI
     public class EvaluatorRandomize : Evaluator
     {
         public Evaluator Evaluator { get; }
+        public Random Random { get;} = new Random();
         public float V { get; }
 
         public EvaluatorRandomize(Evaluator evaluator, float v)
@@ -51,7 +52,7 @@ namespace OthelloAI
 
         public override float Eval(Board board)
         {
-            return Evaluator.Eval(board) + (float) Normal.Sample(Program.Random, 0, V);
+            return Evaluator.Eval(board) + (float) Normal.Sample(Random, 0, V);
         }
 
         public override float EvalTraining(Board board)
@@ -67,7 +68,7 @@ namespace OthelloAI
 
     public class EvaluatorBiasedRandomChoice : Evaluator
     {
-        Random Rand { get; } = new Random(DateTime.Now.Millisecond);
+        Random Rand { get; } = new Random();
         (Evaluator e, float prob)[] Evaluators { get; }
 
         Evaluator Current { get; set; }

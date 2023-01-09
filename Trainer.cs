@@ -41,17 +41,17 @@ namespace OthelloAI
 
     public class TrainerUtil
     {
-        public static TrainingData PlayForTrainingParallel(int n_game, Player player, int num_threads = -1)
+        public static TrainingData PlayForTrainingParallel(int n_game, Func<int, Player> create_player)
         {
-            return new TrainingData(PlayForTrainingParallelSeparated(n_game, player, num_threads).SelectMany(x => x));
+            return new TrainingData(PlayForTrainingParallelSeparated(n_game, create_player).SelectMany(x => x));
         }
 
-        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player, int num_threads = -1)
+        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Func<int, Player> create_player)
         {
-            return PlayForTrainingParallelSeparated(n_game, player, player, rand => Tester.CreateRandomGame(6, rand), num_threads);
+            return PlayForTrainingParallelSeparated(n_game, create_player, create_player);
         }
 
-        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Player player1, Player player2, Func<Random, Board> createInitBoard, int num_threads = -1)
+        public static TrainingData[] PlayForTrainingParallelSeparated(int n_game, Func<int, Player> create_player1, Func<int, Player> create_player2)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -72,11 +72,14 @@ namespace OthelloAI
 
             return n_game.Loop().AsParallel().Select(i =>
             {
+                var p1 = create_player1(i);
+                var p2 = create_player2(i);
+
                 var rand = new Random();
-                Board board = createInitBoard(rand);
+                Board board = Board.Init;
                 List<Board> boards = new List<Board>();
 
-                while (Step(ref board, boards, player1, 1) | Step(ref board, boards, player2, -1))
+                while (Step(ref board, boards, p1, 1) | Step(ref board, boards, p2, -1))
                 {
                 }
 
@@ -84,7 +87,7 @@ namespace OthelloAI
             }).ToArray();
         }
 
-        public static TrainingData PlayForTraining(int n_game, Player player, Random rand)
+        public static TrainingData PlayForTraining(int n_game, Player player)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -107,7 +110,7 @@ namespace OthelloAI
 
             for (int i = 0; i < n_game; i++)
             {
-                Board board = Tester.CreateRandomGame(8, rand);
+                Board board = Board.Init;
                 var boards = new List<Board>();
 
                 while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))

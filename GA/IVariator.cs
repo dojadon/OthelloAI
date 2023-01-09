@@ -143,12 +143,14 @@ namespace OthelloAI.GA
 
         public List<Individual<T>> Vary(List<Score<T>> score, int gen, Random rand)
         {
+            if(NumDime == 1)
+                return Variator.Vary(score, gen, rand);
+
             var result = new List<Individual<T>>();
 
             int size = score.Count / NumDime;
 
             var dimes = Enumerable.Range(0, NumDime)
-                // .AsParallel().WithDegreeOfParallelism(Program.NumThreads)
                 .Select(i => Variator.Vary(score.Skip(i * size).Take(size).ToList(), gen, rand)).ToArray();
 
             for (int i = 0; i < NumDime; i++)

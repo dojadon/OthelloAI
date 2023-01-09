@@ -507,6 +507,9 @@ namespace OthelloAI
             var tokens = line.Split(",").Where(s => s.Length > 0).Skip(3);
             var masks = tokens.Select(ulong.Parse).ToArray();
 
+            foreach (var m in masks)
+                Console.WriteLine(new Board(m, 0));
+
             return new WeightsSum(masks.Select(u => new WeightsArrayR(u)).ToArray());
         }
 
@@ -515,6 +518,47 @@ namespace OthelloAI
             int idx = gen * pop_size;
             return lines[idx..(idx + n_top)].Select(CreateNetworkFromLine).ToArray();
         }
+
+        public static void TestEvalVar()
+        {
+            var rand = new Random();
+            Weight[] weights = 20.Loop(i => new WeightsSum(4.Loop(_ => new WeightsArrayR(rand.GenerateRegion(24, 8)) { Test = false }).ToArray())).ToArray();
+
+            var trainer = new PopulationTrainer(2, 50, 2400, 400);
+
+            var rank_his = new List<int[]>();
+
+            using StreamWriter sw = File.CreateText($"test/test_eval_var_(num20_8x4)_trainer(2,50,2400,200)_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv");
+
+            for (int i = 0; i < 50; i++)
+            {
+                var scores = trainer.Train(weights);
+                var rank = scores.Select(s1 => scores.Count(s2 => s2 < s1) < 5 ? 1 : 0).ToArray();
+                rank_his.Add(rank);
+
+                var avg = weights.Length.Loop(i => rank_his.Select(a => a[i]).Average()).ToArray();
+                var var = weights.Length.Loop(i => rank_his.Select(a => a[i]).Variance()).ToArray();
+
+                sw.WriteLine(string.Join(",", rank) + ",," + string.Join(",", var));
+
+                Console.WriteLine(string.Join(", ", avg));
+                // Console.WriteLine(var.Average());
+            }
+        }
+
+        public static ulong[] MASKS =  {
+            0b01000010_11111111U,
+            0b10111101_10111101U,
+            0b00000111_00000111_00000111UL,
+            0b00000001_00000001_00000001_00000011_00011111UL,
+            0b11111111_00000000UL,
+            0b11111111_00000000_00000000UL,
+            0b11111111_00000000_00000000_00000000UL,
+            0x8040201008040201UL,
+            0x1020408102040UL,
+            0x10204081020UL,
+            0x102040810UL,
+        };
 
         public static void TestGAResult()
         {
@@ -542,80 +586,192 @@ namespace OthelloAI
             static bool p1(TrainingDataElement t) => 34 <= t.board.n_stone && t.board.n_stone <= 40;
             static bool p2(TrainingDataElement t) => 32 <= t.board.n_stone && t.board.n_stone <= 34;
 
-            var data = Enumerable.Range(2001, 13).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p1)).OrderBy(i => Guid.NewGuid()).ToArray();
-            var data_splited = ArrayUtil.Divide(data, 8).Select(a => new TrainingData(a)).ToArray();
+            var data = Enumerable.Range(2001, 10).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").Select(x => x.Where(p1).ToArray())).OrderBy(i => Guid.NewGuid()).ToArray();
 
             // var test_data = WthorRecordReader.Read($"WTH/WTH_2015.wtb").SelectMany(x => x).Where(p2).ToArray();
             var test_data = Enumerable.Range(2014, 2).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p1)).OrderBy(i => Guid.NewGuid()).ToArray(); ;
 
-            string log_dir = $"ga/brkga_2022_12_28_18_14";
+            WeightsSum[] weights = 3.Loop(i => new WeightsSum(MASKS.Select(m => new WeightsArrayR(m) { Test = i < 2 }).ToArray())).ToArray();
+            // Weight[] weights = 6.Loop(i => new WeightsSum(masks.Take(i + 1).Select(m => new WeightsArrayR(m)).ToArray())).ToArray();
+            var trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
+
+            for (int i = 0; i < 500; i++)
+            {
+                TrainingDataElement[] d = data[i];
+                Parallel.ForEach(trainers, t => t.Train(d));
+
+                if (i % 10 == 0)
+                {
+                    var e = trainers.AsParallel().Select(t => t.TestError(test_data, 1)).ToArray();
+                    Console.WriteLine(string.Join(",", e));
+                }
+
+                if (i == 200)
+                {
+                    foreach (var w in weights[0].Weights)
+                        if (w is WeightsArrayR wr)
+                            wr.Test = false;
+                }
+            }
+
+            //string log_dir = $"ga/brkga_2022_12_28_18_14";
+            //var lines = File.ReadAllLines(log_dir + "/tuple.csv");
+            //using StreamWriter sw = File.CreateText(log_dir + "/test.csv");
+
+            //for (int gen = 0; gen <= 2500; gen++)
+            //{
+            //    var weights = num_dimes.Loop(i => lines[(gen * num_dimes + i) * size_dime]).Select(CreateNetworkFromLine);
+            //    // var scores = weights.AsParallel().Select(w => Trainer.KFoldTest(w, GetDepth(w, 40), data_splited)).ToArray();
+            //    var scores = weights.AsParallel().Select(w => new Trainer(w, 0.001F).TrainAndTest(data, test_data)).ToArray();
+
+            //    Console.WriteLine($"{gen}: " + string.Join(",", scores));
+            //    sw.WriteLine(string.Join(",", scores));
+            //}
+        }
+
+        public static void TestWeightAgainstEdaxNetwork()
+        {
+            string log_dir = "ga/brkga_2023_01_07_21_13";
+
+            int num_dimes = 4;
+            int size_dime = 100;
 
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
-            using StreamWriter sw = File.CreateText(log_dir + "/test.csv");
+            var weights = new[] { CreateNetworkFromLine(lines[(1903 * num_dimes + 2) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
+            var trainers = weights.Select(w => new Trainer(w, 0.0002F)).ToArray();
 
-            ulong[] masks = new[] {
-                0b01000010_11111111U,
-            0b00000111_00000111_00000111UL,
-            0b00000001_00000001_00000001_00000011_00011111UL,
-            //0b11111111_00000000UL,
-            //0b11111111_00000000_00000000UL,
-            //0x8040201008040201UL,
-            //0x1020408102040UL,
-            //0x10204081020UL,
-            //0x102040810UL,
-        };
-
-            Weight weight = new WeightsSum(masks.Select(m => new WeightsArrayR(m)).ToArray());
-            var trainer = new Trainer(weight, 0.001F);
-
-            trainer.Train(data.OrderBy(i => Guid.NewGuid()).ToArray());
-
-            Console.WriteLine(GetDepth(weight, 40));
-
-            var depths = 6.Loop(1, i => i * 1F);
-
-            var es = new List<float>();
-
-            for (int i = 0; i < 100; i++)
+            PlayerAI CreatePlayer(Weight w, int depth, int endgame)
             {
-                float d = 1F;
-                var e = trainer.TestError(test_data, d);
-                es.Add(e);
-                (float avg, float var) = es.AverageAndVariance();
-                Console.WriteLine($"{d}, {avg}, {var}");
+                var evaluator = new EvaluatorRandomize(new EvaluatorWeightsBased(w), v: 8);
+                return new PlayerAI(evaluator)
+                {
+                    PrintInfo = false,
+                    Params = new[] {
+                        new SearchParameterFactory(stage: 0, SearchType.Normal, depth),
+                        new SearchParameterFactory(stage: endgame, SearchType.Normal, 64),
+                    },
+                };
             }
-            return;
 
-            for (int gen = 0; gen <= 2500; gen++)
+            bool Within(TrainingDataElement d) => 30 <= d.board.n_stone && d.board.n_stone <= 54;
+
+            for (int i = 0; i < 5000; i++)
             {
-                var weights = num_dimes.Loop(i => lines[(gen * num_dimes + i) * size_dime]).Select(CreateNetworkFromLine);
-                // var scores = weights.AsParallel().Select(w => Trainer.KFoldTest(w, GetDepth(w, 40), data_splited)).ToArray();
-                var scores = weights.AsParallel().Select(w => new Trainer(w, 0.001F).TrainAndTest(data, test_data)).ToArray();
+                var data = TrainerUtil.PlayForTrainingParallelSeparated(32, i => CreatePlayer(weights[i % 2], 5, 48), i => CreatePlayer(weights[(i + 1) % 2], 5, 48));
+                Parallel.ForEach(trainers, t => t.Train(data.SelectMany(x => x)));
 
-                Console.WriteLine($"{gen}: " + string.Join(",", scores));
-                sw.WriteLine(string.Join(",", scores));
+                //Console.WriteLine($"{i} / {NumTrainingGames / 16}");
+                float r = data.Select((d, i) => d[^1].result * (i % 2 == 0 ? 1 : -1)).Select(r => Math.Clamp(r, -0.5F, 0.5F) + 0.5F).Average();
+                Console.WriteLine($"{i} / {r}");
+            }
+
+            float MeasureWinRate(Weight w1, Weight w2)
+            {
+                PlayerAI p1 = CreatePlayer(w1, 5, 48);
+                PlayerAI p2 = CreatePlayer(w2, 5, 48);
+
+                int c1 = 0;
+                int c2 = 0;
+
+                Parallel.For(0, 100, i =>
+                {
+                    int result;
+
+                    if (i % 2 == 0)
+                        result = PlayGame(p1, p2, Board.Init).GetStoneCountGap();
+                    else
+                        result = -PlayGame(p2, p1, Board.Init).GetStoneCountGap();
+
+                    if (result > 0)
+                        Interlocked.Increment(ref c1);
+                    else if (result < 0)
+                        Interlocked.Increment(ref c2);
+                });
+
+                return (float)c1 / (c1 + c2);
             }
         }
 
         public static void TestWeights()
         {
-            string log_dir = "ga/brkga_2023_01_06_13_45";
+            string log_dir = "ga/brkga_2023_01_07_21_13";
 
             int num_dimes = 4;
             int size_dime = 100;
 
-            var gens = 90.Loop(i => i * 10);
-
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
-            var weights = gens.SelectMany(g => num_dimes.Loop(d => lines[(g * num_dimes + d) * size_dime])).Select(CreateNetworkFromLine);
+            var gens = 160.Loop(i => i * 10).ToArray();
+            //var weights = gens.SelectMany(g => num_dimes.Loop(d => lines[(g * num_dimes + d) * size_dime])).Select(CreateNetworkFromLine).ToArray();
+            //weights = weights.ConcatOne(new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray())).ToArray();
+            var weights = new[] { CreateNetworkFromLine(lines[(1903 * num_dimes + 2) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
 
-            var trainer = new PopulationTrainer(2, 50, 20000, 1000);
-            var scores = trainer.Train(weights);
+            if (true)
+            {
+                var trainer = new PopulationTrainer(2, 48, 6400, 600);
+                var scores = trainer.Train(weights);
 
-            Console.WriteLine(string.Join(",", scores));
-            File.WriteAllText(log_dir + "/test.csv", string.Join(",", scores));
+                Console.WriteLine(string.Join(",", scores));
+                // File.WriteAllText(log_dir + "/test.csv", scores[^1] + Environment.NewLine + string.Join(Environment.NewLine, gens.Length.Loop(i => string.Join(",", num_dimes.Loop(d => scores[i * num_dimes + d])))));
+            }
+
+            //Directory.CreateDirectory(log_dir + "/e");
+            //for (int i = 0; i < weights.Length; i++)
+            //{
+            //    weights[i].Save(log_dir + $"/e/{i}.dat");
+            //}
+
+            static PlayerAI CreatePlayer(Weight w)
+            {
+                return new PlayerAI(new EvaluatorRandomize(new EvaluatorWeightsBased(w), 5F))
+                {
+                    Params = new[] {
+                        new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: 7),
+                        new SearchParameterFactory(stage: 48, type: SearchType.Normal, depth: 64),
+                    },
+                    PrintInfo = false,
+                };
+            }
+
+            float MeasureWinRate(Weight w1, Weight w2)
+            {
+                PlayerAI p1 = CreatePlayer(w1);
+                PlayerAI p2 = CreatePlayer(w2);
+
+                int c1 = 0;
+                int c2 = 0;
+
+                Parallel.For(0, 1000, i =>
+                {
+                    int result;
+
+                    if (i % 2 == 0)
+                        result = PlayGame(p1, p2, Board.Init).GetStoneCountGap();
+                    else
+                        result = -PlayGame(p2, p1, Board.Init).GetStoneCountGap();
+
+                    if (result > 0)
+                        Interlocked.Increment(ref c1);
+                    else if (result < 0)
+                        Interlocked.Increment(ref c2);
+
+                    Console.WriteLine($"{c1}:{c2}, {c1 / (float) (c1 + c2)}");
+                });
+
+                return (float)c1 / (c1 + c2);
+            }
+
+            var history = new List<float>();
+
+            for (int i = 0; i < weights.Length - 1; i++)
+            {
+                float rate = MeasureWinRate(weights[i], weights[^1]);
+                Console.WriteLine($"{i}, {rate}");
+                history.Add(rate);
+            }
+
+            // File.WriteAllText(log_dir + "/test_win.csv", string.Join(Environment.NewLine, history));
         }
     }
 }

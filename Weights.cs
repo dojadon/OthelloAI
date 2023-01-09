@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
-using System.Threading.Tasks;
-using System.Xml.Linq;
-using System.Xml.Serialization;
 
 namespace OthelloAI
 {
-    public abstract class Weight 
+    public abstract class Weight
     {
         public const float WEIGHT_RANGE = 10;
 
@@ -48,7 +44,7 @@ namespace OthelloAI
 
     public class WeightsSum : Weight
     {
-        Weight[] Weights { get; }
+        public Weight[] Weights { get; }
 
         public WeightsSum(params Weight[] weights)
         {
@@ -315,7 +311,7 @@ namespace OthelloAI
     {
         public BoardHasher Hasher { get; }
 
-        public  float[] weights;
+        public float[] weights;
 
         byte[] weights_b;
 
@@ -371,9 +367,33 @@ namespace OthelloAI
 
         public override int NumOfEvaluation(int n_discs) => 8;
 
+        public bool Test { get; set; } = false;
+
         public override void UpdataEvaluation(Board board, float add, float range)
         {
-            int hash = Hasher.Hash(board);
+            if (Test)
+            {
+                int hash = Hasher.Hash(board);
+
+                for (int i = 0; i < hash_length; i++)
+                {
+                    int m = (1 << i) | (1 << (i + hash_length));
+                    int h = hash & ~m;
+
+                    Update(h, add, range);
+                    Update(h | (1 << i), add, range);
+                    Update(h | (1 << (i + hash_length)), add, range);
+                }
+            }
+            else
+            {
+                int hash = Hasher.Hash(board);
+                Update(hash, add, range);
+            }
+        }
+
+        public void Update(int hash, float add, float range)
+        {
             int flipped = Hasher.FlipHash(hash);
 
             weights[hash] += add;
