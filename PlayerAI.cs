@@ -275,10 +275,10 @@ namespace OthelloAI
         {
             SearchedNodeCount++;
 
-            if (board.n_stone % 2 != 0)
-            {
-                Console.WriteLine(board.n_stone);
-            }
+            //if (board.n_stone % 2 != 0)
+            //{
+            //    Console.WriteLine(board.n_stone);
+            //}
 
             //if (color == 1 ^ board.n_stone % 2 == 0)
             //{

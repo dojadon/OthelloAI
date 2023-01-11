@@ -87,7 +87,7 @@ namespace OthelloAI
             }).ToArray();
         }
 
-        public static TrainingData PlayForTraining(int n_game, Player player)
+        public static TrainingData PlayForTraining(int n_game, Player player1, Player player2)
         {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
@@ -113,7 +113,7 @@ namespace OthelloAI
                 Board board = Board.Init;
                 var boards = new List<Board>();
 
-                while (Step(ref board, boards, player, 1) | Step(ref board, boards, player, -1))
+                while (Step(ref board, boards, player1, 1) | Step(ref board, boards, player2, -1))
                 {
                 }
                 results.Add(boards, GetResult(board));
@@ -182,10 +182,9 @@ namespace OthelloAI
             return e;
         }
 
-        public void Train(IEnumerable<TrainingDataElement> train_data)
+        public float Train(IEnumerable<TrainingDataElement> train_data)
         {
-            foreach (var d in train_data)
-                Update(d.board, d.result);
+            return train_data.Select(d => Update(d.board, d.result)).Select(x => x * x).Average();
         }
 
         public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data, float depth = 0)

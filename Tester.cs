@@ -532,7 +532,7 @@ namespace OthelloAI
 
             for (int i = 0; i < 50; i++)
             {
-                var scores = trainer.Train(weights);
+                var scores = trainer.TrainAndTest(weights);
                 var rank = scores.Select(s1 => scores.Count(s2 => s2 < s1) < 5 ? 1 : 0).ToArray();
                 rank_his.Add(rank);
 
@@ -631,15 +631,19 @@ namespace OthelloAI
 
         public static void TestWeightAgainstEdaxNetwork()
         {
-            string log_dir = "ga/brkga_2023_01_07_21_13";
+            string log_dir = "ga/brkga_2023_01_10_08_24";
 
             int num_dimes = 4;
             int size_dime = 100;
 
+            int g = 1800;
+            int d = 1;
+
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
-            var weights = new[] { CreateNetworkFromLine(lines[(1903 * num_dimes + 2) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
-            var trainers = weights.Select(w => new Trainer(w, 0.0002F)).ToArray();
+            var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
+            // var weights = new[] { CreateNetworkFromLine(lines[0]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
+            var trainers = weights.Select(w => new Trainer(w, 0.0001F)).ToArray();
 
             PlayerAI CreatePlayer(Weight w, int depth, int endgame)
             {
@@ -654,16 +658,46 @@ namespace OthelloAI
                 };
             }
 
+            using StreamWriter sw = File.CreateText(log_dir + $"/test_wr_{g}_{d}.csv");
+
             bool Within(TrainingDataElement d) => 30 <= d.board.n_stone && d.board.n_stone <= 54;
 
-            for (int i = 0; i < 5000; i++)
+            TrainingData[] CreateData(int n, int d) => n.Loop().AsParallel().Select(j =>
             {
-                var data = TrainerUtil.PlayForTrainingParallelSeparated(32, i => CreatePlayer(weights[i % 2], 5, 48), i => CreatePlayer(weights[(i + 1) % 2], 5, 48));
-                Parallel.ForEach(trainers, t => t.Train(data.SelectMany(x => x)));
+                var p1 = CreatePlayer(weights[0], d, 50);
+                var p2 = CreatePlayer(weights[1], d, 50);
+
+                if (j % 2 == 0)
+                    return TrainerUtil.PlayForTraining(1, p1, p2);
+                else
+                    return TrainerUtil.PlayForTraining(1, p2, p1);
+            }).ToArray();
+
+            var loss1 = new List<float>();
+            var loss2 = new List<float>();
+
+            for (int i = 0; i < 20000; i++)
+            {
+                var data = CreateData(32, 2);
+
+                var e = trainers.Select(t => t.Train(data.SelectMany(x => x).Where(Within))).ToArray();
+                loss1.Add(e[0]);
+                loss2.Add(e[1]);
 
                 //Console.WriteLine($"{i} / {NumTrainingGames / 16}");
-                float r = data.Select((d, i) => d[^1].result * (i % 2 == 0 ? 1 : -1)).Select(r => Math.Clamp(r, -0.5F, 0.5F) + 0.5F).Average();
-                Console.WriteLine($"{i} / {r}");
+                // float r = data.Select((d, j) => d[^1].result * (j % 2 == 0 ? 1 : -1)).Select(r => Math.Clamp(r, -0.5F, 0.5F) + 0.5F).Average();
+
+                if (i % 10 == 0)
+                {
+                    float r = MeasureWinRate(weights[0], weights[1]);
+
+                    var test_data = CreateData(32, 5);
+                    var test_loss = trainers.Select(t => t.TestError(test_data.SelectMany(x => x), 1)).ToArray();
+
+                    Console.WriteLine($"{i}, {r}, {test_loss[0]}, {test_loss[1]}");
+                    sw.WriteLine($"{i}, {r}, {test_loss[0]}, {test_loss[1]}");
+                    sw.Flush();
+                }
             }
 
             float MeasureWinRate(Weight w1, Weight w2)
@@ -695,7 +729,7 @@ namespace OthelloAI
 
         public static void TestWeights()
         {
-            string log_dir = "ga/brkga_2023_01_07_21_13";
+            string log_dir = "ga/brkga_2023_01_10_08_24";
 
             int num_dimes = 4;
             int size_dime = 100;
@@ -705,12 +739,12 @@ namespace OthelloAI
             var gens = 160.Loop(i => i * 10).ToArray();
             //var weights = gens.SelectMany(g => num_dimes.Loop(d => lines[(g * num_dimes + d) * size_dime])).Select(CreateNetworkFromLine).ToArray();
             //weights = weights.ConcatOne(new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray())).ToArray();
-            var weights = new[] { CreateNetworkFromLine(lines[(1903 * num_dimes + 2) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
+            var weights = new[] { CreateNetworkFromLine(lines[(209 * num_dimes + 2) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
 
             if (true)
             {
                 var trainer = new PopulationTrainer(2, 48, 6400, 600);
-                var scores = trainer.Train(weights);
+                var scores = trainer.TrainAndTest(weights);
 
                 Console.WriteLine(string.Join(",", scores));
                 // File.WriteAllText(log_dir + "/test.csv", scores[^1] + Environment.NewLine + string.Join(Environment.NewLine, gens.Length.Loop(i => string.Join(",", num_dimes.Loop(d => scores[i * num_dimes + d])))));
@@ -756,7 +790,7 @@ namespace OthelloAI
                     else if (result < 0)
                         Interlocked.Increment(ref c2);
 
-                    Console.WriteLine($"{c1}:{c2}, {c1 / (float) (c1 + c2)}");
+                    Console.WriteLine($"{c1}:{c2}, {c1 / (float)(c1 + c2)}");
                 });
 
                 return (float)c1 / (c1 + c2);

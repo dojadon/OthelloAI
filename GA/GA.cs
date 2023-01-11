@@ -135,8 +135,8 @@ namespace OthelloAI.GA
             {
                 NumStages = 1,
                 NumTuples = 9,
-                SizeMin = 8,
-                SizeMax = 8,
+                SizeMin = 9,
+                SizeMax = 9,
                 MaxNumWeights = (int)Math.Pow(3, 11) * 1,
                 MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
@@ -144,7 +144,12 @@ namespace OthelloAI.GA
             };
 
             int n_dimes = 4;
-            int dime_size = 100;
+            int dime_size = 50;
+
+            float n_factor = dime_size / 100F;
+            int n_elites = (int)(20 * n_factor);
+            int n_cx = (int)(60 * n_factor);
+            int n_mutants = (int)(20 * n_factor);
 
             int n_start = 30;
             int n_end = 40;
@@ -160,7 +165,7 @@ namespace OthelloAI.GA
                 Info = info,
                 Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
                 {
-                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(2, 50, 9600, 1200))).ToArray(),
+                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50, 32000, 2000))).ToArray(),
                 },
                 // Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
                 // Evaluator = new PopulationEvaluatorTrainingScoreShuffledKFold<float[]>(new TrainingData(data), 9600 * 24, 1200 * 24),
@@ -170,10 +175,10 @@ namespace OthelloAI.GA
                     MigrationRate = 25,
                     Variator = new VariatorEliteArchive<float[]>()
                     {
-                        NumElites = 20 * (dime_size / 100),
+                        NumElites = n_elites,
                         Groups = new VariationGroup<float[]>[] {
-                            new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), 65  * (dime_size / 100)),
-                            new VariationGroupRandom<float[]>(15  * (dime_size / 100)),
+                            new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), n_cx),
+                            new VariationGroupRandom<float[]>(n_mutants),
                         },
                     },
                     MigrationTable = n_dimes.Loop(i => n_dimes.Loop(j => (i + 1) % n_dimes == j ? 10 : 0).ToArray()).ToArray(),
