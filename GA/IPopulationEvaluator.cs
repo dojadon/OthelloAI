@@ -11,18 +11,81 @@ namespace OthelloAI.GA
         public List<U> Evaluate(List<Individual<T>> pop);
     }
 
-    public class PopulationEvaluatorTrainingScorebySelfMatch<T> : IPopulationEvaluator<T, Score<T>>
+    public class PopulationEvaluatorTournament<T> : IPopulationEvaluator<T, Score<T>>
     {
-        PopulationTrainer Trainer { get; }
+        public PopulationTrainer Trainer { get; }
+        public int NumTrainGames { get; }
+        public int NumTestGames { get; }
 
-        public PopulationEvaluatorTrainingScorebySelfMatch(PopulationTrainer trainer)
+        public int Depth { get; init;  }
+        public int Endgame { get; init;  }
+
+        public PopulationEvaluatorTournament(PopulationTrainer trainer, int numTrainGames, int numTestGames, int depth, int endgame)
         {
             Trainer = trainer;
+            NumTrainGames = numTrainGames;
+            NumTestGames = numTestGames;
+            Depth = depth;
+            Endgame = endgame;
         }
 
         public List<Score<T>> Evaluate(List<Individual<T>> pop)
         {
-            var scores = Trainer.TrainAndTest(pop.Select(ind => ind.CreateWeight()).ToList());
+            var weights = pop.Select(ind => ind.CreateWeight()).ToArray();
+            Trainer.Train(weights, NumTrainGames);
+
+            var scores = weights.AsParallel().Select(w => TestWeight(w, weights)).ToArray();
+
+            return pop.Zip(scores, (ind, s) => new Score<T>(ind, -s)).ToList();
+        }
+
+        public float TestWeight(Weight weight, Weight[] weights)
+        {
+            int n_games = NumTestGames / 2 / weights.Length;
+            var rand = new Random();
+
+            return n_games.Loop(_ =>
+            {
+                var w2 = rand.Choice(weights);
+                return (PlayGame(weight, w2) + -PlayGame(w2, weight)) * 0.5F;
+            }).Average();
+        }
+
+        PlayerAI CreatePlayer(Weight w, int d, int endgame)
+        {
+            return new PlayerAI(new EvaluatorRandomize(new EvaluatorWeightsBased(w), 5F))
+            {
+                Params = new[] {
+                        new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: d),
+                        new SearchParameterFactory(stage: endgame, type: SearchType.Normal, depth: 64),
+                    },
+                PrintInfo = false,
+            };
+        }
+
+        public float PlayGame(Weight w1, Weight w2)
+        {
+            var b = TrainerUtil.PlayForTraining(1, CreatePlayer(w1, Depth, Endgame), CreatePlayer(w2, Depth, Endgame));
+            return Math.Clamp(b[^1].result, -1, 1);
+        }
+    }
+
+    public class PopulationEvaluatorTrainingScorebySelfMatch<T> : IPopulationEvaluator<T, Score<T>>
+    {
+        PopulationTrainer Trainer { get; }
+        int NumTrainGames { get; }
+        int NumTestGames { get; }
+
+        public PopulationEvaluatorTrainingScorebySelfMatch(PopulationTrainer trainer, int numTrainGames, int numTestGames)
+        {
+            Trainer = trainer;
+            NumTrainGames = numTrainGames;
+            NumTestGames = numTestGames;
+        }
+
+        public List<Score<T>> Evaluate(List<Individual<T>> pop)
+        {
+            var scores = Trainer.TrainAndTest(pop.Select(ind => ind.CreateWeight()).ToArray(), NumTrainGames, NumTestGames);
             return pop.Zip(scores, (ind, s) => new Score<T>(ind, s)).ToList();
         }
     }
@@ -276,7 +339,7 @@ namespace OthelloAI.GA
                 var data = TrainerUtil.PlayForTrainingParallel(32, _ => CreateRandomPlayer(weights)).Where(Within).ToArray();
                 Parallel.ForEach(trainers, t => t.Train(data));
 
-                //Console.WriteLine($"{i} / {NumTrainingGames / 16}");
+                //Console.WriteLine($"{i} / {n_train / 16}");
                 //Console.WriteLine($"{i} / {NumTrainingGames / 16}: " + string.Join(", ", trainers.Select(t => t.Log.TakeLast(t.Log.Count / 4).Average())));
             }
         }

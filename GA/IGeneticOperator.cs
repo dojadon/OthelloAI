@@ -112,37 +112,6 @@ namespace OthelloAI.GA
         }
     }
 
-    public class MutantRandomSize : MutantEachTuples<float[]>
-    {
-        public override GenomeTuple<float[]> Operate(GenomeTuple<float[]> gene, GenomeInfo<float[]> info, Random rand)
-        {
-            int size = rand.Next(info.SizeMin, info.SizeMax + 1);
-            return new GenomeTuple<float[]>(gene.Genome, size);
-        }
-    }
-
-    public class MutantRandomGenerationOneTuple<T> : IGeneticOperator1<T>
-    {
-        public Individual<T> Operate(Individual<T> ind, Random rand)
-        {
-            int index = rand.Next(ind.Info.NumTuples);
-
-            var g = ind.Genome.Select(a => a.Select((g, i) =>
-            {
-                if (i != index)
-                    return g;
-
-                var gene = ind.Info.GenomeGenerator(rand);
-                int size = rand.Next(ind.Info.SizeMin, ind.Info.SizeMax + 1);
-
-                return new GenomeTuple<T>(gene, size);
-
-            }).ToArray()).ToArray();
-
-            return new Individual<T>(g, ind.Info);
-        }
-    }
-
     public class MutantRandomGeneration<T> : IGeneticOperator1<T>
     {
         public Individual<T> Operate(Individual<T> ind, Random rand)

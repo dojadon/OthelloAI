@@ -186,6 +186,120 @@ namespace OthelloAI
         }
     }
 
+    public enum HashType
+    {
+        BIN, TER
+    }
+
+    public abstract class WeightsArray : Weight
+    {
+        public BoardHasher Hasher { get; }
+
+        public ulong Mask { get; }
+
+        public float[] weights;
+        byte[] weights_b;
+
+        readonly int[] pos;
+
+        public abstract HashType Type { get; }
+
+        public override float[] GetWeights() => weights;
+
+        public int NumOfStates { get; }
+        public int HashLength { get; }
+
+        public WeightsArray(int length)
+        {
+            HashLength = length;
+            NumOfStates = (int) Math.Pow(3, length);
+            Reset();
+        }
+
+        public override Weight Copy()
+        {
+            return new WeightsArrayS(Mask);
+        }
+
+        public override void Reset()
+        {
+            int length = Type switch
+            {
+                HashType.BIN => Math.Pow(2, HashLength * 2),
+                HashType.TER => Math.Pow(3, HashLength),
+            };
+
+            weights = new float[length];
+            weights_b = new byte[length];
+        }
+
+        public abstract int Hash(Board board);
+
+        public int Eval(Board b)
+        {
+            return weights_b[Hash(b)];
+        }
+
+        public override int Eval(RotatedAndMirroredBoards b)
+        {
+            return Eval(b.rot0) + Eval(b.rot90) + Eval(b.rot180) + Eval(b.rot270)
+                + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.inv_rot180) + Eval(b.inv_rot270) - 128 * 8;
+        }
+
+        public float EvalTraining(Board b)
+        {
+            return weights[Hash(b)];
+        }
+
+        public override float EvalTraining(RotatedAndMirroredBoards b)
+        {
+            return EvalTraining(b.rot0) + EvalTraining(b.rot90) + EvalTraining(b.rot180) + EvalTraining(b.rot270)
+                + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.inv_rot180) + EvalTraining(b.inv_rot270);
+        }
+
+        public override int NumOfEvaluation(int n_discs) => 8;
+
+        public override void UpdataEvaluation(Board board, float add, float range)
+        {
+            int hash = Hash(board);
+
+            weights[hash] += add;
+            weights_b[hash] = ConvertToInt8(weights[hash], range);
+        }
+
+        public override void ApplyTrainedEvaluation(float range)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                uint index = Hasher.ConvertStateToHash(i);
+                weights_b[index] = ConvertToInt8(weights[index], range);
+            }
+        }
+
+        public override void Read(BinaryReader reader)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                float e = reader.ReadSingle();
+
+                uint index = Hasher.ConvertStateToHash(i);
+                weights[index] = e;
+                weights_b[index] = ConvertToInt8(weights[index], WEIGHT_RANGE);
+            }
+        }
+
+        public override void Write(BinaryWriter writer)
+        {
+            for (int i = 0; i < NumOfStates; i++)
+            {
+                uint index = Hasher.ConvertStateToHash(i);
+
+                float e = weights[index];
+                writer.Write(e);
+            }
+        }
+    }
+
     public class WeightsArrayS : Weight
     {
         public BoardHasher Hasher { get; }
@@ -367,29 +481,10 @@ namespace OthelloAI
 
         public override int NumOfEvaluation(int n_discs) => 8;
 
-        public bool Test { get; set; } = false;
-
         public override void UpdataEvaluation(Board board, float add, float range)
         {
-            if (Test)
-            {
-                int hash = Hasher.Hash(board);
-
-                for (int i = 0; i < hash_length; i++)
-                {
-                    int m = (1 << i) | (1 << (i + hash_length));
-                    int h = hash & ~m;
-
-                    Update(h, add, range);
-                    Update(h | (1 << i), add, range);
-                    Update(h | (1 << (i + hash_length)), add, range);
-                }
-            }
-            else
-            {
-                int hash = Hasher.Hash(board);
-                Update(hash, add, range);
-            }
+            int hash = Hasher.Hash(board);
+            Update(hash, add, range);
         }
 
         public void Update(int hash, float add, float range)

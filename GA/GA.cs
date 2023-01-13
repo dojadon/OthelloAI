@@ -47,9 +47,6 @@ namespace OthelloAI.GA
             {
                 NumStages = 1,
                 NumTuples = 9,
-                SizeMin = 7,
-                SizeMax = 7,
-                MaxNumWeights = (int)Math.Pow(3, 9),
                 GenomeGenerator = rand => rand.GenerateRegion(19, 7),
                 Decoder = (g, _) => g,
             };
@@ -134,17 +131,16 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 9,
-                SizeMin = 9,
-                SizeMax = 9,
-                MaxNumWeights = (int)Math.Pow(3, 11) * 1,
+                NumTuples = 12,
+                // NetworkSizes = GenomeInfo<float[]>.CreateSimpleNetworkSizes(9, 9, (int)Math.Pow(3, 11) * 1),
+                NetworkSizes = new[] { new[] { 10, 10, 10, 9, 8, 8, 8, 8, 7, 6, 5, 4 } } ,
                 MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
 
             int n_dimes = 4;
-            int dime_size = 50;
+            int dime_size = 100;
 
             float n_factor = dime_size / 100F;
             int n_elites = (int)(20 * n_factor);
@@ -165,7 +161,8 @@ namespace OthelloAI.GA
                 Info = info,
                 Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
                 {
-                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50, 32000, 2000))).ToArray(),
+                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50), 6400, 800)).ToArray(),
+                    // Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTournament<float[]>(new PopulationTrainer(1, 50), 32000, 3200, 3, 48)).ToArray(),
                 },
                 // Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
                 // Evaluator = new PopulationEvaluatorTrainingScoreShuffledKFold<float[]>(new TrainingData(data), 9600 * 24, 1200 * 24),
@@ -288,7 +285,6 @@ namespace OthelloAI.GA
 
         public List<Individual<T>> Init(int n_pop)
         {
-            Info.Init();
             return Enumerable.Range(0, n_pop).Select(_ => Info.Generate(Program.Random)).ToList();
         }
     }

@@ -38,10 +38,11 @@ namespace OthelloAI
 
         static void Main()
         {
-           // GATest.TestBRKGA();
+          // GATest.TestBRKGA();
 
             //Tester.TestGAResult();
 
+            //Tester.TestWeights();
             Tester.TestWeightAgainstEdaxNetwork();
             //Tester.TestEvalVar();
         }

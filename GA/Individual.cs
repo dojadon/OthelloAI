@@ -35,7 +35,6 @@ namespace OthelloAI.GA
             Info = info;
 
             Tuples = new ulong[info.NumStages][];
-            var weights = new Weight[info.NumStages];
 
             for (int i = 0; i < genome.Length; i++)
             {
@@ -44,7 +43,7 @@ namespace OthelloAI.GA
                 int n_weights = 0;
                 foreach (var g in Genome[i])
                 {
-                    if (n_weights + g.NumWeights > info.MaxNumWeights)
+                    if (g.Size <= 0)
                         continue;
 
                     n_weights += g.NumWeights;

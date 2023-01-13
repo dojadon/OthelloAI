@@ -21,25 +21,21 @@ namespace OthelloAI.GA
 
         public int NumStages { get; init; }
         public int NumTuples { get; init; }
-        public int SizeMax { get; init; }
-        public int SizeMin { get; init; }
-
-        public int MaxNumWeights { get; init; }
 
         public float MinDepth { get; init; }
 
-        public int[][] TupleSizeCombinations { get; set; }
+        public int[][] NetworkSizes { get; set; }
 
-        public void Init()
+        public static int[][] CreateSimpleNetworkSizes(int size_min, int size_max, int max_n_weights)
         {
             bool CheckSize(IEnumerable<int> list)
             {
-                return list.Sum(i => i == 0 ? 0 : Math.Pow(3, i)) <= MaxNumWeights;
+                return list.Sum(i => i == 0 ? 0 : Math.Pow(3, i)) <= max_n_weights;
             }
 
             IEnumerable<int[]> Func(int[] list)
             {
-                for (int i = SizeMin; i <= SizeMax; i++)
+                for (int i = size_min; i <= size_max; i++)
                 {
                     if (list.Length > 0 && i < list[^1])
                         continue;
@@ -59,6 +55,8 @@ namespace OthelloAI.GA
                 }
             }
 
+            var sizes = Func(Array.Empty<int>()).ToArray();
+
             bool IsDominated(int[] s1, int[] s2)
             {
                 return s1.Length == s2.Length && s1.Zip(s2).All(t => t.First <= t.Second);
@@ -66,23 +64,19 @@ namespace OthelloAI.GA
 
             bool IsDominatedAny(int[] s)
             {
-                return TupleSizeCombinations.Count(s2 => IsDominated(s, s2)) > 1;
+                return sizes.Count(s2 => IsDominated(s, s2)) > 1;
             }
 
-            TupleSizeCombinations = Func(Array.Empty<int>()).ToArray();
-            TupleSizeCombinations = TupleSizeCombinations.Where(s => !IsDominatedAny(s)).ToArray();
-
-            //foreach (var s in TupleSizeCombinations)
-            //    Console.WriteLine(string.Join(", ", s));
+            return sizes.Where(s => !IsDominatedAny(s)).ToArray();
         }
 
         public Individual<T> Generate(Random rand)
         {
-            int[] sizes = rand.Choice(TupleSizeCombinations);
+            int[] sizes = rand.Choice(NetworkSizes);
 
             GenomeTuple<T> CreateGenome(int i)
             {
-                int size = i < sizes.Length ? sizes[i] : rand.Next(SizeMin, SizeMax + 1);
+                int size = i < sizes.Length ? sizes[i] : -1;
                 return new GenomeTuple<T>(GenomeGenerator(rand), size);
             }
 
