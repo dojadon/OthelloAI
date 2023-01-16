@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace OthelloAI.GA
 {
@@ -130,7 +131,7 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumStages = 1,
+                NumStages = 5,
                 NumTuples = 12,
                 // NetworkSizes = GenomeInfo<float[]>.CreateSimpleNetworkSizes(9, 9, (int)Math.Pow(3, 11) * 1),
                 NetworkSizes = new[] { new[] { 10, 10, 10, 9, 8, 8, 8, 8, 7, 6, 5, 4 } } ,
@@ -161,7 +162,7 @@ namespace OthelloAI.GA
                 Info = info,
                 Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
                 {
-                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50), 6400, 800)).ToArray(),
+                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50), 12800, 800)).ToArray(),
                     // Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTournament<float[]>(new PopulationTrainer(1, 50), 32000, 3200, 3, 48)).ToArray(),
                 },
                 // Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
@@ -199,7 +200,7 @@ namespace OthelloAI.GA
                     int id = t.i / 100;
                     int rank = t.i % 100;
 
-                    sw_tuple.WriteLine($"{gen},{id},{s.score}," + string.Join(", ", s.ind.Tuples[0].Select(t => t)));
+                    sw_tuple.WriteLine($"{gen},{id},{s.score},," + string.Join(",,", s.ind.Tuples.Select(a => string.Join(", ", a.Select(t => t)))));
                 }
 
                 var top_inds = n_dimes.Loop(i => pop.Skip(dime_size * i).Take(dime_size).MinBy(s => s.score).First()).ToArray();

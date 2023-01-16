@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Intrinsics.X86;
@@ -111,14 +112,17 @@ namespace OthelloAI
     {
         Weight[] Weights { get; }
 
+        public int Start { get; } = 10;
+        public int End { get; } = 51;
+
         public WeightsStagebased(Weight[] weights)
         {
             Weights = weights;
         }
 
-        public static int GetStage(int n_stone, int n_div)
+        public int GetStage(int n_stone, int n_div)
         {
-            return (n_stone - 5) / (60 / n_div);
+            return (Math.Clamp(n_stone, Start, End - 1) - Start) / (End / n_div);
         }
 
         protected Weight GetCurrentWeights(Board board)
@@ -186,51 +190,32 @@ namespace OthelloAI
         }
     }
 
-    public enum HashType
-    {
-        BIN, TER
-    }
-
     public abstract class WeightsArray : Weight
     {
-        public BoardHasher Hasher { get; }
-
-        public ulong Mask { get; }
-
         public float[] weights;
         byte[] weights_b;
-
-        readonly int[] pos;
-
-        public abstract HashType Type { get; }
 
         public override float[] GetWeights() => weights;
 
         public int NumOfStates { get; }
         public int HashLength { get; }
+        public abstract int ArrayLength { get; }
 
         public WeightsArray(int length)
         {
             HashLength = length;
-            NumOfStates = (int) Math.Pow(3, length);
+            NumOfStates = (int)Math.Pow(3, length);
             Reset();
         }
 
-        public override Weight Copy()
-        {
-            return new WeightsArrayS(Mask);
-        }
+        public abstract uint ConvertStateToHash(int state);
+
+        public abstract int FlipHash(int hash);
 
         public override void Reset()
         {
-            int length = Type switch
-            {
-                HashType.BIN => Math.Pow(2, HashLength * 2),
-                HashType.TER => Math.Pow(3, HashLength),
-            };
-
-            weights = new float[length];
-            weights_b = new byte[length];
+            weights = new float[ArrayLength];
+            weights_b = new byte[ArrayLength];
         }
 
         public abstract int Hash(Board board);
@@ -262,16 +247,20 @@ namespace OthelloAI
         public override void UpdataEvaluation(Board board, float add, float range)
         {
             int hash = Hash(board);
+           // int flipped = FlipHash(hash);
 
             weights[hash] += add;
+           // weights[flipped] -= add;
+
             weights_b[hash] = ConvertToInt8(weights[hash], range);
+         //   weights_b[flipped] = ConvertToInt8(weights[flipped], range);
         }
 
         public override void ApplyTrainedEvaluation(float range)
         {
             for (int i = 0; i < NumOfStates; i++)
             {
-                uint index = Hasher.ConvertStateToHash(i);
+                uint index = ConvertStateToHash(i);
                 weights_b[index] = ConvertToInt8(weights[index], range);
             }
         }
@@ -282,7 +271,7 @@ namespace OthelloAI
             {
                 float e = reader.ReadSingle();
 
-                uint index = Hasher.ConvertStateToHash(i);
+                uint index = ConvertStateToHash(i);
                 weights[index] = e;
                 weights_b[index] = ConvertToInt8(weights[index], WEIGHT_RANGE);
             }
@@ -292,7 +281,7 @@ namespace OthelloAI
         {
             for (int i = 0; i < NumOfStates; i++)
             {
-                uint index = Hasher.ConvertStateToHash(i);
+                uint index = ConvertStateToHash(i);
 
                 float e = weights[index];
                 writer.Write(e);
@@ -300,44 +289,82 @@ namespace OthelloAI
         }
     }
 
-    public class WeightsArrayS : Weight
+    public abstract class WeightArrayTer : WeightsArray
     {
-        public BoardHasher Hasher { get; }
+        public WeightArrayTer(int length) : base(length)
+        {
+        }
 
+        public override int ArrayLength => (int) Math.Pow(3, HashLength);
+
+        public override uint ConvertStateToHash(int state) => (uint) state;
+
+        public override int FlipHash(int hash)
+        {
+            int result = 0;
+
+            for (int i = 0; i < HashLength; i++)
+            {
+                int s = hash % 3;
+                hash /= 3;
+                s = s == 0 ? 0 : (s == 1 ? 2 : 1);
+                result += s * BinTerUtil.POW3_TABLE[i];
+            }
+            return result;
+        }
+    }
+
+    public abstract class WeightArrayBin : WeightsArray
+    {
+        public WeightArrayBin(int length) : base(length)
+        {
+        }
+
+        public override int ArrayLength => (int) Math.Pow(2, HashLength * 2);
+
+        public override uint ConvertStateToHash(int state)
+        {
+            (uint b1, uint b2) = BinTerUtil.ConvertTerToBinPair(state, HashLength);
+            return b1 | (b2 << HashLength);
+        }
+
+        public override int FlipHash(int hash)
+        {
+            return (hash >> HashLength) | ((hash & ((1 << HashLength) - 1)) << HashLength);
+        }
+    }
+
+    public class WeightsArrayScanning : WeightArrayTer
+    {
         public ulong Mask { get; }
-
-        public float[] weights;
-        byte[] weights_b;
 
         readonly int[] pos;
 
-        public override float[] GetWeights() => weights;
+        public static int[] MaskToPositions(ulong mask)
+        {
+            var list = new List<int>();
 
-        public int NumOfStates { get; }
+            for (int i = 0; i < 64; i++)
+            {
+                if (((mask >> i) & 1) != 0)
+                    list.Add(i);
+            }
+            list.Reverse();
+            return list.ToArray();
+        }
 
-        public WeightsArrayS(ulong m)
+        public WeightsArrayScanning(ulong m) : base(Board.BitCount(m))
         {
             Mask = m;
-
-            pos = BoardHasherMask.MaskToPositions(m);
-            Hasher = new BoardHasherScanning(pos);
-            NumOfStates = Hasher.NumOfStates;
-
-            Reset();
+            pos = MaskToPositions(m);
         }
 
         public override Weight Copy()
         {
-            return new WeightsArrayS(Mask);
+            return new WeightsArrayScanning(Mask);
         }
 
-        public override void Reset()
-        {
-            weights = new float[Hasher.ArrayLength];
-            weights_b = new byte[Hasher.ArrayLength];
-        }
-
-        public int Hash(Board board)
+        public override int Hash(Board board)
         {
             int hash = 0;
 
@@ -351,183 +378,51 @@ namespace OthelloAI
             }
             return hash;
         }
-
-        public int Eval(Board b)
-        {
-            return weights_b[Hash(b)];
-        }
-
-        public override int Eval(RotatedAndMirroredBoards b)
-        {
-            return Eval(b.rot0) + Eval(b.rot90) + Eval(b.rot180) + Eval(b.rot270)
-                + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.inv_rot180) + Eval(b.inv_rot270) - 128 * 8;
-        }
-
-        public float EvalTraining(Board b)
-        {
-            return weights[Hash(b)];
-        }
-
-        public override float EvalTraining(RotatedAndMirroredBoards b)
-        {
-            return EvalTraining(b.rot0) + EvalTraining(b.rot90) + EvalTraining(b.rot180) + EvalTraining(b.rot270)
-                + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.inv_rot180) + EvalTraining(b.inv_rot270);
-        }
-
-        public override int NumOfEvaluation(int n_discs) => 8;
-
-        public override void UpdataEvaluation(Board board, float add, float range)
-        {
-            int hash = Hasher.Hash(board);
-            int flipped = Hasher.FlipHash(hash);
-
-            weights[hash] += add;
-            weights[flipped] -= add;
-
-            weights_b[hash] = ConvertToInt8(weights[hash], range);
-            weights_b[flipped] = ConvertToInt8(weights[flipped], range);
-        }
-
-        public override void ApplyTrainedEvaluation(float range)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-                weights_b[index] = ConvertToInt8(weights[index], range);
-            }
-        }
-
-        public override void Read(BinaryReader reader)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                float e = reader.ReadSingle();
-
-                uint index = Hasher.ConvertStateToHash(i);
-                weights[index] = e;
-                weights_b[index] = ConvertToInt8(weights[index], WEIGHT_RANGE);
-            }
-        }
-
-        public override void Write(BinaryWriter writer)
-        {
-            for (int i = 0; i < NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-
-                float e = weights[index];
-                writer.Write(e);
-            }
-        }
     }
 
-    public class WeightsArrayR : Weight
+    public class WeightArrayPextHashingTer : WeightArrayTer
     {
-        public BoardHasher Hasher { get; }
-
-        public float[] weights;
-
-        byte[] weights_b;
-
         readonly ulong mask;
-
         readonly int hash_length;
 
-        public override float[] GetWeights() => weights;
-
-        public WeightsArrayR(ulong m)
+        public WeightArrayPextHashingTer(ulong m) : base(Board.BitCount(m))
         {
             mask = m;
             hash_length = Board.BitCount(mask);
-
-            Hasher = new BoardHasherMask(mask);
-
-            Reset();
         }
 
         public override Weight Copy()
         {
-            return new WeightsArrayR(mask);
+            return new WeightArrayPextHashingTer(mask);
         }
 
-        public override void Reset()
+        public override int Hash(Board b)
         {
-            weights = new float[Hasher.ArrayLength];
-            weights_b = new byte[Hasher.ArrayLength];
+            int hash1 = BinTerUtil.ConvertBinToTer((int) Bmi2.X64.ParallelBitExtract(b.bitB, mask), hash_length);
+            int hash2 = BinTerUtil.ConvertBinToTer((int) Bmi2.X64.ParallelBitExtract(b.bitW, mask), hash_length);
+            return hash1 + hash2 * 2;
+        }
+    }
+
+    public class WeightArrayPextHashingBin : WeightArrayBin
+    {
+        readonly ulong mask;
+        readonly int hash_length;
+
+        public WeightArrayPextHashingBin(ulong m) : base(Board.BitCount(m))
+        {
+            mask = m;
+            hash_length = Board.BitCount(mask);
         }
 
-        public int Eval_(Board b)
+        public override Weight Copy()
         {
-            ulong idx = Bmi2.X64.ParallelBitExtract(b.bitB, mask) | (Bmi2.X64.ParallelBitExtract(b.bitW, mask) << hash_length);
-            return weights_b[idx];
+            return new WeightArrayPextHashingBin(mask);
         }
 
-        public override int Eval(RotatedAndMirroredBoards b)
+        public override int Hash(Board b)
         {
-            return Eval_(b.rot0) + Eval_(b.inv_rot0) + Eval_(b.rot90) + Eval_(b.inv_rot90)
-                + Eval_(b.rot180) + Eval_(b.inv_rot180) + Eval_(b.rot270) + Eval_(b.inv_rot270) - 128 * 8;
-        }
-
-        public float EvalTraining_(Board b)
-        {
-            return weights[Hasher.Hash(b)];
-        }
-
-        public override float EvalTraining(RotatedAndMirroredBoards b)
-        {
-            return EvalTraining_(b.rot0) + EvalTraining_(b.inv_rot0) + EvalTraining_(b.rot90) + EvalTraining_(b.inv_rot90) +
-                EvalTraining_(b.rot180) + EvalTraining_(b.inv_rot180) + EvalTraining_(b.rot270) + EvalTraining_(b.inv_rot270);
-        }
-
-        public override int NumOfEvaluation(int n_discs) => 8;
-
-        public override void UpdataEvaluation(Board board, float add, float range)
-        {
-            int hash = Hasher.Hash(board);
-            Update(hash, add, range);
-        }
-
-        public void Update(int hash, float add, float range)
-        {
-            int flipped = Hasher.FlipHash(hash);
-
-            weights[hash] += add;
-            weights[flipped] -= add;
-
-            weights_b[hash] = ConvertToInt8(weights[hash], range);
-            weights_b[flipped] = ConvertToInt8(weights[flipped], range);
-        }
-
-        public override void ApplyTrainedEvaluation(float range)
-        {
-            for (int i = 0; i < Hasher.NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-                weights_b[index] = ConvertToInt8(weights[index], range);
-            }
-        }
-
-        public override void Read(BinaryReader reader)
-        {
-            for (int i = 0; i < Hasher.NumOfStates; i++)
-            {
-                float e = reader.ReadSingle();
-
-                uint index = Hasher.ConvertStateToHash(i);
-                weights[index] = e;
-                weights_b[index] = ConvertToInt8(weights[index], WEIGHT_RANGE);
-            }
-        }
-
-        public override void Write(BinaryWriter writer)
-        {
-            for (int i = 0; i < Hasher.NumOfStates; i++)
-            {
-                uint index = Hasher.ConvertStateToHash(i);
-
-                float e = weights[index];
-                writer.Write(e);
-            }
+            return (int)(Bmi2.X64.ParallelBitExtract(b.bitB, mask) | (Bmi2.X64.ParallelBitExtract(b.bitW, mask) << hash_length));
         }
     }
 }

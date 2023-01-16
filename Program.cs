@@ -27,23 +27,24 @@ namespace OthelloAI
             0x102040810UL,
         };
 
-        public static readonly Weight WEIGHT_EDGE2X = new WeightsArrayR(0b01000010_11111111UL);
-        public static readonly Weight WEIGHT_EDGE_BLOCK = new WeightsArrayR(0b00000111_00000111_00000111UL);
-        public static readonly Weight WEIGHT_CORNER_BLOCK = new WeightsArrayR(0b00000001_00000001_00000001_00000011_00011111UL);
-        public static readonly Weight WEIGHT_CORNER = new WeightsArrayR(0b01000010_11111111UL);
-        public static readonly Weight WEIGHT_LINE1 = new WeightsArrayR(0b11111111UL);
-        public static readonly Weight WEIGHT_LINE2 = new WeightsArrayR(0b11111111_00000000UL);
+        public static readonly Weight WEIGHT_EDGE2X = new WeightArrayPextHashingBin(0b01000010_11111111UL);
+        public static readonly Weight WEIGHT_EDGE_BLOCK = new WeightArrayPextHashingBin(0b00000111_00000111_00000111UL);
+        public static readonly Weight WEIGHT_CORNER_BLOCK = new WeightArrayPextHashingBin(0b00000001_00000001_00000001_00000011_00011111UL);
+        public static readonly Weight WEIGHT_CORNER = new WeightArrayPextHashingBin(0b01000010_11111111UL);
+        public static readonly Weight WEIGHT_LINE1 = new WeightArrayPextHashingBin(0b11111111UL);
+        public static readonly Weight WEIGHT_LINE2 = new WeightArrayPextHashingBin(0b11111111_00000000UL);
 
         public static readonly Weight WEIGHT = new WeightsSum(WEIGHT_EDGE2X, WEIGHT_EDGE_BLOCK, WEIGHT_CORNER_BLOCK, WEIGHT_CORNER, WEIGHT_LINE1, WEIGHT_LINE2);
 
         static void Main()
         {
-          // GATest.TestBRKGA();
+            //GATest.TestBRKGA();
 
+            WeightEdax.Test();
             //Tester.TestGAResult();
 
             //Tester.TestWeights();
-            Tester.TestWeightAgainstEdaxNetwork();
+            //Tester.TestWeightAgainstEdaxNetwork();
             //Tester.TestEvalVar();
         }
 

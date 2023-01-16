@@ -136,7 +136,7 @@ namespace OthelloAI
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                p.SolveRoot(new Search(), board, p.Params[^1].CreateSearchParameter(board.n_stone));
+                p.SolveRoot(new Search(), board, p.Params[^1].CreateSearchParameter(1, board.n_stone));
                 sw.Stop();
                 float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
@@ -363,7 +363,7 @@ namespace OthelloAI
                 {
                     p.SearchedNodeCount = 0;
                     var timer = Stopwatch.StartNew();
-                    float eval = p.Evaluate(t.board);
+                    float eval = p.Evaluate(t.board, t.board.n_stone % 2 == 0 ? 1 : -1);
                     timer.Stop();
 
                     float time = (float)timer.ElapsedTicks / Stopwatch.Frequency;
@@ -452,8 +452,8 @@ namespace OthelloAI
         {
             Weight Create(int size, Random rand) => type switch
             {
-                "pext" => new WeightsArrayR(rand.GenerateRegion(24, size)),
-                "scan" => new WeightsArrayS(rand.GenerateRegion(24, size)),
+                "pext" => new WeightArrayPextHashingBin(rand.GenerateRegion(24, size)),
+                "scan" => new WeightsArrayScanning(rand.GenerateRegion(24, size)),
                 _ => null
             };
 
@@ -507,10 +507,15 @@ namespace OthelloAI
             var tokens = line.Split(",").Where(s => s.Length > 0).Skip(3);
             var masks = tokens.Select(ulong.Parse).ToArray();
 
-            foreach (var m in masks)
-                Console.WriteLine(new Board(m, 0));
+            //foreach (var m in masks)
+            //    Console.WriteLine(new Board(m, 0));
 
-            return new WeightsSum(masks.Select(u => new WeightsArrayR(u)).ToArray());
+            double avg = masks.Select(m1 => MASKS.Select(m2 =>Math.Pow(3, Board.BitCount(m1 & m2))).Sum()).Average();
+            double min = masks.Select(m1 => MASKS.Select(m2 => Math.Pow(3, Board.BitCount(m1 & m2))).Sum()).Min();
+            double max = masks.Select(m1 => MASKS.Select(m2 => Math.Pow(3, Board.BitCount(m1 & m2))).Sum()).Max();
+            Console.WriteLine($"{avg}, {min}, {max}");
+
+            return new WeightsSum(masks.Select(u => new WeightArrayPextHashingBin(u)).ToArray());
         }
 
         public static Weight[] CreateNetworkFromLogFile(string[] lines, int gen, int pop_size, int n_top)
@@ -522,7 +527,7 @@ namespace OthelloAI
         public static void TestEvalVar()
         {
             var rand = new Random();
-            Weight[] weights = 20.Loop(i => new WeightsSum(4.Loop(_ => new WeightsArrayR(rand.GenerateRegion(24, 8))).ToArray())).ToArray();
+            Weight[] weights = 20.Loop(i => new WeightsSum(4.Loop(_ => new WeightArrayPextHashingBin(rand.GenerateRegion(24, 8))).ToArray())).ToArray();
 
             var trainer = new PopulationTrainer(2, 50);
 
@@ -591,7 +596,7 @@ namespace OthelloAI
             // var test_data = WthorRecordReader.Read($"WTH/WTH_2015.wtb").SelectMany(x => x).Where(p2).ToArray();
             var test_data = Enumerable.Range(2014, 2).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p1)).OrderBy(i => Guid.NewGuid()).ToArray(); ;
 
-            WeightsSum[] weights = 3.Loop(i => new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray())).ToArray();
+            WeightsSum[] weights = 3.Loop(i => new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray())).ToArray();
             // Weight[] weights = 6.Loop(i => new WeightsSum(masks.Take(i + 1).Select(m => new WeightsArrayR(m)).ToArray())).ToArray();
             var trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
 
@@ -624,7 +629,7 @@ namespace OthelloAI
 
         public static void TestWeightAgainstEdaxNetwork()
         {
-            string log_dir = "ga/brkga_2023_01_12_05_42";
+            string log_dir = "ga/brkga_2023_01_11_20_57";
 
             int num_dimes = 4;
             int size_dime = 100;
@@ -634,7 +639,10 @@ namespace OthelloAI
 
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
-            var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
+             CreateNetworkFromLogFile(lines, 0, 400, 20);
+            return;
+
+            var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray()) };
             // var weights = new[] { CreateNetworkFromLine(lines[0]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
             var trainers = weights.Select(w => new Trainer(w, 0.0001F)).ToArray();
 
@@ -680,7 +688,7 @@ namespace OthelloAI
                 //Console.WriteLine($"{i} / {NumTrainingGames / 16}");
                 // float r = data.Select((d, j) => d[^1].result * (j % 2 == 0 ? 1 : -1)).Select(r => Math.Clamp(r, -0.5F, 0.5F) + 0.5F).Average();
 
-                if (i % 25 == 0)
+                if (i % 10 == 0)
                 {
                     float r = MeasureWinRate(weights[0], weights[1]);
 

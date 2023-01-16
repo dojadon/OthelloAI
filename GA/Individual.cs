@@ -27,8 +27,6 @@ namespace OthelloAI.GA
 
         public GenomeInfo<T> Info { get; }
 
-        public List<float> Log { get; } = new List<float>();
-
         public Individual(GenomeTuple<T>[][] genome, GenomeInfo<T> info)
         {
             Genome = genome;
@@ -57,7 +55,15 @@ namespace OthelloAI.GA
 
         public Weight CreateWeight()
         {
-            return new WeightsSum(Tuples[0].Select(t => new WeightsArrayR(t)).ToArray());
+            static Weight CreateWeightFromArray(ulong[] m)
+            {
+                return new WeightsSum(m.Select(t => new WeightArrayPextHashingTer(t)).ToArray());
+            }
+
+            if(Tuples.Length > 1)
+                return new WeightsStagebased(Tuples.Select(CreateWeightFromArray).ToArray());
+            else
+             return CreateWeightFromArray(Tuples[0]);
         }
 
         public float GetDepth() => Info.GetDepth(Tuples[0].Length);
