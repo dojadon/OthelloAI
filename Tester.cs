@@ -136,7 +136,7 @@ namespace OthelloAI
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                p.SolveRoot(new Search(), board, p.Params[^1].CreateSearchParameter(1, board.n_stone));
+                p.SolveRoot(new Search(), board, p.Params[^1].CreateSearchParameter(1));
                 sw.Stop();
                 float time = 1000F * sw.ElapsedTicks / System.Diagnostics.Stopwatch.Frequency;
 
@@ -363,7 +363,7 @@ namespace OthelloAI
                 {
                     p.SearchedNodeCount = 0;
                     var timer = Stopwatch.StartNew();
-                    float eval = p.Evaluate(t.board, t.board.n_stone % 2 == 0 ? 1 : -1);
+                    float eval = p.Evaluate(t.board);
                     timer.Stop();
 
                     float time = (float)timer.ElapsedTicks / Stopwatch.Frequency;
@@ -453,7 +453,7 @@ namespace OthelloAI
             Weight Create(int size, Random rand) => type switch
             {
                 "pext" => new WeightArrayPextHashingBin(rand.GenerateRegion(24, size)),
-                "scan" => new WeightsArrayScanning(rand.GenerateRegion(24, size)),
+                "scan" => new WeightArrayScanning(rand.GenerateRegion(24, size)),
                 _ => null
             };
 
@@ -629,20 +629,19 @@ namespace OthelloAI
 
         public static void TestWeightAgainstEdaxNetwork()
         {
-            string log_dir = "ga/brkga_2023_01_11_20_57";
+            string log_dir = "ga/brkga_2023_01_10_08_24";
 
             int num_dimes = 4;
             int size_dime = 100;
 
-            int g = 220;
-            int d = 2;
+            int g = 1106;
+            int d = 1;
 
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
-             CreateNetworkFromLogFile(lines, 0, 400, 20);
-            return;
-
-            var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray()) };
+            // var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray()) };
+            var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightEdax() };
+            weights[1].Load("eval.dat");
             // var weights = new[] { CreateNetworkFromLine(lines[0]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
             var trainers = weights.Select(w => new Trainer(w, 0.0001F)).ToArray();
 
@@ -661,7 +660,7 @@ namespace OthelloAI
 
             using StreamWriter sw = File.CreateText(log_dir + $"/test_wr_{g}_{d}.csv");
 
-            bool Within(TrainingDataElement d) => 30 <= d.board.n_stone && d.board.n_stone <= 54;
+            bool Within(TrainingDataElement d) => 10 <= d.board.n_stone && d.board.n_stone <= 54;
 
             TrainingData[] CreateData(int n, int d) => n.Loop().AsParallel().Select(j =>
             {
@@ -674,16 +673,12 @@ namespace OthelloAI
                     return TrainerUtil.PlayForTraining(1, p2, p1);
             }).ToArray();
 
-            var loss1 = new List<float>();
-            var loss2 = new List<float>();
-
             for (int i = 0; i < 20000; i++)
             {
                 var data = CreateData(32, 2);
 
-                var e = trainers.Select(t => t.Train(data.SelectMany(x => x).Where(Within))).ToArray();
-                loss1.Add(e[0]);
-                loss2.Add(e[1]);
+                // var e = trainers.Select(t => t.Train(data.SelectMany(x => x).Where(Within))).ToArray();
+                var e = trainers[0].Train(data.SelectMany(x => x).Where(Within));
 
                 //Console.WriteLine($"{i} / {NumTrainingGames / 16}");
                 // float r = data.Select((d, j) => d[^1].result * (j % 2 == 0 ? 1 : -1)).Select(r => Math.Clamp(r, -0.5F, 0.5F) + 0.5F).Average();
@@ -693,7 +688,8 @@ namespace OthelloAI
                     float r = MeasureWinRate(weights[0], weights[1]);
 
                     var test_data = CreateData(32, 5);
-                    var test_loss = trainers.Select(t => t.TestError(test_data.SelectMany(x => x), 1)).ToArray();
+                    // var test_loss = trainers.Select(t => t.TestError(test_data.SelectMany(x => x), 1)).ToArray();
+                    var test_loss = new[] { 0, 0 };
 
                     Console.WriteLine($"{i}, {r}, {test_loss[0]}, {test_loss[1]}");
                     sw.WriteLine($"{i}, {r}, {test_loss[0]}, {test_loss[1]}");

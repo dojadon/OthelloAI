@@ -211,7 +211,7 @@ namespace OthelloAI
 
             float EvalError(TrainingDataElement t)
             {
-                float eval = player.Evaluate(t.board, t.board.n_stone % 2 == 0 ? 1 : -1);
+                float eval = player.Evaluate(t.board);
                 return (eval - t.result) * (eval - t.result);
             }
 

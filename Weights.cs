@@ -6,6 +6,91 @@ using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI
 {
+    public static class WeightUtil
+    {
+        public static T[] ConcatWithMask<T>(T[] a1, T[] a2, bool[] mask)
+        {
+            T[] dst = new T[a1.Length + a2.Length];
+
+            int i1 = 0;
+            int i2 = 0;
+
+            for (int i = 0; i < dst.Length; i++)
+            {
+                if (mask[i])
+                    dst[i] = a1[i1++];
+                else
+                    dst[i] = a2[i2++];
+            }
+
+            return dst;
+        }
+
+        public static int Assemble(int[] discs)
+        {
+            int result = 0;
+            for (int i = 0; i < discs.Length; i++)
+            {
+                result = result * 3 + discs[discs.Length - 1 - i];
+            }
+            return result;
+        }
+
+        public static int[] Disassemble(int hash, int length)
+        {
+            int[] result = new int[length];
+            for (int i = 0; i < length; i++)
+            {
+                result[i] = hash % 3;
+                hash /= 3;
+            }
+            return result;
+        }
+
+        public static void Test(float[] w1, float[] w2, int[] p1, int[] p2)
+        {
+            int[] union1 = p1.Where(p2.Contains).ToArray();
+            int[] union2 = p2.Where(p1.Contains).ToArray();
+
+            int[] index = union2.Select(i => Array.IndexOf(union1, i)).ToArray();
+
+            int len_union = union1.Length;
+            int len_sub1 = p1.Length - union1.Length;
+            int len_sub2 = p2.Length - union1.Length;
+
+            int n_union = (int)Math.Pow(3, len_union);
+            int n_sub1 = (int)Math.Pow(3, len_sub1);
+            int n_sub2 = (int)Math.Pow(3, len_sub2);
+
+            bool[] mask1 = p1.Select(p2.Contains).ToArray();
+            bool[] mask2 = p1.Select(p2.Contains).ToArray();
+
+            for (int i = 0; i < n_union; i++)
+            {
+                int[] a1 = Disassemble(i, len_union);
+
+                float tmp = 0;
+
+                for (int j = 0; j < n_sub1; j++)
+                {
+                    int[] a2 = Disassemble(j, len_sub1);
+                    int[] a = ConcatWithMask(a1, a2, mask1);
+                    tmp += w1[Assemble(a)];
+                }
+                tmp /= n_sub1;
+
+                a1 = index.Select(k => a1[k]).ToArray();
+
+                for (int j = 0; j < n_sub2; j++)
+                {
+                    int[] a2 = Disassemble(j, len_sub2);
+                    int[] a = ConcatWithMask(a1, a2, mask2);
+                    w2[Assemble(a)] += tmp;
+                }
+            }
+        }
+    }
+
     public abstract class Weight
     {
         public const float WEIGHT_RANGE = 10;
@@ -190,7 +275,7 @@ namespace OthelloAI
         }
     }
 
-    public abstract class WeightsArray : Weight
+    public abstract class WeightArray : Weight
     {
         public float[] weights;
         byte[] weights_b;
@@ -201,7 +286,7 @@ namespace OthelloAI
         public int HashLength { get; }
         public abstract int ArrayLength { get; }
 
-        public WeightsArray(int length)
+        public WeightArray(int length)
         {
             HashLength = length;
             NumOfStates = (int)Math.Pow(3, length);
@@ -247,13 +332,13 @@ namespace OthelloAI
         public override void UpdataEvaluation(Board board, float add, float range)
         {
             int hash = Hash(board);
-           // int flipped = FlipHash(hash);
+            // int flipped = FlipHash(hash);
 
             weights[hash] += add;
-           // weights[flipped] -= add;
+            // weights[flipped] -= add;
 
             weights_b[hash] = ConvertToInt8(weights[hash], range);
-         //   weights_b[flipped] = ConvertToInt8(weights[flipped], range);
+            //   weights_b[flipped] = ConvertToInt8(weights[flipped], range);
         }
 
         public override void ApplyTrainedEvaluation(float range)
@@ -289,15 +374,15 @@ namespace OthelloAI
         }
     }
 
-    public abstract class WeightArrayTer : WeightsArray
+    public abstract class WeightArrayTer : WeightArray
     {
         public WeightArrayTer(int length) : base(length)
         {
         }
 
-        public override int ArrayLength => (int) Math.Pow(3, HashLength);
+        public override int ArrayLength => (int)Math.Pow(3, HashLength);
 
-        public override uint ConvertStateToHash(int state) => (uint) state;
+        public override uint ConvertStateToHash(int state) => (uint)state;
 
         public override int FlipHash(int hash)
         {
@@ -314,13 +399,13 @@ namespace OthelloAI
         }
     }
 
-    public abstract class WeightArrayBin : WeightsArray
+    public abstract class WeightArrayBin : WeightArray
     {
         public WeightArrayBin(int length) : base(length)
         {
         }
 
-        public override int ArrayLength => (int) Math.Pow(2, HashLength * 2);
+        public override int ArrayLength => (int)Math.Pow(2, HashLength * 2);
 
         public override uint ConvertStateToHash(int state)
         {
@@ -334,10 +419,8 @@ namespace OthelloAI
         }
     }
 
-    public class WeightsArrayScanning : WeightArrayTer
+    public class WeightArrayScanning : WeightArrayTer
     {
-        public ulong Mask { get; }
-
         readonly int[] pos;
 
         public static int[] MaskToPositions(ulong mask)
@@ -353,15 +436,18 @@ namespace OthelloAI
             return list.ToArray();
         }
 
-        public WeightsArrayScanning(ulong m) : base(Board.BitCount(m))
+        public WeightArrayScanning(ulong m) : this(MaskToPositions(m))
         {
-            Mask = m;
-            pos = MaskToPositions(m);
+        }
+
+        public WeightArrayScanning(int[] pos) : base(pos.Length)
+        {
+            this.pos = pos;
         }
 
         public override Weight Copy()
         {
-            return new WeightsArrayScanning(Mask);
+            return new WeightArrayScanning(pos);
         }
 
         public override int Hash(Board board)
@@ -371,10 +457,8 @@ namespace OthelloAI
             for (int i = 0; i < pos.Length; i++)
             {
                 int p = pos[i];
-
-                hash *= 3;
-                hash += (int)((board.bitB >> p) & 1);
-                hash += (int)((board.bitW >> p) & 1) * 2;
+                int c = 2 - 2 * (int)((board.bitB >> p) & 1) - (int)((board.bitW >> p) & 1);
+                hash = hash * 3 + c;
             }
             return hash;
         }
@@ -398,8 +482,8 @@ namespace OthelloAI
 
         public override int Hash(Board b)
         {
-            int hash1 = BinTerUtil.ConvertBinToTer((int) Bmi2.X64.ParallelBitExtract(b.bitB, mask), hash_length);
-            int hash2 = BinTerUtil.ConvertBinToTer((int) Bmi2.X64.ParallelBitExtract(b.bitW, mask), hash_length);
+            int hash1 = BinTerUtil.ConvertBinToTer((int)Bmi2.X64.ParallelBitExtract(b.bitB, mask), hash_length);
+            int hash2 = BinTerUtil.ConvertBinToTer((int)Bmi2.X64.ParallelBitExtract(b.bitW, mask), hash_length);
             return hash1 + hash2 * 2;
         }
     }

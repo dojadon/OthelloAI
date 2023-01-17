@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace OthelloAI
 {
-    internal class EdaxUtil
+    public class EdaxUtil
     {
         const int A1 = 0, B1 = 1, C1 = 2, D1 = 3, E1 = 4, F1 = 5, G1 = 6, H1 = 7;
         const int A2 = 8 + 0, B2 = 8 + 1, C2 = 8 + 2, D2 = 8 + 3, E2 = 8 + 4, F2 = 8 + 5, G2 = 8 + 6, H2 = 8 + 7;
@@ -16,7 +16,7 @@ namespace OthelloAI
         const int A8 = 56 + 0, B8 = 56 + 1, C8 = 56 + 2, D8 = 56 + 3, E8 = 56 + 4, F8 = 56 + 5, G8 = 56 + 6, H8 = 56 + 7;
         const int PASS = 64, NOMOVE = 65;
 
-        static int[][] EVAL_F2X = {
+        public static int[][] EVAL_F2X = {
             new [] {A1, B1, A2, B2, C1, A3, C2, B3, C3},
             new [] {H1, G1, H2, G2, F1, H3, F2, G3, F3},
             new [] {A8, A7, B8, B7, A6, C8, B6, C7, C6},
@@ -78,7 +78,7 @@ namespace OthelloAI
             new [] {NOMOVE}
         };
 
-        static int[] EVAL_OFFSET = {
+        public static int[] EVAL_OFFSET = {
          0,      0,      0,      0,
      19683,  19683,  19683,  19683,
      78732,  78732,  78732,  78732,
@@ -210,6 +210,9 @@ namespace OthelloAI
             int n_w = 114364;
             short[][][] EVAL_WEIGHT = 2.Loop(_ => EVAL_N_PLY.Loop(_ => new short[EVAL_N_WEIGHT]).ToArray()).ToArray();
 
+            byte[] header = reader.ReadBytes(28);
+            // Console.WriteLine(string.Join(", ", header));
+
             for (int ply = 0; ply < EVAL_N_PLY; ply++)
             {
                 short[] w = n_w.Loop(_ => reader.ReadInt16()).ToArray();
@@ -329,7 +332,59 @@ namespace OthelloAI
             return feature;
         }
 
+        public static ulong ConvertToMask(int id)
+        {
+            int[] f2x = EVAL_F2X[id];
 
+            ulong dst = 0;
+            for (int i = 0; i < f2x.Length; i++)
+            {
+                dst |= 1UL << f2x[i];
+            }
+            return dst;
+        }
+
+        public static float[] ConvertToMyWeight(short[] w, int id)
+        {
+            int[] f2x = EVAL_F2X[id];
+            int offset = EVAL_OFFSET[id];
+
+            int len = (int)Math.Pow(3, f2x.Length);
+
+            float[] dst = new float[len];
+
+            int[] indices = f2x.OrderBy(x => x).Select(x => Array.IndexOf(f2x, x)).ToArray();
+            int[] color = { 1, 2, 0 };
+
+            for (int i = 0; i < len; i++)
+            {
+                int[] a = WeightUtil.Disassemble(i, f2x.Length);
+                a = a.Reverse().ToArray();
+                a = indices.Select(x => a[x]).Select(x => color[x]).ToArray();
+                int hash = WeightUtil.Assemble(a);
+
+                dst[hash] = w[i + offset] / 128F;
+            }
+
+            return dst;
+        }
+
+        public static float[] ConvertToMyWeight2(short[] w, int id)
+        {
+            int[] f2x = EVAL_F2X[id];
+            int offset = EVAL_OFFSET[id];
+
+            int len = (int)Math.Pow(3, f2x.Length);
+
+            float[] dst = new float[len];
+
+            for (int i = 0; i < len; i++)
+            {
+                dst[i] = w[i + offset] / 128F;
+            }
+
+            return dst;
+        }
     }
 
     public class WeightEdax : Weight
@@ -351,7 +406,7 @@ namespace OthelloAI
 
         public int Eval(Board b)
         {
-            short[] w = weight[0][b.n_stone];
+            short[] w = weight[b.n_stone & 1][b.n_stone - 4];
             int[] f = EdaxUtil.CreateFeature(b);
 
             int score = w[f[0]] + w[f[1]] + w[f[2]] + w[f[3]]
@@ -366,8 +421,7 @@ namespace OthelloAI
                             + w[f[34]] + w[f[35]] + w[f[36]] + w[f[37]]
                             + w[f[38]] + w[f[39]] + w[f[40]] + w[f[41]]
                             + w[f[42]] + w[f[43]] + w[f[44]] + w[f[45]]
-                            + w[226314]
-                            ;
+                            + w[226314];
 
             if (score > 0) score += 64; else score -= 64;
             score /= 128;
@@ -375,7 +429,7 @@ namespace OthelloAI
             if (score <= SCORE_MIN) score = SCORE_MIN + 1;
             else if (score >= SCORE_MAX) score = SCORE_MAX - 1;
 
-            return score;
+            return score * -((b.n_stone & 1) * 2 - 1);
         }
 
         public override int Eval(RotatedAndMirroredBoards b)
@@ -415,15 +469,85 @@ namespace OthelloAI
             throw new System.NotImplementedException();
         }
 
+        public WeightArray[] Convert1()
+        {
+            short[] w = weight[0][36];
+
+            return (new[] { 0, 4, 8, 12, 16, 20, 24, 28, 30, 34, 38, 42 }).Select(i =>
+            {
+                float[] w2 = EdaxUtil.ConvertToMyWeight(w, i);
+                ulong mask = EdaxUtil.ConvertToMask(i);
+
+                if (i == 28)
+                {
+                    for (int j = 0; j < w2.Length; j++)
+                        w2[j] = w2[j] * 0.25F + w[^1] / 128F * 0.125F;
+                }
+                else
+                {
+                    for (int j = 0; j < w2.Length; j++)
+                        w2[j] = w2[j] * 0.5F;
+                }
+
+                return new WeightArrayPextHashingTer(mask) { weights = w2 };
+            }).ToArray();
+        }
+
+        public WeightArray[] Convert2()
+        {
+            short[] w = weight[0][36];
+
+            return (new[] { 0, 4, 8, 12, 16, 20, 24, 28, 30, 34, 38, 42 }).Select(i =>
+            {
+                float[] w2 = EdaxUtil.ConvertToMyWeight2(w, i);
+                ulong mask = EdaxUtil.ConvertToMask(i);
+
+                Console.WriteLine(string.Join(", ", EdaxUtil.EVAL_F2X[i]));
+                Console.WriteLine(new Board(mask, 0));
+
+                if (i == 28)
+                {
+                    for (int j = 0; j < w2.Length; j++)
+                        w2[j] = w2[j] * 0.25F + w[^1] / 128F * 0.125F;
+                }
+                else
+                {
+                    for (int j = 0; j < w2.Length; j++)
+                        w2[j] = w2[j] * 0.5F;
+                }
+
+                return new WeightArrayScanning(EdaxUtil.EVAL_F2X[i]) { weights = w2 };
+            }).ToArray();
+        }
+
         public static void Test()
         {
             var weight = new WeightEdax();
             weight.Load("eval.dat");
 
+            var w = new WeightsSum(weight.Convert1());
+
             static bool Within(TrainingDataElement d) => 40 <= d.board.n_stone && d.board.n_stone <= 40;
             var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(Within).ToArray()).ToArray();
 
-            float e = data.Select(d => d.result - weight.Eval(d.board)).Select(x => x * x).Average();
+            //foreach(var d in data)
+            //{
+            //    Console.WriteLine(d.board);
+            //    Console.WriteLine(w.EvalTraining(new RotatedAndMirroredBoards(d.board)));
+            //}
+
+            float eval(Weight x, Board b)
+            {
+                float s = x.EvalTraining(new RotatedAndMirroredBoards(b));
+                if (s > 0)
+                    s += 0.5F;
+                else
+                    s -= 0.5F;
+                return Math.Clamp(s, -64, 64);
+            }
+
+            float e = data.Select(d => d.result - eval(w, d.board)).Select(x => x * x).Average();
+            // float e = data.Select(d => d.result - weight.Eval(d.board)).Select(x => x * x).Average();
             Console.WriteLine(e);
         }
     }
