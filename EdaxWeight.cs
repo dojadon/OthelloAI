@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -394,6 +395,15 @@ namespace OthelloAI
         const int SCORE_MIN = -64;
         const int SCORE_MAX = 64;
 
+        public WeightEdax(string path)
+        {
+            Load(path);
+        }
+
+        public WeightEdax()
+        {
+        }
+
         public override void ApplyTrainedEvaluation(float range)
         {
             throw new System.NotImplementedException();
@@ -469,11 +479,11 @@ namespace OthelloAI
             throw new System.NotImplementedException();
         }
 
-        public WeightArray[] Convert1()
+        public (ulong mask, float[] weight)[] Convert1()
         {
             short[] w = weight[0][36];
 
-            return (new[] { 0, 4, 8, 12, 16, 20, 24, 28, 30, 34, 38, 42 }).Select(i =>
+            return (new[] { 0, 4, 8, 12, 16, 20, 24, 28, 33, 36, 40, 42 }).Select(i =>
             {
                 float[] w2 = EdaxUtil.ConvertToMyWeight(w, i);
                 ulong mask = EdaxUtil.ConvertToMask(i);
@@ -489,65 +499,55 @@ namespace OthelloAI
                         w2[j] = w2[j] * 0.5F;
                 }
 
-                return new WeightArrayPextHashingTer(mask) { weights = w2 };
-            }).ToArray();
-        }
-
-        public WeightArray[] Convert2()
-        {
-            short[] w = weight[0][36];
-
-            return (new[] { 0, 4, 8, 12, 16, 20, 24, 28, 30, 34, 38, 42 }).Select(i =>
-            {
-                float[] w2 = EdaxUtil.ConvertToMyWeight2(w, i);
-                ulong mask = EdaxUtil.ConvertToMask(i);
-
-                Console.WriteLine(string.Join(", ", EdaxUtil.EVAL_F2X[i]));
-                Console.WriteLine(new Board(mask, 0));
-
-                if (i == 28)
-                {
-                    for (int j = 0; j < w2.Length; j++)
-                        w2[j] = w2[j] * 0.25F + w[^1] / 128F * 0.125F;
-                }
-                else
-                {
-                    for (int j = 0; j < w2.Length; j++)
-                        w2[j] = w2[j] * 0.5F;
-                }
-
-                return new WeightArrayScanning(EdaxUtil.EVAL_F2X[i]) { weights = w2 };
+                return (mask, w2);
             }).ToArray();
         }
 
         public static void Test()
         {
-            var weight = new WeightEdax();
-            weight.Load("eval.dat");
-
-            var w = new WeightsSum(weight.Convert1());
-
             static bool Within(TrainingDataElement d) => 40 <= d.board.n_stone && d.board.n_stone <= 40;
             var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(Within).ToArray()).ToArray();
 
-            //foreach(var d in data)
-            //{
-            //    Console.WriteLine(d.board);
-            //    Console.WriteLine(w.EvalTraining(new RotatedAndMirroredBoards(d.board)));
-            //}
+            var weight = new WeightEdax("eval.dat");
+            var converted = weight.Convert1();
+
+            ulong[] masks = { 30350, 45511, 69523, 72054, 129808, 159624, 164601, 422476, 446696 };
+            masks = new[] {
+            0b10111101_10111101UL,
+            0b00000111_00000111_00000111UL,
+            0b00000001_00000001_00000001_00000011_00011111UL,
+            0b01000010_11111111UL,
+            0b11111111_00000000UL,
+            0b11111111_00000000_00000000UL,
+            0b11111111_00000000_00000000_00000000UL,
+            0x8040201008040201UL,
+            0x1020408102040UL,
+            0x10204081020UL,
+            0x102040810UL,
+            0x1020408UL,
+            };
+
+            var wa = masks.Select(mask => new WeightArrayPextHashingTer(mask)).ToArray();
+
+            foreach ((ulong m, float[] f) in converted)
+            {
+                var w1 = wa.OrderByDescending(w1 => Board.BitCount(w1.mask & m)).First();
+                Console.WriteLine(Board.BitCount(w1.mask & m));
+                WeightUtil.Test(f, w1.weights, m, w1.mask);
+            }
+
+            var w = new WeightsSum(wa);
+            var trainer = new Trainer(w, 0.0005F);
 
             float eval(Weight x, Board b)
             {
                 float s = x.EvalTraining(new RotatedAndMirroredBoards(b));
-                if (s > 0)
-                    s += 0.5F;
-                else
-                    s -= 0.5F;
                 return Math.Clamp(s, -64, 64);
             }
 
+            // float e = trainer.TrainAndTest(data[..90000], data[90000..]);
+
             float e = data.Select(d => d.result - eval(w, d.board)).Select(x => x * x).Average();
-            // float e = data.Select(d => d.result - weight.Eval(d.board)).Select(x => x * x).Average();
             Console.WriteLine(e);
         }
     }

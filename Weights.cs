@@ -47,23 +47,38 @@ namespace OthelloAI
             return result;
         }
 
-        public static void Test(float[] w1, float[] w2, int[] p1, int[] p2)
+        public static void Test(float[] w1, float[] w2, ulong m1, ulong m2)
         {
-            int[] union1 = p1.Where(p2.Contains).ToArray();
-            int[] union2 = p2.Where(p1.Contains).ToArray();
+            int len_union = Board.BitCount(m1 & m2);
 
-            int[] index = union2.Select(i => Array.IndexOf(union1, i)).ToArray();
+            if(len_union == 0)
+            {
+                float avg = w1.Average();
+                for (int i = 0; i < w2.Length; i++)
+                    w2[i] += avg;
 
-            int len_union = union1.Length;
-            int len_sub1 = p1.Length - union1.Length;
-            int len_sub2 = p2.Length - union1.Length;
+                return;
+            }
+
+            int len_sub1 = Board.BitCount(m1 & ~m2);
+            int len_sub2 = Board.BitCount(~m1 & m2);
 
             int n_union = (int)Math.Pow(3, len_union);
             int n_sub1 = (int)Math.Pow(3, len_sub1);
             int n_sub2 = (int)Math.Pow(3, len_sub2);
 
-            bool[] mask1 = p1.Select(p2.Contains).ToArray();
-            bool[] mask2 = p1.Select(p2.Contains).ToArray();
+            static IEnumerable<ulong> DisassembleBits(ulong m)
+            {
+                ulong b;
+                while ((b = Board.NextMove(m)) != 0)
+                {
+                    m = Board.RemoveMove(m, b);
+                    yield return b;
+                }
+            }
+
+            bool[] mask1 = DisassembleBits(m1).Select(b => (b & m2) != 0).ToArray();
+            bool[] mask2 = DisassembleBits(m2).Select(b => (b & m1) != 0).ToArray();
 
             for (int i = 0; i < n_union; i++)
             {
@@ -78,8 +93,6 @@ namespace OthelloAI
                     tmp += w1[Assemble(a)];
                 }
                 tmp /= n_sub1;
-
-                a1 = index.Select(k => a1[k]).ToArray();
 
                 for (int j = 0; j < n_sub2; j++)
                 {
@@ -466,8 +479,8 @@ namespace OthelloAI
 
     public class WeightArrayPextHashingTer : WeightArrayTer
     {
-        readonly ulong mask;
-        readonly int hash_length;
+        public readonly ulong mask;
+        public readonly int hash_length;
 
         public WeightArrayPextHashingTer(ulong m) : base(Board.BitCount(m))
         {
