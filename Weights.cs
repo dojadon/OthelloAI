@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NumSharp.Utilities;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,104 +7,6 @@ using System.Runtime.Intrinsics.X86;
 
 namespace OthelloAI
 {
-    public static class WeightUtil
-    {
-        public static T[] ConcatWithMask<T>(T[] a1, T[] a2, bool[] mask)
-        {
-            T[] dst = new T[a1.Length + a2.Length];
-
-            int i1 = 0;
-            int i2 = 0;
-
-            for (int i = 0; i < dst.Length; i++)
-            {
-                if (mask[i])
-                    dst[i] = a1[i1++];
-                else
-                    dst[i] = a2[i2++];
-            }
-
-            return dst;
-        }
-
-        public static int Assemble(int[] discs)
-        {
-            int result = 0;
-            for (int i = 0; i < discs.Length; i++)
-            {
-                result = result * 3 + discs[discs.Length - 1 - i];
-            }
-            return result;
-        }
-
-        public static int[] Disassemble(int hash, int length)
-        {
-            int[] result = new int[length];
-            for (int i = 0; i < length; i++)
-            {
-                result[i] = hash % 3;
-                hash /= 3;
-            }
-            return result;
-        }
-
-        public static void Test(float[] w1, float[] w2, ulong m1, ulong m2)
-        {
-            int len_union = Board.BitCount(m1 & m2);
-
-            if(len_union == 0)
-            {
-                float avg = w1.Average();
-                for (int i = 0; i < w2.Length; i++)
-                    w2[i] += avg;
-
-                return;
-            }
-
-            int len_sub1 = Board.BitCount(m1 & ~m2);
-            int len_sub2 = Board.BitCount(~m1 & m2);
-
-            int n_union = (int)Math.Pow(3, len_union);
-            int n_sub1 = (int)Math.Pow(3, len_sub1);
-            int n_sub2 = (int)Math.Pow(3, len_sub2);
-
-            static IEnumerable<ulong> DisassembleBits(ulong m)
-            {
-                ulong b;
-                while ((b = Board.NextMove(m)) != 0)
-                {
-                    m = Board.RemoveMove(m, b);
-                    yield return b;
-                }
-            }
-
-            bool[] mask1 = DisassembleBits(m1).Select(b => (b & m2) != 0).ToArray();
-            bool[] mask2 = DisassembleBits(m2).Select(b => (b & m1) != 0).ToArray();
-
-            for (int i = 0; i < n_union; i++)
-            {
-                int[] a1 = Disassemble(i, len_union);
-
-                float tmp = 0;
-
-                for (int j = 0; j < n_sub1; j++)
-                {
-                    int[] a2 = Disassemble(j, len_sub1);
-                    int[] a = ConcatWithMask(a1, a2, mask1);
-                    tmp += w1[Assemble(a)];
-                }
-                tmp /= n_sub1;
-
-                for (int j = 0; j < n_sub2; j++)
-                {
-                    int[] a2 = Disassemble(j, len_sub2);
-                    int[] a = ConcatWithMask(a1, a2, mask2);
-                    w2[Assemble(a)] += tmp;
-                }
-            }
-        }
-    }
-
     public abstract class Weight
     {
         public const float WEIGHT_RANGE = 10;
@@ -203,6 +106,85 @@ namespace OthelloAI
         public override Weight Copy()
         {
             return new WeightsSum(Weights.Select(w => w.Copy()).ToArray());
+        }
+    }
+
+    public class WeightsStagebased60 : Weight
+    {
+        Weight[] Weights { get; }
+
+        public WeightsStagebased60(Weight[] weights)
+        {
+            Weights = weights;
+        }
+
+        public int GetStage(int n_stone)
+        {
+            return n_stone - 4;
+        }
+
+        protected Weight GetCurrentWeights(Board board)
+        {
+            return GetCurrentWeights(board.n_stone);
+        }
+
+        protected Weight GetCurrentWeights(int n_discs)
+        {
+            return Weights[GetStage(n_discs)];
+        }
+
+        public override float[] GetWeights()
+        {
+            return Weights.SelectMany(w => w.GetWeights()).ToArray();
+        }
+
+        public override void Reset()
+        {
+            foreach (var w in Weights)
+                w.Reset();
+        }
+
+        public override void UpdataEvaluation(Board board, float add, float range)
+        {
+            GetCurrentWeights(board).UpdataEvaluation(board, add, range);
+        }
+
+        public override int Eval(RotatedAndMirroredBoards b)
+        {
+            return GetCurrentWeights(b.rot0).Eval(b);
+        }
+
+        public override float EvalTraining(RotatedAndMirroredBoards b)
+        {
+            return GetCurrentWeights(b.rot0).EvalTraining(b);
+        }
+
+        public override int NumOfEvaluation(int n_discs)
+        {
+            return GetCurrentWeights(n_discs).NumOfEvaluation(n_discs);
+        }
+
+        public override void ApplyTrainedEvaluation(float range)
+        {
+            foreach (var w in Weights)
+                w.ApplyTrainedEvaluation(range);
+        }
+
+        public override void Read(BinaryReader reader)
+        {
+            foreach (var w in Weights)
+                w.Read(reader);
+        }
+
+        public override void Write(BinaryWriter writer)
+        {
+            foreach (var w in Weights)
+                w.Write(writer);
+        }
+
+        public override Weight Copy()
+        {
+            return new WeightsStagebased60(Weights.Select(w => w.Copy()).ToArray());
         }
     }
 

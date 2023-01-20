@@ -2,6 +2,7 @@
 using OthelloAI.GA;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace OthelloAI
@@ -43,7 +44,7 @@ namespace OthelloAI
             WeightEdax.Test();
             //Tester.TestGAResult();
 
-            //Tester.TestWeights();
+            //Tester.TestError3();
             //Tester.TestWeightAgainstEdaxNetwork();
             //Tester.TestEvalVar();
         }

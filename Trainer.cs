@@ -189,19 +189,19 @@ namespace OthelloAI
 
         public float TrainAndTest(IEnumerable<TrainingDataElement> train_data, IEnumerable<TrainingDataElement> valid_data, float depth = 0)
         {
-            Weight.Reset();
+            // Weight.Reset();
 
             foreach (var d in train_data)
                 Update(d.board, d.result);
 
-            if (depth > 0)
-                return TestError(valid_data, depth);
-            else
-                return valid_data.Select(d => TestError(d.board, d.result)).Select(x => x * x).Average();
+            return TestError(valid_data, depth);
         }
 
         public float TestError(IEnumerable<TrainingDataElement> valid_data, float depth = 0)
         {
+            if(depth == 0)
+                return valid_data.Select(d => TestError(d.board, d.result)).Select(x => x * x).Average();
+
             var player = new PlayerAI(new EvaluatorWeightsBased(Weight))
             {
                 Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.Normal, depth: depth), },

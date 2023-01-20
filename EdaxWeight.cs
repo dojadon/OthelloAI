@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace OthelloAI
 {
@@ -479,9 +478,9 @@ namespace OthelloAI
             throw new System.NotImplementedException();
         }
 
-        public (ulong mask, float[] weight)[] Convert1()
+        public WeightArrayPextHashingTer[] Convert1(int n_ply)
         {
-            short[] w = weight[0][36];
+            short[] w = weight[n_ply % 2][n_ply];
 
             return (new[] { 0, 4, 8, 12, 16, 20, 24, 28, 33, 36, 40, 42 }).Select(i =>
             {
@@ -499,19 +498,22 @@ namespace OthelloAI
                         w2[j] = w2[j] * 0.5F;
                 }
 
-                return (mask, w2);
+                return new WeightArrayPextHashingTer(mask) { weights = w2 };
             }).ToArray();
+        }
+
+        public FineTuner CreateFineTuner()
+        {
+            return new FineTuner(61.Loop(Convert1).ToArray());
         }
 
         public static void Test()
         {
-            static bool Within(TrainingDataElement d) => 40 <= d.board.n_stone && d.board.n_stone <= 40;
-            var data = Enumerable.Range(2001, 15).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(Within).ToArray()).ToArray();
+            var data = GamRecordReader.Read("WTH/xxx.gam").ToArray();
 
             var weight = new WeightEdax("eval.dat");
-            var converted = weight.Convert1();
 
-            ulong[] masks = { 30350, 45511, 69523, 72054, 129808, 159624, 164601, 422476, 446696 };
+            ulong[] masks = { 1052, 1180, 86118, 197676, 207916, 207924, 209445, 232558, 353342, 440368, 473380, 504944 };
             masks = new[] {
             0b10111101_10111101UL,
             0b00000111_00000111_00000111UL,
@@ -529,15 +531,14 @@ namespace OthelloAI
 
             var wa = masks.Select(mask => new WeightArrayPextHashingTer(mask)).ToArray();
 
-            foreach ((ulong m, float[] f) in converted)
-            {
-                var w1 = wa.OrderByDescending(w1 => Board.BitCount(w1.mask & m)).First();
-                Console.WriteLine(Board.BitCount(w1.mask & m));
-                WeightUtil.Test(f, w1.weights, m, w1.mask);
-            }
+            //var tuner = weight.CreateFineTuner();
+            //tuner.Apply(wa, 36);
 
             var w = new WeightsSum(wa);
-            var trainer = new Trainer(w, 0.0005F);
+            w.ApplyTrainedEvaluation(10);
+
+            var trainer = new Trainer(w, 0.001F);
+            //1052	1180	70246	197708	207916	207924	232558	337470	342060	440368	472632	473380
 
             float eval(Weight x, Board b)
             {
@@ -545,10 +546,24 @@ namespace OthelloAI
                 return Math.Clamp(s, -64, 64);
             }
 
-            // float e = trainer.TrainAndTest(data[..90000], data[90000..]);
+            //foreach(var d in data)
+            //{
+            //    Console.WriteLine(d.board);
+            //    Console.WriteLine($"{d.result}, {weight.Eval(d.board)}");
+            //}
 
-            float e = data.Select(d => d.result - eval(w, d.board)).Select(x => x * x).Average();
-            Console.WriteLine(e);
+            for (int i = 0; i < 50; i++)
+            {
+                var data_i = data.SelectMany(a => a.ToArray()[i..(i+2)]).ToArray();
+
+                int n_train = (int)(121123 * 0.8F) * 2;
+                w.Reset();
+                float e = trainer.TrainAndTest(data_i[..n_train], data_i[n_train..]);
+                Console.WriteLine($"{i}, {e}");
+            }
+
+            //float e = data[90000..].Select(d => d.result - eval(w, d.board)).Select(x => x * x).Average();
+            // float e = data[90000..].Select(d => d.result - weight.Eval(d.board)).Select(x => x * x).Average();
         }
     }
 }

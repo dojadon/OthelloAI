@@ -42,81 +42,6 @@ namespace OthelloAI.GA
 
     public class GATest
     {
-        public static void TestES()
-        {
-            var info = new GenomeInfo<ulong>()
-            {
-                NumStages = 1,
-                NumTuples = 9,
-                GenomeGenerator = rand => rand.GenerateRegion(19, 7),
-                Decoder = (g, _) => g,
-            };
-
-            var ga = new GA<ulong, Score<ulong>>()
-            {
-                Info = info,
-                //Evaluator = new PopulationEvaluatorRandomTournament<ulong>(new PopulationTrainerCoLearning(1, 54, 160, 16000, -1), 2, 54, 100 * 400)
-                //{
-                //    GetDepthFraction = (_, _, _) => (1, 1)
-                //},
-                // Evaluator = new PopulationEvaluatorTrainingScore<float[]>(new PopulationTrainerCoLearning(1, 54, 3200, true)),
-                Variator = new VariatorES<ulong>()
-                {
-                    Mu = 10,
-                    LambdaM = 80,
-                    LambdaCX = 10,
-                    Mutant = new MutantBits(0.25F),
-                    Crossover = new CrossoverExchange<ulong>(),
-                },
-            };
-
-            var log = $"G:/マイドライブ/Lab/test/ga/log_es_7x9_{DateTime.Now:yyyy_MM_dd_HH_mm}.csv";
-            using StreamWriter sw = File.AppendText(log);
-
-            // ga.Run(ga.IO.Load("ga/ind.dat"), (n_gen, time, pop) =>
-            ga.Run(ga.Init(100), (n_gen, time, pop) =>
-            {
-                var score = pop.MinBy(ind => ind.score).First();
-
-                foreach (var s in pop.OrderBy(s => s.score))
-                {
-                    sw.Write(s.score + ",");
-
-                    foreach (var t in s.ind.Tuples)
-                    {
-                        sw.Write(",," + string.Join(", ", t.Select(t => t)));
-                    }
-                    sw.WriteLine();
-                }
-
-                foreach (var t in score.ind.Tuples)
-                {
-                    ulong[] tuples = t.Select(t => t).ToArray();
-
-                    for (int i = 0; i < tuples.Length / 2.0F; i++)
-                    {
-                        var b1 = tuples[i * 2];
-
-                        if (i * 2 + 1 < tuples.Length)
-                        {
-                            var b2 = tuples[i * 2 + 1];
-                            Console.WriteLine(new Board(b1, Board.HorizontalMirror(b2)));
-                        }
-                        else
-                        {
-                            Console.WriteLine(new Board(b1, 0));
-                        }
-                    }
-                    Console.WriteLine();
-                }
-
-                Console.WriteLine($"Gen : {n_gen}, {time}");
-                Console.WriteLine(string.Join(", ", score.ind.Genome.Select(t => $"({string.Join(", ", t.Select(t => t.Size))})")));
-
-                sw.Flush();
-            });
-        }
-
         public static void TestBRKGA()
         {
             static ulong Decode(float[] keys, int size)
@@ -131,10 +56,11 @@ namespace OthelloAI.GA
 
             var info = new GenomeInfo<float[]>()
             {
-                NumStages = 5,
+                NumStages = 1,
                 NumTuples = 12,
-                // NetworkSizes = GenomeInfo<float[]>.CreateSimpleNetworkSizes(9, 9, (int)Math.Pow(3, 11) * 1),
+                //NetworkSizes = GenomeInfo<float[]>.CreateSimpleNetworkSizes(9, 9, (int)Math.Pow(3, 11) * 1),
                 NetworkSizes = new[] { new[] { 10, 10, 10, 9, 8, 8, 8, 8, 7, 6, 5, 4 } } ,
+                //NetworkSizes = new[] { 11.Loop(_ => 9).ToArray() } ,
                 MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 19).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
@@ -148,25 +74,31 @@ namespace OthelloAI.GA
             int n_cx = (int)(60 * n_factor);
             int n_mutants = (int)(20 * n_factor);
 
-            int n_start = 30;
-            int n_end = 40;
+            int n_start = 29;
+            int n_end = 30;
 
-            bool p(TrainingDataElement t) => n_start < t.board.n_stone && t.board.n_stone <= n_end;
-            var data = Enumerable.Range(2001, 14).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).OrderBy(i => Guid.NewGuid()).ToArray();
-            var data_splited = ArrayUtil.Divide(data, n_dimes).Select(a => new TrainingData(a)).ToArray();
+            bool p(TrainingDataElement t) => n_start <= t.board.n_stone && t.board.n_stone <= n_end;
 
-            var test_data = Enumerable.Range(2015, 1).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").SelectMany(x => x).Where(p)).ToArray();
+            var data = GamRecordReader.Read("WTH/xxx.gam").SelectMany(x => x.Where(p)).ToArray();
+
+            int n_train = (int)(121123 * 0.8F) * (n_end - n_start + 1);
+
+            var train_data = data[..n_train];
+            var test_data = data[n_train..];
+
+            var weight_edax = new WeightEdax("eval.dat");
+            var tuner = weight_edax.CreateFineTuner();
 
             var ga = new GA<float[], Score<float[]>>()
             {
                 Info = info,
-                Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
-                {
-                    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50), 12800, 800)).ToArray(),
-                    // Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTournament<float[]>(new PopulationTrainer(1, 50), 32000, 3200, 3, 48)).ToArray(),
-                },
+                //Evaluator = new PopulationEvaluatorDistributed<float[], Score<float[]>>()
+                //{
+                //    Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTrainingScorebySelfMatch<float[]>(new PopulationTrainer(1, 50), 4800, 800) { Tuner = tuner }).ToArray(),
+                //    // Evaluators = n_dimes.Loop(i => new PopulationEvaluatorTournament<float[]>(new PopulationTrainer(1, 50), 32000, 3200, 3, 48)).ToArray(),
+                //},
                 // Evaluator = new PopulationEvaluatorTrainingScoreKFoldWithVariableDepth<float[]>(data_splited),
-                // Evaluator = new PopulationEvaluatorTrainingScoreShuffledKFold<float[]>(new TrainingData(data), 9600 * 24, 1200 * 24),
+                Evaluator = new PopulationEvaluatorTrainingScoreShuffledKFold2<float[]>(data, 0.8F, 0.2F),
                 Variator = new VariatorDistributed<float[]>()
                 {
                     NumDime = n_dimes,
@@ -197,8 +129,8 @@ namespace OthelloAI.GA
                 foreach (var t in pop.Select((s, i) => (s, i)).OrderBy(t => t.i / dime_size).ThenBy(t => t.s.score))
                 {
                     var s = t.s;
-                    int id = t.i / 100;
-                    int rank = t.i % 100;
+                    int id = t.i / dime_size;
+                    int rank = t.i % dime_size;
 
                     sw_tuple.WriteLine($"{gen},{id},{s.score},," + string.Join(",,", s.ind.Tuples.Select(a => string.Join(", ", a.Select(t => t)))));
                 }
@@ -206,12 +138,11 @@ namespace OthelloAI.GA
                 var top_inds = n_dimes.Loop(i => pop.Skip(dime_size * i).Take(dime_size).MinBy(s => s.score).First()).ToArray();
 
                 var train_scores = top_inds.Select(s => s.score);
-
-                var test_scores = top_inds.Select(s =>
+                var test_scores = top_inds.AsParallel().Select(s =>
                 {
                     var w = s.ind.CreateWeight();
                     var trainer = new Trainer(w, 0.001F);
-                    return trainer.TrainAndTest(data, test_data, s.ind.GetDepth());
+                    return trainer.TrainAndTest(train_data, test_data);
                 }).ToArray();
 
                 // var top_scores = Enumerable.Range(0, pop.Count / 100).Select(i => pop[i * 100].score).ToArray();

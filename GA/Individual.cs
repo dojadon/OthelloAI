@@ -53,6 +53,26 @@ namespace OthelloAI.GA
             }
         }
 
+        public Weight CreateWeightWithFineTuning(FineTuner tuner)
+        {
+            Weight CreateWeightFromArray(int i)
+            {
+                var dst = Tuples[i].Select(t => new WeightArrayPextHashingTer(t)).ToArray();
+                int step = 60 / Tuples.Length;
+                tuner.Apply(dst, step * i + 5, step * (i + 1) - 5);
+
+                foreach (var w in dst)
+                    w.ApplyTrainedEvaluation(10);
+
+                return new WeightsSum(dst);
+            }
+
+            if (Tuples.Length > 1)
+                return new WeightsStagebased(Tuples.Length.Loop(CreateWeightFromArray).ToArray());
+            else
+                return CreateWeightFromArray(0);
+        }
+
         public Weight CreateWeight()
         {
             static Weight CreateWeightFromArray(ulong[] m)
