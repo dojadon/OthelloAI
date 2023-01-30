@@ -41,11 +41,11 @@ namespace OthelloAI
         {
             //GATest.TestBRKGA();
 
-            WeightEdax.Test();
+            //WeightEdax.Test();
             //Tester.TestGAResult();
 
-            //Tester.TestError3();
-            //Tester.TestWeightAgainstEdaxNetwork();
+           Tester.TestWeight2();
+          // Tester.TestWeightAgainstEdaxNetwork();
             //Tester.TestEvalVar();
         }
 

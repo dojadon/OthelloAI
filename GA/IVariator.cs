@@ -143,6 +143,15 @@ namespace OthelloAI.GA
 
         public List<Individual<T>> Vary(List<Score<T>> score, int gen, Random rand)
         {
+            if (gen == 0)
+            {
+                foreach(var a in MigrationTable)
+                {
+                    Console.WriteLine(string.Join(", ", a));
+                }
+            }
+
+
             if(NumDime == 1)
                 return Variator.Vary(score, gen, rand);
 

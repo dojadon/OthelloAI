@@ -552,18 +552,39 @@ namespace OthelloAI
             //    Console.WriteLine($"{d.result}, {weight.Eval(d.board)}");
             //}
 
-            for (int i = 0; i < 50; i++)
-            {
-                var data_i = data.SelectMany(a => a.ToArray()[i..(i+2)]).ToArray();
+            int n_train = (int)(121123 * 0.8F);
 
-                int n_train = (int)(121123 * 0.8F) * 2;
-                w.Reset();
-                float e = trainer.TrainAndTest(data_i[..n_train], data_i[n_train..]);
-                Console.WriteLine($"{i}, {e}");
-            }
+            //for (int i = 0; i < 50; i++)
+            //{
+            //    var data_i = data.SelectMany(a => a.ToArray()[i..(i+2)]).ToArray();
+
+            //    w.Reset();
+            //    float e = trainer.TrainAndTest(data_i[..n_train], data_i[n_train..]);
+            //    Console.WriteLine($"{i}, {e}");
+            //}
 
             //float e = data[90000..].Select(d => d.result - eval(w, d.board)).Select(x => x * x).Average();
-            // float e = data[90000..].Select(d => d.result - weight.Eval(d.board)).Select(x => x * x).Average();
+
+            float ScoreClass(float result, float eval)
+            {
+                if (result == 0)
+                    return eval == 0 ? 1 : 0;
+                else if (result > 0)
+                    return eval > 0 ? 1 : 0;
+                else
+                    return eval < 0 ? 1 : 0;
+            }
+
+            float Score2(float result, float eval)
+            {
+                return (result - eval) * (result - eval);
+            }
+
+            for (int i = 0; i < 50; i++)
+            {
+                float e = data[n_train..].SelectMany(x => x.ToArray()[i..(i + 2)]).Select(d => Score2(d.result, weight.Eval(d.board))).Average();
+                Console.WriteLine($"{i}, {e}");
+            }
         }
     }
 }

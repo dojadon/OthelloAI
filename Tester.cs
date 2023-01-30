@@ -501,7 +501,7 @@ namespace OthelloAI
             {
                 if (s.Length == 0)
                 {
-                    if(current.Count > 0)
+                    if (current.Count > 0)
                     {
                         list.Add(current.ToArray());
                         current = new List<ulong>();
@@ -519,6 +519,11 @@ namespace OthelloAI
         public static Weight CreateNetworkFromLine(string line)
         {
             var masks = GetMaskFromLine(line);
+
+            foreach (var m in masks[0].OrderBy(Board.BitCount))
+                Console.WriteLine(GATest.TupleToString(m) + Environment.NewLine);
+            Console.WriteLine();
+
             if (masks.Length == 1)
                 return new WeightsSum(masks[0].Select(u => new WeightArrayPextHashingTer(u)).ToArray());
             else
@@ -634,38 +639,84 @@ namespace OthelloAI
             //}
         }
 
+        public static void TestWeight2()
+        {
+            string log_dir = "ga/brkga_2023_01_28_14_23";
+            int num_dimes = 4;
+            int size_dime = 100;
+
+            Weight CreateWeight(int gen, int d)
+            {
+                var lines = File.ReadAllLines(log_dir + "/tuple.csv");
+                return CreateNetworkFromLine(lines[(gen * num_dimes + d) * size_dime]);
+            }
+
+            Weight[] CreateWeights(int gen)
+            {
+                var lines = File.ReadAllLines(log_dir + "/tuple.csv");
+                return num_dimes.Loop(i => CreateNetworkFromLine(lines[(gen * num_dimes + i) * size_dime])).ToArray();
+            }
+
+            var weights = 
+                CreateWeights(400)
+            // CreateWeights("ga/brkga_2023_01_25_14_16", 4000, 5, 100)
+            .ConcatOne(new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray())).ToArray();
+
+            var trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
+
+            var rand = new Random(100);
+            var data = GamRecordReader.Read("WTH/xxx.gam").Select(x => x.ToArray()).OrderBy(_ => rand.Next()).ToArray();
+            // var data = Enumerable.Range(2001, 10).SelectMany(i => WthorRecordReader.Read($"WTH/WTH_{i}.wtb").Select(x => x.ToArray())).ToArray();
+
+            int n = 1;
+            int n_train = (int)(data.Length * 0.8F);
+
+            for (int i = 0; i < 60 - n; i++)
+            {
+                var train_data = data[..n_train].Where(a => a.Length > i + n).SelectMany(a => a[i..(i + n)]).ToArray();
+                var valid_data = data[n_train..].Where(a => a.Length > i + n).SelectMany(a => a[i..(i + n)]).ToArray();
+
+                foreach (var w in weights)
+                    w.Reset();
+
+                float ScoreClass(float result, float eval)
+                {
+                    if (eval == 0)
+                        return 0.5F;
+                    else if (result > 0)
+                        return eval > 0 ? 1 : 0;
+                    else
+                        return eval < 0 ? 1 : 0;
+                }
+
+                Parallel.ForEach(trainers, t => t.Train(train_data));
+
+                //var e = trainers.AsParallel().Select(t => valid_data.Where(d => d.result != 0).Select(d => ScoreClass(d.result, t.Weight.EvalTraining(new RotatedAndMirroredBoards(d.board)))).Average()).ToArray();
+                var e = trainers.AsParallel().Select(t => t.TestError(valid_data)).ToArray();
+                Console.WriteLine($"{i}, {string.Join(", ", e)}");
+            }
+        }
+
         public static void TestWeightAgainstEdaxNetwork()
         {
-            string log_dir = "ga/brkga_2023_01_18_17_13";
+            string log_dir = "ga/brkga_2023_01_20_11_35";
 
             int num_dimes = 4;
             int size_dime = 50;
 
-            int g = 201;
-            int d = 3;
+            int g = 3430;
+            int d = 1;
 
             var lines = File.ReadAllLines(log_dir + "/tuple.csv");
 
-            var weight_edax = new WeightEdax("eval.dat");
-            var tuner = weight_edax.CreateFineTuner();
-
             var masks = GetMaskFromLine(lines[(g * num_dimes + d) * size_dime]);
-            var wa1 = new Weight[61];
 
-            foreach (var a in masks)
-                Console.WriteLine(a.Length + " : " + string.Join(", ", a));
+            Weight CreateFromMask(ulong[] m) => new WeightsSum(m.Select(x => new WeightArrayPextHashingTer(x)).ToArray());
 
-            for (int i = 0; i < wa1.Length; i++)
-            {
-                int k = (int)(i / 61F * masks.Length);
-                var wa2 = masks[k].Select(mask => new WeightArrayPextHashingTer(mask)).ToArray();
-                wa1[i] = new WeightsSum(wa2);
+            var weights = new Weight[] {
+                new WeightsStagebased60(61.Loop(i => i < 45 ? masks[0] :  MASKS).Select(CreateFromMask).ToArray()),
+                 new WeightsStagebased60(61.Loop(_ => CreateFromMask(MASKS)).ToArray()) };
 
-                tuner.Apply(wa2, i);
-                wa1[i].ApplyTrainedEvaluation(10);
-            }
-
-            var weights = new Weight[] { new WeightsStagebased60(wa1), weight_edax };
             // var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray()) };
             // var weights = new[] { CreateNetworkFromLine(lines[(g * num_dimes + d) * size_dime]), new WeightEdax("eval.dat") };
             // var weights = new[] { CreateNetworkFromLine(lines[0]), new WeightsSum(MASKS.Select(m => new WeightsArrayR(m)).ToArray()) };
@@ -686,7 +737,7 @@ namespace OthelloAI
 
             using StreamWriter sw = File.CreateText(log_dir + $"/test_wr_{g}_{d}.csv");
 
-            bool Within(TrainingDataElement d) => 4 <= d.board.n_stone && d.board.n_stone <= 54;
+            bool Within(TrainingDataElement d) => 4 <= d.board.n_stone && d.board.n_stone <= 58;
 
             TrainingData[] CreateData(int n, int d) => n.Loop().AsParallel().Select(j =>
             {
@@ -703,9 +754,9 @@ namespace OthelloAI
             {
                 var data = CreateData(64, 5);
 
-                // var e = trainers.Select(t => t.Train(data.SelectMany(x => x).Where(Within))).ToArray();
-                var e = trainers[0].Train(data.SelectMany(x => x));
+                var e = trainers.Select(t => t.Train(data.SelectMany(x => x).Where(Within))).ToArray();
 
+                // var e = trainers[0].Train(data.SelectMany(x => x));
                 int[] fa = { 1, -1 };
                 //float r = data.Select((a, j) => Math.Clamp(a[^1].result * fa[j & 1], -0.5F, 0.5F) + 0.5F).Average();
                 // float r = data.Select((d, j) => d[^1].result * (j % 2 == 0 ? 1 : -1)).Select(r => Math.Clamp(r, -0.5F, 0.5F) + 0.5F).Average();

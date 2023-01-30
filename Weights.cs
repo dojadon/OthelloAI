@@ -461,7 +461,7 @@ namespace OthelloAI
 
     public class WeightArrayPextHashingTer : WeightArrayTer
     {
-        public readonly ulong mask;
+        public ulong mask;
         public readonly int hash_length;
 
         public WeightArrayPextHashingTer(ulong m) : base(Board.BitCount(m))

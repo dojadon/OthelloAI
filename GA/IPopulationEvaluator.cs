@@ -190,60 +190,15 @@ namespace OthelloAI.GA
 
     public class PopulationEvaluatorTrainingScoreShuffledKFold<T> : IPopulationEvaluator<T, Score<T>>
     {
-        TrainingData[] Data { get; }
+        TrainingDataElement[][] Data { get; }
         public int NumSamplesForTraining { get; }
         public int NumSamplesForValidation { get; }
 
-        public FineTuner Tuner { get; set; }
-
-        public PopulationEvaluatorTrainingScoreShuffledKFold(TrainingData[] data, float r_train, float r_valid) : this(data, (int)(data.Length * r_train), (int)(data.Length * r_valid))
+        public PopulationEvaluatorTrainingScoreShuffledKFold(TrainingDataElement[][] data, float r_train, float r_valid) : this(data, (int)(data.Length * r_train), (int)(data.Length * r_valid))
         {
         }
 
-        public PopulationEvaluatorTrainingScoreShuffledKFold(TrainingData[] data, int n_train, int n_valid)
-        {
-            Data = data;
-            NumSamplesForTraining = n_train;
-            NumSamplesForValidation = n_valid;
-        }
-
-        public Score<T> TrainAndTest(Individual<T> ind)
-        {
-            var rand = new Random();
-            var indices_train = new HashSet<int>(rand.Sample(Data.Length.Loop(), NumSamplesForTraining));
-            var indices_valid = new HashSet<int>(rand.Sample(Data.Length.Loop(), NumSamplesForValidation));
-
-            var train_data = Enumerable.Range(0, Data.Length).Where(indices_train.Contains).SelectMany(i => Data[i]);
-            var valid_data = Enumerable.Range(0, Data.Length).Where(indices_valid.Contains).SelectMany(i => Data[i]);
-
-            var trainer = new Trainer(ind.CreateWeightWithFineTuning(Tuner), 0.001F);
-            trainer.Train(train_data);
-
-            float score = trainer.TestError(valid_data);
-
-            return new Score<T>(ind, score);
-        }
-
-        public List<Score<T>> Evaluate(List<Individual<T>> pop)
-        {
-            return pop
-                .AsParallel()
-                // .WithDegreeOfParallelism(Program.NumThreads)
-                .Select(TrainAndTest).ToList();
-        }
-    }
-
-    public class PopulationEvaluatorTrainingScoreShuffledKFold2<T> : IPopulationEvaluator<T, Score<T>>
-    {
-        TrainingDataElement[] Data { get; }
-        public int NumSamplesForTraining { get; }
-        public int NumSamplesForValidation { get; }
-
-        public PopulationEvaluatorTrainingScoreShuffledKFold2(TrainingDataElement[] data, float r_train, float r_valid) : this(data, (int)(data.Length * r_train), (int)(data.Length * r_valid))
-        {
-        }
-
-        public PopulationEvaluatorTrainingScoreShuffledKFold2(TrainingDataElement[] data, int n_train, int n_valid)
+        public PopulationEvaluatorTrainingScoreShuffledKFold(TrainingDataElement[][] data, int n_train, int n_valid)
         {
             Data = data;
             NumSamplesForTraining = n_train;
@@ -266,8 +221,8 @@ namespace OthelloAI.GA
             var indices_train = new HashSet<int>(rand.Sample(Data.Length.Loop(), NumSamplesForTraining));
             var indices_valid = new HashSet<int>(rand.Sample(Data.Length.Loop(), NumSamplesForValidation));
 
-            var train_data = Enumerable.Range(0, Data.Length).Where(indices_train.Contains).Select(i => Data[i]);
-            var valid_data = Enumerable.Range(0, Data.Length).Where(indices_valid.Contains).Select(i => Data[i]);
+            var train_data = Enumerable.Range(0, Data.Length).Where(indices_train.Contains).SelectMany(i => Data[i]).OrderBy(_ => Guid.NewGuid());
+            var valid_data = Enumerable.Range(0, Data.Length).Where(indices_valid.Contains).SelectMany(i => Data[i]);
 
             return pop
                 .AsParallel()
