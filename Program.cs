@@ -39,13 +39,13 @@ namespace OthelloAI
 
         static void Main()
         {
-            //GATest.TestBRKGA();
+            GATest.TestBRKGA();
 
             //WeightEdax.Test();
             //Tester.TestGAResult();
 
-           Tester.TestWeight2();
-          // Tester.TestWeightAgainstEdaxNetwork();
+           //Tester.TestWeight2();
+          //Tester.TestWeightAgainstEdaxNetwork();
             //Tester.TestEvalVar();
         }
 

@@ -89,34 +89,30 @@ namespace OthelloAI.GA
         }
     }
 
-    public class MutantGaussNoise : MutantEachTuples<float[]>
+    public class MutantSwap<T> : IGeneticOperator1<T>
     {
-        public float Variance { get; }
-
-        public MutantGaussNoise(float variance)
+        public GenomeTuple<T>[] Operate(GenomeTuple<T>[] genomes, Random rand)
         {
-            Variance = variance;
-        }
+            int i1 = rand.Next(genomes.Length);
+            int i2 = rand.Next(genomes.Length);
 
-        public override GenomeTuple<float[]> Operate(GenomeTuple<float[]> gene, GenomeInfo<float[]> info, Random rand)
-        {
-            float[] g = gene.Genome;
-
-            for (int i = 0; i < g.Length; i++)
+            while(i1 == i2 && genomes.Length != 1)
             {
-                g[i] += (float)Normal.Sample(rand, 0, Variance);
-                g[i] = Math.Clamp(g[i], 0, 1);
+                i2 = rand.Next(genomes.Length);
             }
 
-            return new GenomeTuple<float[]>(g, gene.Size);
-        }
-    }
+            var g1 = genomes[i1];
+            var g2 = genomes[i2];
 
-    public class MutantRandomGeneration<T> : IGeneticOperator1<T>
-    {
+            genomes[i1] = new GenomeTuple<T>(g2.Genome, g1.Size);
+            genomes[i2] = new GenomeTuple<T>(g1.Genome, g2.Size);
+
+            return genomes;
+        }
+
         public Individual<T> Operate(Individual<T> ind, Random rand)
         {
-            return ind.Info.Generate(rand);
+            return new Individual<T>(ind.Genome.Select(a => Operate(a, rand)).ToArray(), ind.Info);
         }
     }
 

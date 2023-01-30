@@ -78,11 +78,26 @@ namespace OthelloAI.GA
         public abstract Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites, Random rand);
     }
 
-    public class VariationGroupOperation<T> : VariationGroup<T>
+    public class VariationGroupOperation1<T> : VariationGroup<T>
+    {
+        public IGeneticOperator1<T> Operator { get; }
+
+        public VariationGroupOperation1(IGeneticOperator1<T> opt, int size) : base(size)
+        {
+            Operator = opt;
+        }
+
+        public override Individual<T> Generate(Individual<T>[] elites, Individual<T>[] non_elites, Random rand)
+        {
+            return Operator.Operate(rand.Choice(elites), rand);
+        }
+    }
+
+    public class VariationGroupOperation2<T> : VariationGroup<T>
     {
         public IGeneticOperator2<T> Operator { get; }
 
-        public VariationGroupOperation(IGeneticOperator2<T> opt, int size) : base(size)
+        public VariationGroupOperation2(IGeneticOperator2<T> opt, int size) : base(size)
         {
             Operator = opt;
         }
@@ -143,15 +158,6 @@ namespace OthelloAI.GA
 
         public List<Individual<T>> Vary(List<Score<T>> score, int gen, Random rand)
         {
-            if (gen == 0)
-            {
-                foreach(var a in MigrationTable)
-                {
-                    Console.WriteLine(string.Join(", ", a));
-                }
-            }
-
-
             if(NumDime == 1)
                 return Variator.Vary(score, gen, rand);
 

@@ -65,8 +65,8 @@ namespace OthelloAI.GA
                 Decoder = Decode,
             };
 
-            int[] t = { 34, 39, 44, 49 };
-            int range = 3;
+            int[] t = 8.Loop(i => 22 + i * 4).ToArray();
+            int range = 1;
 
             Func<TrainingDataElement, bool> Within(int i)
             {
@@ -78,8 +78,13 @@ namespace OthelloAI.GA
 
             float n_factor = dime_size / 100F;
             int n_elites = (int)(20 * n_factor);
-            int n_cx = (int)(60 * n_factor);
-            int n_mutants = (int)(20 * n_factor);
+
+            var variation_groups = new VariationGroup<float[]>[] 
+            {
+                new VariationGroupOperation2<float[]>(new CrossoverEliteBiased(0.7F), (int)(60 * n_factor)),
+                // new VariationGroupOperation1<float[]>(new MutantSwap<float[]>(), (int)(10 * n_factor)),
+                new VariationGroupRandom<float[]>( (int)(20 * n_factor)),
+            };
 
             var rand = new Random(100);
             var data = GamRecordReader.Read("WTH/xxx.gam").Select(x => x.ToArray()).OrderBy(_ => rand.Next()).ToArray();
@@ -107,10 +112,7 @@ namespace OthelloAI.GA
                     Variator = new VariatorEliteArchive<float[]>()
                     {
                         NumElites = n_elites,
-                        Groups = new VariationGroup<float[]>[] {
-                            new VariationGroupOperation<float[]>(new CrossoverEliteBiased(0.7F), n_cx),
-                            new VariationGroupRandom<float[]>(n_mutants),
-                        },
+                        Groups = variation_groups,
                     },
                     // MigrationTable = n_dimes.Loop(i => n_dimes.Loop(j => (i + 1) % n_dimes == j ? 10 : 0).ToArray()).ToArray(),
                     MigrationTable = n_dimes.Loop(i => (i, n_dimes - i) switch
