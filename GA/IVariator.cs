@@ -147,6 +147,33 @@ namespace OthelloAI.GA
         }
     }
 
+    public interface IMigrationModel
+    {
+        int[] CreateMigrationTable(int gen, int n_dimes);
+    }
+
+    public class MigrationModelLine : IMigrationModel
+    {
+        Random Random { get; } = new Random();
+        public int Range { get; set; }
+
+        public int[] CreateMigrationTable(int gen, int n_dimes)
+        {
+            return n_dimes.Loop(i =>
+            {
+                int min = Math.Clamp(i - Range, 0, n_dimes - 1);
+                int max = Math.Clamp(i + Range, 0, n_dimes - 1);
+
+                int idx = Random.Next(min, max);
+
+                if (idx == i)
+                    idx = max;
+
+                return idx;
+            }).ToArray();
+        }
+    }
+
     public class VariatorDistributed<T> : IVariator<T, Score<T>>
     {
         public int MigrationRate { get; init; }
@@ -154,11 +181,12 @@ namespace OthelloAI.GA
 
         public IVariator<T, Score<T>> Variator { get; init; }
 
-        public int[][] MigrationTable { get; init; }
+        public int MigrationSize { get; init; }
+        public IMigrationModel MigrationModel { get; init; }
 
         public List<Individual<T>> Vary(List<Score<T>> score, int gen, Random rand)
         {
-            if(NumDime == 1)
+            if (NumDime == 1)
                 return Variator.Vary(score, gen, rand);
 
             var result = new List<Individual<T>>();
@@ -168,21 +196,24 @@ namespace OthelloAI.GA
             var dimes = Enumerable.Range(0, NumDime)
                 .Select(i => Variator.Vary(score.Skip(i * size).Take(size).ToList(), gen, rand)).ToArray();
 
-            for (int i = 0; i < NumDime; i++)
+            if (gen % MigrationRate == 0 && gen > 0)
             {
-                IEnumerable<Individual<T>> next;
+                int[] table = MigrationModel.CreateMigrationTable(gen, NumDime);
 
-                if (gen % MigrationRate == 0 && gen > 0)
+                for (int i = 0; i < NumDime; i++)
                 {
-                    var migrations = MigrationTable[i].SelectMany((n, index) => dimes[index].Take(n)).ToList();
-                    next = dimes[i].Take(dimes[i].Count - migrations.Count).Concat(migrations).ToList();
-                }
-                else
-                {
-                    next = dimes[i];
-                }
+                    var migrations = dimes[table[i]].Take(MigrationSize).ToList();
+                    var next = dimes[i].Take(dimes[i].Count - migrations.Count).Concat(migrations).ToList();
 
-                result.AddRange(next);
+                    result.AddRange(next);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < NumDime; i++)
+                {
+                    result.AddRange(dimes[i]);
+                }
             }
 
             if (result.Count < size * NumDime)

@@ -56,21 +56,21 @@ namespace OthelloAI.GA
             var info = new GenomeInfo<float[]>()
             {
                 NumStages = 1,
-                NumTuples = 12,
-                //NetworkSizes = GenomeInfo<float[]>.CreateSimpleNetworkSizes(9, 9, (int)Math.Pow(3, 11) * 1),
-                NetworkSizes = new[] { new[] { 10, 10, 10, 9, 8, 8, 8, 8, 7, 6, 5, 4 } },
-                //NetworkSizes = new[] { 11.Loop(_ => 9).ToArray() } ,
+                NumTuples = 6,
+                // NetworkSizes = GenomeInfo<float[]>.CreateSimpleNetworkSizes(9, 9, (int)Math.Pow(3, 11) * 1),
+                // NetworkSizes = new[] { new[] { 10, 10, 10, 9, 8, 8, 8, 8, 7, 6, 5, 4 } },
+                NetworkSizes = new[] { 6.Loop(_ => 6).ToArray() } ,
                 MinDepth = 1,
                 GenomeGenerator = rand => Enumerable.Range(0, 24).Select(_ => (float)rand.NextDouble()).ToArray(),
                 Decoder = Decode,
             };
 
-            int[] t = 8.Loop(i => 22 + i * 4).ToArray();
-            int range = 1;
+            int[] t = 8.Loop(i => 20 + i * 5).ToArray();
+            int range = 2;
 
             Func<TrainingDataElement, bool> Within(int i)
             {
-                return t => i <= t.board.n_stone && t.board.n_stone < i + range;
+                return t => i - range <= t.board.n_stone && t.board.n_stone < i + range;
             };
 
             int n_dimes = t.Length;
@@ -79,7 +79,7 @@ namespace OthelloAI.GA
             float n_factor = dime_size / 100F;
             int n_elites = (int)(20 * n_factor);
 
-            var variation_groups = new VariationGroup<float[]>[] 
+            var variation_groups = new VariationGroup<float[]>[]
             {
                 new VariationGroupOperation2<float[]>(new CrossoverEliteBiased(0.7F), (int)(60 * n_factor)),
                 // new VariationGroupOperation1<float[]>(new MutantSwap<float[]>(), (int)(10 * n_factor)),
@@ -108,19 +108,17 @@ namespace OthelloAI.GA
                 Variator = new VariatorDistributed<float[]>()
                 {
                     NumDime = n_dimes,
-                    MigrationRate = 25,
                     Variator = new VariatorEliteArchive<float[]>()
                     {
                         NumElites = n_elites,
                         Groups = variation_groups,
                     },
-                    // MigrationTable = n_dimes.Loop(i => n_dimes.Loop(j => (i + 1) % n_dimes == j ? 10 : 0).ToArray()).ToArray(),
-                    MigrationTable = n_dimes.Loop(i => (i, n_dimes - i) switch
+                    MigrationRate = 25,
+                    MigrationSize = 10,
+                    MigrationModel = new MigrationModelLine()
                     {
-                        (0, _) => n_dimes.Loop(j => j == 1 ? 10 : 0).ToArray(),
-                        (_, 1) => n_dimes.Loop(j => j == n_dimes - 2 ? 10 : 0).ToArray(),
-                        _ => n_dimes.Loop(j => Math.Abs(i - j) == 1 ? 5 : 0).ToArray()
-                    }).ToArray(),
+                        Range = 1
+                    },
                 },
             };
 

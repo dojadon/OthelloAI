@@ -109,19 +109,16 @@ namespace OthelloAI
         }
     }
 
-    public class WeightsStagebased60 : Weight
+    public abstract class WeightsStagebasedAbstract : Weight
     {
-        Weight[] Weights { get; }
+        public Weight[] Weights { get; }
 
-        public WeightsStagebased60(Weight[] weights)
+        public WeightsStagebasedAbstract(Weight[] weights)
         {
             Weights = weights;
         }
 
-        public int GetStage(int n_stone)
-        {
-            return n_stone - 4;
-        }
+        public abstract int GetStage(int n_discs);
 
         protected Weight GetCurrentWeights(Board board)
         {
@@ -180,6 +177,35 @@ namespace OthelloAI
         {
             foreach (var w in Weights)
                 w.Write(writer);
+        }
+    }
+
+    public class WeightsStagebased60 : WeightsStagebasedAbstract
+    {
+        public WeightsStagebased60(Weight[] weights) : base(weights)
+        {
+        }
+
+        public override int GetStage(int n_stone)
+        {
+            return n_stone - 4;
+        }
+
+        public override Weight Copy()
+        {
+            return new WeightsStagebased60(Weights.Select(w => w.Copy()).ToArray());
+        }
+    }
+
+    public class WeightsStagebased6x6 : WeightsStagebasedAbstract
+    {
+        public WeightsStagebased6x6(Weight[] weights) : base(weights)
+        {
+        }
+
+        public override int GetStage(int n_discs)
+        {
+            return Math.Clamp((n_discs - 1) / 5 - 5, 0, 5);
         }
 
         public override Weight Copy()
@@ -480,6 +506,24 @@ namespace OthelloAI
             int hash1 = BinTerUtil.ConvertBinToTer((int)Bmi2.X64.ParallelBitExtract(b.bitB, mask), hash_length);
             int hash2 = BinTerUtil.ConvertBinToTer((int)Bmi2.X64.ParallelBitExtract(b.bitW, mask), hash_length);
             return hash1 + hash2 * 2;
+        }
+
+        public void Test(float min)
+        {
+            for(int i = 0; i < weights.Length; i++)
+            {
+                if (Math.Abs(weights[i]) < min)
+                    continue;
+
+                var t = BinTerUtil.ConvertTerToBinPair(i, hash_length);
+
+                ulong b1 = Bmi2.X64.ParallelBitDeposit(t.Item1, mask);
+                ulong b2 = Bmi2.X64.ParallelBitDeposit(t.Item2, mask);
+
+                Console.WriteLine(new Board(b1, b2));
+                Console.WriteLine(weights[i]);
+                Console.WriteLine();
+            }
         }
     }
 

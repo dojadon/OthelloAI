@@ -89,6 +89,11 @@ namespace OthelloAI
 
         public static TrainingData PlayForTraining(int n_game, Player player1, Player player2)
         {
+            return PlayForTraining(n_game, player1, player2, Board.Init);
+        }
+
+        public static TrainingData PlayForTraining(int n_game, Player player1, Player player2, Board init)
+        {
             static bool Step(ref Board board, List<Board> boards, Player player, int stone)
             {
                 (_, _, ulong move) = player.DecideMove(board, stone);
@@ -110,7 +115,7 @@ namespace OthelloAI
 
             for (int i = 0; i < n_game; i++)
             {
-                Board board = Board.Init;
+                Board board = init;
                 var boards = new List<Board>();
 
                 while (Step(ref board, boards, player1, 1) | Step(ref board, boards, player2, -1))

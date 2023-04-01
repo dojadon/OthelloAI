@@ -39,14 +39,22 @@ namespace OthelloAI
 
         static void Main()
         {
-            GATest.TestBRKGA();
+            // var runner = new EdaxRunner();
+            // runner.StartEdax(@"./bin/lEdax-x64");
+            //GATest.TestBRKGA();
 
-            //WeightEdax.Test();
-            //Tester.TestGAResult();
+            // WeightEdax.Test();
+            // Tester.TestBook();
+            // Book.Test();
 
-           //Tester.TestWeight2();
-          //Tester.TestWeightAgainstEdaxNetwork();
-            //Tester.TestEvalVar();
+            Tester.StartGame();
+            // Tester.ConvertByteWeight();
+            // Tester.TestParamMPC();
+            // Tester.Train();
+            // Tester.TrainWithDataset();
+            // Tester.TestWeight2();
+            // Tester.TestWeightAgainstEdaxNetwork();
+            // Tester.TestEvalVar();
         }
 
         static void StartClient(Evaluator evaluator)
@@ -63,16 +71,28 @@ namespace OthelloAI
 
         static void StartGame(Evaluator evaluator)
         {
-            PlayerAI p = new PlayerAI(evaluator)
+            var book = new Book("book.dat.store");
+
+            PlayerAI p1 = new PlayerAI(evaluator)
             {
-                Params = new[] { new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: 11),
-                new SearchParameterFactory(stage: 44, type: SearchType.Normal, depth: 64) },
-                PrintInfo = true
+                Params = new[] {
+                    new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: 11),
+                    new SearchParameterFactory(stage: 44, type: SearchType.Normal, depth: 64) },
+                PrintInfo = true,
+                Book = book,
+            };
+
+            PlayerAI p2 = new PlayerAI(evaluator)
+            {
+                Params = new[] {
+                    new SearchParameterFactory(stage: 0, type: SearchType.IterativeDeepening, depth: 11),
+                    new SearchParameterFactory(stage: 44, type: SearchType.Normal, depth: 64) },
+                PrintInfo = true,
             };
 
             for (int i = 0; i < 1; i++)
             {
-                Board board = Tester.PlayGame(p, p, Board.Init, r => Console.WriteLine(r.next_board));
+                Board board = Tester.PlayGame(p1, p2, Board.Init, r => Console.WriteLine(r.next_board));
 
                 Console.WriteLine($"B: {board.GetStoneCount(1)}");
                 Console.WriteLine($"W: {board.GetStoneCount(-1)}");

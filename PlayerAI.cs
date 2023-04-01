@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace OthelloAI
@@ -58,6 +57,26 @@ namespace OthelloAI
             p.alpha = Math.Max(p.alpha, lower);
             p.beta = Math.Min(p.beta, upper);
 
+            return false;
+        }
+
+        public virtual bool TryProbCutoff(PlayerAI player, Move move, SearchParameter p, int depthShallow, float avg, float var, ref float value)
+        {
+            float low = p.alpha - avg - var * 1.6F;
+
+            if (player.Solve(this, move, new SearchParameter(depthShallow, low - 1, low, false, false)) < low)
+            {
+                value = p.alpha - 1;
+                return true;
+            }
+
+            float up = p.beta - avg + var * 1.6F;
+
+            if (player.Solve(this, move, new SearchParameter(depthShallow, up, up + 1, false, false)) > up)
+            {
+                value = p.beta + 1;
+                return true;
+            }
             return false;
         }
     }
@@ -172,6 +191,14 @@ namespace OthelloAI
         public SearchParameter Deepen()
         {
             return new SearchParameter(depth - 1, -beta, -alpha, transposition_cut, store_transposition);
+        }
+
+        public SearchParameter Deepen(int d)
+        {
+            if (d % 2 == 0)
+                return new SearchParameter(depth - d, alpha, beta, transposition_cut, store_transposition);
+            else
+                return new SearchParameter(depth - d, -beta, -alpha, transposition_cut, store_transposition);
         }
 
         public SearchParameter SwapAlphaBeta()
@@ -304,11 +331,27 @@ namespace OthelloAI
             return (x, y, move);
         }
 
+        public Book Book { get; set; }
+
         int color;
 
         public (int x, int y, ulong move, float e) DecideMoveWithEvaluation(Board board, int stone)
         {
             SearchedNodeCount = 0;
+
+            if (Book != null)
+            {
+                ulong move = Book.Search(board, stone);
+
+                if (move != 0)
+                {
+                    Console.WriteLine("Found Position");
+
+                    (int xx, int yy) = Board.ToPos(move);
+
+                    return (xx, yy, move, 0);
+                }
+            }
 
             if (stone == -1)
                 board = board.ColorFliped();
@@ -386,6 +429,130 @@ namespace OthelloAI
             return 0;
         }
 
+        public List<float>[] Errors = 60.Loop(_ => new List<float>()).ToArray();
+
+        public static double[] avg = {
+            -0.040797614,
+0.66978055    ,
+0.37934193    ,
+0.86878          ,
+0.5464785      ,
+2.8221052      ,
+0.29154423    ,
+3.66192          ,
+0.7397154      ,
+4.0271688      ,
+0.9654541      ,
+4.3736925      ,
+1.2865216      ,
+4.479592        ,
+1.555555        ,
+4.2833447      ,
+2.0407941      ,
+4.520586        ,
+1.9052997      ,
+4.4924097      ,
+0.95056          ,
+5.4000936      ,
+0.4569389      ,
+4.5676417      ,
+3.7433705      ,
+4.3786507      ,
+4.383622        ,
+4.59787          ,
+4.6662345      ,
+4.741156        ,
+3.7971044      ,
+3.5280662      ,
+4.9263673      ,
+4.03094          ,
+5.949238        ,
+5.3838835      ,
+5.390336        ,
+5.227772        ,
+5.5430946      ,
+4.0768523      ,
+4.712555        ,
+5.01673          ,
+7.732921        ,
+3.4486496      ,
+6.312923        ,
+0.04794008    ,
+6.525366        ,
+-0.054144207,
+4.536696        ,
+0.51772803    ,
+4.403394        ,
+0.029048447  ,
+3.1076183      ,
+-0.37305945  ,
+1.2830694      ,
+-0.34651178  ,
+-0.032439914,
+};
+
+        public static double[] var =
+        {
+            0.903211564,
+1.148147494,
+2.468252397,
+1.179641874,
+3.312044076,
+2.851501297,
+3.279486627,
+3.767106141,
+3.596443825,
+3.951706221,
+3.700687556,
+3.989085087,
+3.952979406,
+4.203443551,
+3.614856076,
+4.481601828,
+3.84079151  ,
+4.210410232,
+3.853231753,
+4.206731787,
+4.391371043,
+5.946572851,
+4.552847908,
+5.341285182,
+5.60257932  ,
+5.591765323,
+6.239090821,
+5.827181088,
+6.805832706,
+5.816464948,
+7.34040763  ,
+6.86643365  ,
+7.556012358,
+7.61525341  ,
+7.776866981,
+7.855476763,
+8.247550832,
+8.10072103  ,
+7.754332039,
+7.62969351  ,
+7.581629998,
+7.920663353,
+11.63516414,
+10.68029828,
+10.74463431,
+9.755358666,
+9.619264157,
+9.04140274  ,
+9.088559482,
+8.046162931,
+8.180113278,
+7.665379154,
+7.034635958,
+5.962356099,
+6.615256864,
+5.800548449,
+4.944035321,
+
+        };
+
         public (ulong, float) SolveRoot(Search search, Board board, SearchParameter p)
         {
             Move root = new Move(board);
@@ -400,6 +567,9 @@ namespace OthelloAI
 
             Move result = array[0];
             float max = -Solve(search, array[0], p.Deepen());
+
+            // float eval_4 = -Solve(search, array[0], p.Deepen(5));
+            // Errors[board.n_stone - 4].Add(CorrectEvaluation(max) - CorrectEvaluation(eval_4));
 
             if (PrintInfo)
             {
@@ -417,6 +587,9 @@ namespace OthelloAI
                 {
                     p.alpha = eval;
                     eval = -Solve(search, move, p.Deepen());
+                    // eval_4 = -Solve(search, move, SearchParameter.CreateInitParam(2, false, false));
+                    // Errors[board.n_stone - 4].Add(CorrectEvaluation(eval) - CorrectEvaluation(eval_4));
+
                     p.alpha = Math.Max(p.alpha, eval);
 
                     if (PrintInfo)
@@ -591,6 +764,9 @@ namespace OthelloAI
                 return -EvalFinishedGame(move.reversed.Reversed(move.moves));
 
             if (search.TryTranspositionCutoff(move, ref p, out float lower, out float upper, ref value))
+                return value;
+
+            if (p.depth == 6 &&  search.TryProbCutoff(this, move, p, 2, (float) avg[move.reversed.n_stone - 4], (float) var[move.reversed.n_stone - 4], ref value))
                 return value;
 
             if (p.depth >= 3 && move.reversed.n_stone < 60)

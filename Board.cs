@@ -166,24 +166,9 @@ namespace OthelloAI
             return x;
         }
 
-        public IEnumerable<Board> RotatedAndMirrored()
-        {
-            yield return this;
+        public static ulong Rotate90(ulong x) => Transpose(HorizontalMirror(x));
 
-            var inv = HorizontalMirrored();
-            yield return inv;
-            yield return inv.Transposed();
-
-            var inv_rot90 = Transposed();
-            var rot270 = inv_rot90.HorizontalMirrored();
-            yield return inv_rot90;
-            yield return rot270;
-            yield return rot270.VerticalMirrored();
-
-            var inv_rot180 = VerticalMirrored();
-            yield return inv_rot180;
-            yield return inv_rot180.HorizontalMirrored();
-        }
+        public Board Rotated90() => new Board(Rotate90(bitB), Rotate90(bitW), n_stone);
 
         public static int BitCount(ulong v)
         {
@@ -230,7 +215,10 @@ namespace OthelloAI
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(bitB, bitW);
+            int result = 0;
+            result = result * 31 + (int) (bitB ^ (bitB >> 32));
+            result = result * 31 + (int) (bitW ^ (bitW >> 32));
+            return result;
         }
 
         public override bool Equals(object obj)
