@@ -604,6 +604,7 @@ namespace OthelloAI
 
             int n = (int)Math.Pow(3, 6) * 6 * 6;
 
+            float[] data_raw = new float[n];
             byte[] data = new byte[n];
 
             static byte ConvertToInt8(float x, float range)
@@ -614,8 +615,12 @@ namespace OthelloAI
             for (int i = 0; i < n; i++)
             {
                 float e = reader.ReadSingle();
+                data_raw[i] = e;
                 data[i] = ConvertToInt8(e, 4);
             }
+
+            DataEncoding.Encode(data_raw, 4);
+            return;
 
             // File.WriteAllText(log_dir + "/e.csv", string.Join(Environment.NewLine, ee));
 
@@ -642,9 +647,10 @@ namespace OthelloAI
 
             var timer = new Stopwatch();
 
-            (float[], int) Play(int i)
+            (float[], int[], int) Play(int i)
             {
                 float[] t = new float[60];
+                int[] n = new int[60];
 
                 var board = Condingame.Board.Init;
 
@@ -661,6 +667,7 @@ namespace OthelloAI
                     if ((move & board.GetMoves(stone)) != 0)
                     {
                         t[board.n_stone - 4] = (float)timer.ElapsedTicks / Stopwatch.Frequency * 1000;
+                        n[board.n_stone - 4] = PlayerLight.node_count;
 
                         board = board.Reversed(move, stone);
                         // Console.WriteLine(board);
@@ -671,16 +678,17 @@ namespace OthelloAI
 
                 while (Step(1) | Step(-1)) { }
 
-                return (t, board.GetStoneCountGap());
+                return (t, n, board.GetStoneCountGap());
             }
 
-            var times = new float[2][];
+            var times = new float[1][];
+            var count = new int[times.Length][];
             int w1 = 1;
             int w2 = 1;
 
             for (int i = 0; i < times.Length; i++)
             {
-                (float[] t, int result) = Play(i);
+                (float[] t, int[] n, int result) = Play(i);
 
                 if (i % 2 != 0)
                     result = -result;
@@ -691,20 +699,28 @@ namespace OthelloAI
                     w2++;
 
                 times[i] = new float[60];
+                count[i] = new int[60];
 
                 for (int j = 0; j < 60; j++)
+                {
                     times[i][j] = t[j];
+                    count[i][j] = n[j];
+                }
 
                 Console.WriteLine($"{i}, {w1 / (float)(w1 + w2)}");
             }
 
             for (int j = 0; j < 60; j++)
             {
-                float avg = times.Average(t => t[j]);
-                float max = times.Max(t => t[j]);
+                double avg_t = times.Average(t => t[j]);
+                double max_t = times.Max(t => t[j]);
 
-                Console.WriteLine($"{j}, {avg}, {max}");
+                double avg_n = count.Average(t => t[j]);
+                double max_n = count.Max(t => t[j]);
+
+                Console.WriteLine($"{j}, {avg_t:f2}, {max_t:f2}, {avg_n}, {max_n}, {avg_t / avg_n * 1000000:f2}");
             }
+            Console.WriteLine(WeightLight.t.Average());
         }
 
         public static void TrainWithDataset()

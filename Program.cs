@@ -3,6 +3,7 @@ using OthelloAI.GA;
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace OthelloAI
@@ -47,8 +48,8 @@ namespace OthelloAI
             // Tester.TestBook();
             // Book.Test();
 
-            Tester.StartGame();
-            // Tester.ConvertByteWeight();
+            // Tester.StartGame();
+            Tester.ConvertByteWeight();
             // Tester.TestParamMPC();
             // Tester.Train();
             // Tester.TrainWithDataset();
