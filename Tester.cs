@@ -598,7 +598,7 @@ namespace OthelloAI
         public static void ConvertByteWeight()
         {
             string log_dir = "codingame";
-            string path = log_dir + "/weight_6x6.dat";
+            string path = log_dir + "/weight_8x4.dat";
 
             using var reader = new BinaryReader(new FileStream(path, FileMode.Open));
 
@@ -619,10 +619,13 @@ namespace OthelloAI
                 data[i] = ConvertToInt8(e, 4);
             }
 
-            DataEncoding.Encode(data_raw, 4);
-            return;
+            Console.WriteLine(data_raw.Length);
+            Console.WriteLine(data_raw.Count(t => t == 0));
 
-            // File.WriteAllText(log_dir + "/e.csv", string.Join(Environment.NewLine, ee));
+            // DataEncoding.Encode(data_raw, 4);
+
+            File.WriteAllText(log_dir + "/e.csv", string.Join(Environment.NewLine, data_raw));
+            return;
 
             string s = System.Text.Encoding.ASCII.GetString(data);
             byte[] data2 = System.Text.Encoding.ASCII.GetBytes(s);
@@ -652,7 +655,7 @@ namespace OthelloAI
                 float[] t = new float[60];
                 int[] n = new int[60];
 
-                var board = Condingame.Board.Init;
+                var board = Condingame.B.Init;
 
                 bool Step(int stone)
                 {
@@ -670,7 +673,7 @@ namespace OthelloAI
                         n[board.n_stone - 4] = PlayerLight.node_count;
 
                         board = board.Reversed(move, stone);
-                        // Console.WriteLine(board);
+                        Console.WriteLine(board);
                         return true;
                     }
                     return false;
@@ -758,18 +761,18 @@ namespace OthelloAI
 
             Weight CreateFromMask(ulong[] m, int n_ply)
             {
-                return new WeightsSum(m.Select(x => new WeightArrayPextHashingTer(x)).ToArray());
+                return new WeightsSum(m.Select(x => new WeightArrayPextHashingBin(x)).ToArray());
             }
 
-            var weight = new WeightsStagebased6x6(masks.Select(CreateFromMask).ToArray());
-            weight.Load(log_dir + "/weight_6x6.dat");
+            var weight = new WeightsStagebased8x4(masks.Select(CreateFromMask).ToArray());
+            weight.Load(log_dir + "/weight_8x4.dat");
 
-            //var w = (WeightArrayPextHashingTer)((WeightsSum)weight.Weights[4]).Weights[4];
+            //var w = (WeightArrayPextHashingTer)((WeightsSum)weight.Weights[3]).Weights[2];
             //w.Test(3);
 
-            // return;
+            //return;
 
-            var trainer = new Trainer(weight, 0.00025F);
+            var trainer = new Trainer(weight, 0.0001F);
 
             var w_edax = new WeightEdax("eval.dat");
 
@@ -789,8 +792,9 @@ namespace OthelloAI
             TrainingData[] CreateData(int n, int d, int ed) => n.Loop().AsParallel().AsOrdered().Select(j =>
             {
                 var rand = new Random();
-                var p1 = CreatePlayer(weight, 16, d, ed);
-                var p2 = CreatePlayer(w_edax, 2, d - 2, ed);
+                var p1 = CreatePlayer(weight, 4, d, ed);
+                // var p2 = CreatePlayer(weight, 4, d, ed);
+                var p2 = CreatePlayer(w_edax, 2, d - 4, ed + 2);
                 if (j % 2 == 0)
                     return TrainerUtil.PlayForTraining(1, p1, p2, Board.Init);
                 else
@@ -802,7 +806,9 @@ namespace OthelloAI
 
             var timer = new Stopwatch();
 
-            return;
+            //var p = CreatePlayer(weight, 2, depth, endgame);
+            //Tester.PlayGame(p, p, Board.Init, r => Console.WriteLine(r.next_board));
+            //return;
 
             using StreamWriter sw = File.CreateText(log_dir + $"/train.csv");
 
@@ -825,7 +831,7 @@ namespace OthelloAI
 
                 if (i % 10 == 0)
                 {
-                    weight.Save(log_dir + "/weight_6x6.dat");
+                    weight.Save(log_dir + "/weight_8x4.dat");
                 }
             }
         }
@@ -875,27 +881,15 @@ namespace OthelloAI
 
         public static void TestWeight2()
         {
-            //string log_dir = "ga/brkga_2023_01_31_04_25";
-            string log_dir = "ga/brkga_2023_03_07_20_46";
-            int num_dimes = 8;
-            int size_dime = 100;
-
-            Weight CreateWeight(int gen, int d)
+            Weight CreateFromMask(ulong[] m, int n_ply)
             {
-                var lines = File.ReadAllLines(log_dir + "/tuple.csv");
-                return CreateNetworkFromLine(lines[(gen * num_dimes + d) * size_dime]);
+                return new WeightsSum(m.Select(x => new WeightArrayPextHashingBin(x)).ToArray());
             }
 
-            Weight[] CreateWeights(int gen)
-            {
-                var lines = File.ReadAllLines(log_dir + "/tuple.csv");
-                return num_dimes.Loop(i => CreateNetworkFromLine(lines[(gen * num_dimes + i) * size_dime])).ToArray();
-            }
-
-            var weights =
-                CreateWeights(900)
-            // CreateWeights("ga/brkga_2023_01_25_14_16", 4000, 5, 100)
-            .ConcatOne(new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray())).ToArray();
+            var weights = new Weight[] {
+                 new WeightsStagebased8x4(Data.MASKS.Select(CreateFromMask).ToArray()),
+                new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray()) 
+            };
 
             var trainers = weights.Select(w => new Trainer(w, 0.001F)).ToArray();
 
@@ -916,16 +910,6 @@ namespace OthelloAI
                 foreach (var w in weights)
                     w.Reset();
 
-                float ScoreClass(float result, float eval)
-                {
-                    if (eval == 0)
-                        return 0.5F;
-                    else if (result > 0)
-                        return eval > 0 ? 1 : 0;
-                    else
-                        return eval < 0 ? 1 : 0;
-                }
-
                 Parallel.ForEach(trainers, t => t.Train(train_data));
 
                 //var e = trainers.AsParallel().Select(t => valid_data.Where(d => d.result != 0).Select(d => ScoreClass(d.result, t.Weight.EvalTraining(new RotatedAndMirroredBoards(d.board)))).Average()).ToArray();
@@ -933,7 +917,7 @@ namespace OthelloAI
                 result.Add(e);
                 Console.WriteLine($"{i}, {string.Join(", ", e)}");
             }
-            File.WriteAllLines(log_dir + "/test.csv", result.Select((e, i) => $"{i}, {string.Join(", ", e)}").ToArray());
+            File.WriteAllLines("codingame/test.csv", result.Select((e, i) => $"{i}, {string.Join(", ", e)}").ToArray());
         }
 
         public static void TestWeightAgainstEdaxNetwork()

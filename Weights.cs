@@ -214,6 +214,23 @@ namespace OthelloAI
         }
     }
 
+    public class WeightsStagebased8x4 : WeightsStagebasedAbstract
+    {
+        public WeightsStagebased8x4(Weight[] weights) : base(weights)
+        {
+        }
+
+        public override int GetStage(int n_discs)
+        {
+            return Math.Clamp((n_discs + 5) / 10 - 2, 0, 3);
+        }
+
+        public override Weight Copy()
+        {
+            return new WeightsStagebased8x4(Weights.Select(w => w.Copy()).ToArray());
+        }
+    }
+
     public class WeightsStagebased : Weight
     {
         Weight[] Weights { get; }
@@ -296,6 +313,11 @@ namespace OthelloAI
         }
     }
 
+    public enum SymmetricalTypes
+    {
+        X, XY, DIAGONAL, NONE
+    }
+
     public abstract class WeightArray : Weight
     {
         public float[] weights;
@@ -307,11 +329,27 @@ namespace OthelloAI
         public int HashLength { get; }
         public abstract int ArrayLength { get; }
 
+        public abstract SymmetricalTypes SymmetricalType { get; }
+
         public WeightArray(int length)
         {
             HashLength = length;
             NumOfStates = (int)Math.Pow(3, length);
             Reset();
+        }
+
+        public static SymmetricalTypes GetSymmetricalType(ulong mask)
+        {
+            //if ((mask & ~0x8040201008040201UL) == 0)
+            //    return SymmetricalTypes.DIAGONAL;
+
+            //if(Board.HorizontalMirror(mask) == mask || Board.VerticalMirror(mask) == mask)
+            //    return SymmetricalTypes.X;
+
+            //if (Board.Transpose(mask) == mask || Board.Transpose(Board.HorizontalMirror(mask)) == mask)
+            //    return SymmetricalTypes.XY;
+
+            return SymmetricalTypes.NONE;
         }
 
         public abstract uint ConvertStateToHash(int state);
@@ -333,8 +371,15 @@ namespace OthelloAI
 
         public override int Eval(RotatedAndMirroredBoards b)
         {
-            return Eval(b.rot0) + Eval(b.rot90) + Eval(b.rot180) + Eval(b.rot270)
-                + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.inv_rot180) + Eval(b.inv_rot270) - 128 * 8;
+            return SymmetricalType switch
+            {
+                SymmetricalTypes.X => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot270) - 128 * 4,
+                SymmetricalTypes.XY => Eval(b.rot0) + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.rot90) - 128 * 4,
+                SymmetricalTypes.DIAGONAL => Eval(b.rot0) + Eval(b.inv_rot0) - 128 * 2,
+                SymmetricalTypes.NONE => Eval(b.rot0) + Eval(b.rot90) + Eval(b.rot180) + Eval(b.rot270)
+                + Eval(b.inv_rot0) + Eval(b.inv_rot90) + Eval(b.inv_rot180) + Eval(b.inv_rot270) - 128 * 8,
+                _ => throw new NotImplementedException(),
+            };
         }
 
         public float EvalTraining(Board b)
@@ -344,8 +389,15 @@ namespace OthelloAI
 
         public override float EvalTraining(RotatedAndMirroredBoards b)
         {
-            return EvalTraining(b.rot0) + EvalTraining(b.rot90) + EvalTraining(b.rot180) + EvalTraining(b.rot270)
-                + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.inv_rot180) + EvalTraining(b.inv_rot270);
+            return SymmetricalType switch
+            {
+                SymmetricalTypes.X => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot270),
+                SymmetricalTypes.XY => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.rot90),
+                SymmetricalTypes.DIAGONAL => EvalTraining(b.rot0) + EvalTraining(b.inv_rot0),
+                SymmetricalTypes.NONE => EvalTraining(b.rot0) + EvalTraining(b.rot90) + EvalTraining(b.rot180) + EvalTraining(b.rot270)
+                + EvalTraining(b.inv_rot0) + EvalTraining(b.inv_rot90) + EvalTraining(b.inv_rot180) + EvalTraining(b.inv_rot270),
+                _ => throw new NotImplementedException(),
+            };
         }
 
         public override int NumOfEvaluation(int n_discs) => 8;
@@ -353,13 +405,13 @@ namespace OthelloAI
         public override void UpdataEvaluation(Board board, float add, float range)
         {
             int hash = Hash(board);
-            // int flipped = FlipHash(hash);
+            int flipped = FlipHash(hash);
 
             weights[hash] += add;
-            // weights[flipped] -= add;
+            weights[flipped] -= add;
 
             weights_b[hash] = ConvertToInt8(weights[hash], range);
-            //   weights_b[flipped] = ConvertToInt8(weights[flipped], range);
+            weights_b[flipped] = ConvertToInt8(weights[flipped], range);
         }
 
         public override void ApplyTrainedEvaluation(float range)
@@ -443,6 +495,7 @@ namespace OthelloAI
     public class WeightArrayScanning : WeightArrayTer
     {
         readonly int[] pos;
+        public override SymmetricalTypes SymmetricalType { get; }
 
         public static int[] MaskToPositions(ulong mask)
         {
@@ -490,10 +543,14 @@ namespace OthelloAI
         public ulong mask;
         public readonly int hash_length;
 
+        public override SymmetricalTypes SymmetricalType { get; }
+
         public WeightArrayPextHashingTer(ulong m) : base(Board.BitCount(m))
         {
             mask = m;
             hash_length = Board.BitCount(mask);
+
+            SymmetricalType = GetSymmetricalType(m);
         }
 
         public override Weight Copy()
@@ -532,10 +589,16 @@ namespace OthelloAI
         readonly ulong mask;
         readonly int hash_length;
 
+        public override SymmetricalTypes SymmetricalType { get; }
+
         public WeightArrayPextHashingBin(ulong m) : base(Board.BitCount(m))
         {
             mask = m;
             hash_length = Board.BitCount(mask);
+            SymmetricalType = GetSymmetricalType(m);
+
+            Console.WriteLine(new Board(m, 0));
+            Console.WriteLine(SymmetricalType);
         }
 
         public override Weight Copy()

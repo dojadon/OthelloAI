@@ -1,4 +1,5 @@
 ﻿using NumSharp;
+using OthelloAI.Condingame;
 using OthelloAI.GA;
 using System;
 using System.IO;
@@ -48,8 +49,8 @@ namespace OthelloAI
             // Tester.TestBook();
             // Book.Test();
 
-            // Tester.StartGame();
-            Tester.ConvertByteWeight();
+            // DataEncoding.ConvertByteWeight();
+            Tester.StartGame();
             // Tester.TestParamMPC();
             // Tester.Train();
             // Tester.TrainWithDataset();
