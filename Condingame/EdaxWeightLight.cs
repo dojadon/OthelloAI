@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NumSharp.Utilities;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -109,18 +110,54 @@ namespace OthelloAI.Condingame
         readonly static int[] PS = { 10206, 29889, 29646, 29646, 3321, 3321, 3321, 3321, 1134, 378, 135, 45, 1 };
         readonly static int[] S = { 19683, 59049, 59049, 59049, 6561, 6561, 6561, 6561, 2187, 729, 243, 81, 1 };
 
+        public const int EVAL_N_PACKED_WEIGHT = 114364;
         /** number of (unpacked) weights */
-        const int EVAL_N_WEIGHT = 226315;
+        public const int EVAL_N_WEIGHT = 226315;
         /** number of plies */
-        const int EVAL_N_PLY = 3;
+        public const int EVAL_N_PLY = 2;
         /** number of features */
-        const int EVAL_N_FEATURE = 47;
+        public const int EVAL_N_FEATURE = 47;
 
-        static int[] o = { 1, 0, 2 };
+        public static int GetStage(int n_ply)
+        {
+            return Math.Clamp((n_ply + 10) / 30, 0, EVAL_N_PLY - 1);
+        }
+
+        static short[][][] percentiles = {
+            new [] {
+                new short[] { -307, -69, -53, -13, 16, 32, 61, 303 },
+                new short[] { -165, -36, -10, 0, 3, 17, 41, 169 },
+                new short[] { -154, -34, -10, 0, 1, 11, 36, 165 },
+                new short[] { -119, -22, -4, 0, 0, 9, 30, 139 },
+                new short[] { -40, -2, 0, 0, 6, 15, 32, 100 },
+                new short[] { -110, -22, -5, 0, 0, 5, 19, 73 },
+                new short[] { -173, -37, -11, -2, 0, 3, 20, 102 },
+                new short[] { -71, -11, 0, 0, 7, 20, 48, 173 },
+                new short[] { -27, -1, 0, 2, 9, 20, 46, 182 },
+                new short[] { 0, 0, 2, 7, 15, 29, 55, 186 },
+                new short[] { -7, 0, 4, 8, 13, 23, 47, 158 },
+                new short[] { 0, 1, 6, 9, 13, 20, 45, 116 },
+            },
+            new [] {
+                new short[] { -391, -111, -48, -16, 24, 51, 105, 388 },
+                new short[] { -307, -101, -40, -8, 16, 48, 112, 329 },
+                new short[] { -300, -102, -41, -9, 10, 43, 110, 315 },
+                new short[] { -276, -84, -28, -1, 11, 43, 109, 310 },
+                new short[] { -161, -33, -1, 11, 35, 70, 143, 333 },
+                new short[] { -294, -95, -36, -8, 7, 37, 97, 262 },
+                new short[] { -337, -136, -57, -21, 0, 27, 95, 296 },
+                new short[] { -205, -55, -10, 10, 40, 87, 184, 418 },
+                new short[] { -82, -15, 4, 22, 47, 91, 177, 417 },
+                new short[] { -39, 9, 25, 45, 78, 124, 205, 438 },
+                new short[] { -67, 2, 17, 42, 70, 114, 169, 351 },
+                new short[] { -36, 9, 39, 62, 109, 146, 180, 308 },
+            }
+        }; 
 
         static byte[][] weight;
+        static short[] weight_const = { -262, -248 };
 
-        public static byte[][] Open(byte[] w)
+        public static void Open(byte[] w)
         {
             int[] T = new int[59049];
             int i, j, k, l, n;
@@ -277,8 +314,6 @@ namespace OthelloAI.Condingame
                 i++;
                 weight[ply][j] = w[offset];
             }
-
-            return weight;
         }
 
         static int board_get_square_color(B board, int x)
@@ -307,24 +342,27 @@ namespace OthelloAI.Condingame
         const int SCORE_MIN = -64;
         const int SCORE_MAX = 64;
 
-        public static int Eval(B b)
+        public static float Eval(B b)
         {
-            byte[] w = weight[b.n_stone - 4];
-            int[] f = CreateFeature(b);
+            int stage = GetStage(b.n_stone - 4);
 
-            int score = w[f[0]] + w[f[1]] + w[f[2]] + w[f[3]]
-                            + w[f[4]] + w[f[5]] + w[f[6]] + w[f[7]]
-                            + w[f[8]] + w[f[9]] + w[f[10]] + w[f[11]]
-                            + w[f[12]] + w[f[13]] + w[f[14]] + w[f[15]]
-                            + w[f[16]] + w[f[17]] + w[f[18]] + w[f[19]]
-                            + w[f[20]] + w[f[21]] + w[f[22]] + w[f[23]]
-                            + w[f[24]] + w[f[25]]
-                            + w[f[26]] + w[f[27]] + w[f[28]] + w[f[29]]
-                            + w[f[30]] + w[f[31]] + w[f[32]] + w[f[33]]
-                            + w[f[34]] + w[f[35]] + w[f[36]] + w[f[37]]
-                            + w[f[38]] + w[f[39]] + w[f[40]] + w[f[41]]
-                            + w[f[42]] + w[f[43]] + w[f[44]] + w[f[45]]
-                            + w[226314];
+            byte[] w = weight[stage];
+            int[] f = CreateFeature(b);
+            short[][] p = percentiles[stage];
+
+            float score = p[0][w[f[0]]] + p[0][w[f[1]]] + p[0][w[f[2]]] + p[0][w[f[3]]]
+                            + p[1][w[f[4]]] + p[1][w[f[5]]] + p[1][w[f[6]]] + p[1][w[f[7]]]
+                            + p[2][w[f[8]]] + p[2][w[f[9]]] + p[2][w[f[10]]] + p[2][w[f[11]]]
+                            + p[3][w[f[12]]] + p[3][w[f[13]]] + p[3][w[f[14]]] + p[3][w[f[15]]]
+                            + p[4][w[f[16]]] + p[4][w[f[17]]] + p[4][w[f[18]]] + p[4][w[f[19]]]
+                            + p[5][w[f[20]]] + p[5][w[f[21]]] + p[5][w[f[22]]] + p[5][w[f[23]]]
+                            + p[6][w[f[24]]] + p[6][w[f[25]]]
+                            + p[7][w[f[26]]] + p[7][w[f[27]]] + p[7][w[f[28]]] + p[7][w[f[29]]]
+                            + p[8][w[f[30]]] + p[8][w[f[31]]] + p[8][w[f[32]]] + p[8][w[f[33]]]
+                            + p[9][w[f[34]]] + p[9][w[f[35]]] + p[9][w[f[36]]] + p[9][w[f[37]]]
+                            + p[10][w[f[38]]] + p[10][w[f[39]]] + p[10][w[f[40]]] + p[10][w[f[41]]]
+                            + p[11][w[f[42]]] + p[11][w[f[43]]] + p[11][w[f[44]]] + p[11][w[f[45]]]
+                            + weight_const[stage];
 
             if (score > 0) score += 64; else score -= 64;
             score /= 128;

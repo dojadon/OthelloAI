@@ -730,7 +730,7 @@ namespace OthelloAI
         {
             string log_dir = "codingame";
 
-            var masks = Data.MASKS;
+            var masks = C_MASKS;
 
             Weight CreateFromMask(ulong[] m, int n_ply)
             {
@@ -753,11 +753,19 @@ namespace OthelloAI
             }
         }
 
+        public readonly static ulong[][] C_MASKS = new[] {
+                new ulong[] { 0b11111111, 0b11000000_11100000_11100000, 0b00111100_00111100_00000000_00000000 },
+                new ulong[] { 0b11111111, 0b11000000_11100000_11100000, 0b00111100_00111100_00000000_00000000 },
+                new ulong[] { 0b11111111, 0b11000000_11100000_11100000, 0x8040201008040201UL },
+                new ulong[] { 0b11111111, 0b11000000_11100000_11100000, 0x8040201008040201UL }
+            };
+
+
         public static void Train()
         {
             string log_dir = "codingame";
 
-            var masks = Data.MASKS;
+            var masks = C_MASKS;
 
             Weight CreateFromMask(ulong[] m, int n_ply)
             {
@@ -840,7 +848,7 @@ namespace OthelloAI
         {
             string log_dir = "codingame";
 
-            var masks = Data.MASKS;
+            var masks = C_MASKS;
 
             static Weight CreateFromMask(ulong[] m, int n_ply)
             {
@@ -887,7 +895,7 @@ namespace OthelloAI
             }
 
             var weights = new Weight[] {
-                 new WeightsStagebased8x4(Data.MASKS.Select(CreateFromMask).ToArray()),
+                 new WeightsStagebased8x4(C_MASKS.Select(CreateFromMask).ToArray()),
                 new WeightsSum(MASKS.Select(m => new WeightArrayPextHashingBin(m)).ToArray()) 
             };
 

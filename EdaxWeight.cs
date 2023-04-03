@@ -106,6 +106,7 @@ namespace OthelloAI
         readonly static int[] EVAL_PACKED_SIZE = { 10206, 29889, 29646, 29646, 3321, 3321, 3321, 3321, 1134, 378, 135, 45, 1 };
         readonly static int[] EVAL_SIZE = { 19683, 59049, 59049, 59049, 6561, 6561, 6561, 6561, 2187, 729, 243, 81, 1 };
 
+        const int EVAL_N_PACKED_WEIGHT = 114364;
         /** number of (unpacked) weights */
         const int EVAL_N_WEIGHT = 226315;
         /** number of plies */
@@ -122,7 +123,30 @@ namespace OthelloAI
             return f;
         }
 
+        public static short[][] OpenPackedWeight(BinaryReader reader)
+        {
+            byte[] header = reader.ReadBytes(28);
+            // Console.WriteLine(string.Join(", ", header));
+
+            short[][] w = new short[EVAL_N_PLY][];
+            
+            for(int ply = 0; ply < EVAL_N_PLY; ply++)
+            {
+                w[ply] = new short[EVAL_N_PACKED_WEIGHT];
+
+                for (int i = 0; i < w[ply].Length; i++)
+                    w[ply][i] = reader.ReadInt16();
+            }
+            return w;
+        }
+
         public static short[][][] Open(BinaryReader reader)
+        {
+            short[][] w = OpenPackedWeight(reader);
+            return Open(w);
+        }
+
+        public static short[][][] Open(short[][] packed_w)
         {
             int[] T = new int[59049];
             int i, j, k, l, n;
@@ -207,15 +231,11 @@ namespace OthelloAI
                 EVAL_C10[1][opponent_feature(l, 10)] = T[l];
             }
 
-            int n_w = 114364;
             short[][][] EVAL_WEIGHT = 2.Loop(_ => EVAL_N_PLY.Loop(_ => new short[EVAL_N_WEIGHT]).ToArray()).ToArray();
-
-            byte[] header = reader.ReadBytes(28);
-            // Console.WriteLine(string.Join(", ", header));
 
             for (int ply = 0; ply < EVAL_N_PLY; ply++)
             {
-                short[] w = n_w.Loop(_ => reader.ReadInt16()).ToArray();
+                short[] w = packed_w[ply];
 
                 i = j = offset = 0;
                 for (k = 0; k < EVAL_SIZE[i]; k++, j++)

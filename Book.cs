@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OthelloAI.Condingame;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.IO;
@@ -22,7 +23,9 @@ namespace OthelloAI
             var book = new Book();
             book.Read(reader);
 
-            Console.WriteLine(book.ToBytesString(3600));
+            byte[] data = book.ToBytes(3200);
+            string s = DataEncoding.Encode(data);
+            File.WriteAllText("codingame/encoded_book.txt", s);
         }
 
         public Book()
@@ -172,6 +175,19 @@ namespace OthelloAI
 
             return builder.ToString();
         }
+
+        public byte[] ToBytes(int n)
+        {
+            byte[] data = new byte[n * 5];
+            var positions = Positions.OrderBy(t => t.Key.n_stone).Take(n).ToArray();
+
+            for(int i = 0; i < positions.Length; i++)
+            {
+                positions[i].Value.Write(data, i * 5);
+            }
+
+            return data;
+        }
     }
 
     public class BookPosition
@@ -192,6 +208,18 @@ namespace OthelloAI
         {
             var link = Links.MaxBy(l => l.eval).First();
             return string.Format("{0:X8}{1:X2}", Board.GetHashCode(), link.move);
+        }
+
+        public void Write(byte[] dst, int offset)
+        {
+            var link = Links.MaxBy(l => l.eval).First();
+            int index = Board.GetHashCode();
+
+            dst[offset] = link.move;
+            dst[offset + 1] = (byte)(index & 0xFF);
+            dst[offset + 2] = (byte)((index >> 8) & 0xFF);
+            dst[offset + 3] = (byte)((index >> 16) & 0xFF);
+            dst[offset + 4] = (byte)((index >> 24) & 0xFF);
         }
     }
 
