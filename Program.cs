@@ -47,12 +47,12 @@ namespace OthelloAI
 
             // WeightEdax.Test();
             // Tester.TestBook();
-            Book.Test();
+            // Book.Test();
 
             // EdaxWeightLight.EncodeWeight();
             // DataEncoding.EncodeEdaxWeight();
             // DataEncoding.ConvertByteWeight();
-            // Tester.StartGame();
+            Tester.StartGame();
             // Tester.TestParamMPC();
             // Tester.Train();
             // Tester.TrainWithDataset();

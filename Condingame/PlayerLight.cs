@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.VisualBasic;
+using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -632,7 +633,7 @@ namespace OthelloAI.Condingame
         }
     }
 
-    public class Eval
+    public class Evaluation
     {
         public static int[] features = new int[46];
         public static B prev;
@@ -647,22 +648,61 @@ namespace OthelloAI.Condingame
 
         public static void Update(Move move)
         {
-            ulong flipped = prev.bitB ^ move.reversed.bitW;
+            (ulong flipped, int f1, int f2) = move.player switch
+            {
+                B.PLAYER_B => (move.reversed.bitB ^ prev.bitB, -2, -1),
+                B.PLAYER_W => (move.reversed.bitW ^ prev.bitW, -1, 1),
+                _ => throw new NotImplementedException()
+            };
+
+            flipped = B.RemoveMove(flipped, move.move);
+            int pos = B.To1dPos(flipped);
+            var s = EVAL_X2F[pos];
+
+            for (int i = 0; i < s.i.Length; i++)
+                features[s.i[i]] += f1 * s.x[i];
 
             ulong x;
             while ((x = B.NextMove(flipped)) != 0)
             {
                 flipped = B.RemoveMove(flipped, x);
 
-                int pos = B.To1dPos(flipped);
-                var s = EVAL_X2F[pos];
+                pos = B.To1dPos(flipped);
+                s = EVAL_X2F[pos];
 
                 for(int i = 0; i < s.i.Length; i++)
-                {
-                    features[s.i[i]] -= 2 * s.x[i];
-                }
+                    features[s.i[i]] += f2 * s.x[i];
             }
+            prev = move.reversed;
+        }
 
+        public static void Restore(Move move)
+        {
+            (ulong flipped, int f1, int f2) = move.player switch
+            {
+                B.PLAYER_B => (move.reversed.bitB ^ prev.bitB, -2, -1),
+                B.PLAYER_W => (move.reversed.bitW ^ prev.bitW, -1, 1),
+                _ => throw new NotImplementedException()
+            };
+
+            flipped = B.RemoveMove(flipped, move.move);
+            int pos = B.To1dPos(flipped);
+            var s = EVAL_X2F[pos];
+
+            for (int i = 0; i < s.i.Length; i++)
+                features[s.i[i]] -= f1 * s.x[i];
+
+            ulong x;
+            while ((x = B.NextMove(flipped)) != 0)
+            {
+                flipped = B.RemoveMove(flipped, x);
+
+                pos = B.To1dPos(flipped);
+                s = EVAL_X2F[pos];
+
+                for (int i = 0; i < s.i.Length; i++)
+                    features[s.i[i]] -= f2 * s.x[i];
+            }
             prev = move.reversed;
         }
     }
@@ -676,7 +716,7 @@ namespace OthelloAI.Condingame
 
         static MoveComparer comparer = new MoveComparer();
 
-        public static bool use_transposition_cut = true;
+        public static bool use_transposition_cut = false;
 
         static float EvalFinishedGame(B board)
         {
@@ -765,6 +805,11 @@ namespace OthelloAI.Condingame
             Move result = array[0];
             float max = -Solve(array[0], p.Deepen());
 
+            if (true)
+            {
+                Console.WriteLine($"{Board.ToPos(result.move)} : {max}");
+            }
+
             for (int i = 1; i < array.Length; i++)
             {
                 Move move = array[i];
@@ -775,6 +820,15 @@ namespace OthelloAI.Condingame
                     p.alpha = eval;
                     eval = -Solve(move, p.Deepen());
                     p.alpha = Math.Max(p.alpha, eval);
+
+                    if (true)
+                    {
+                        Console.WriteLine($"{Board.ToPos(move.move)} : {eval}");
+                    }
+                }
+                else if (true)
+                {
+                    Console.WriteLine($"{Board.ToPos(move.move)} : Pruned");
                 }
 
                 if (max < eval)
@@ -897,15 +951,17 @@ namespace OthelloAI.Condingame
 
         static float Solve(Move move, SP p)
         {
+            // Evaluation.Update(move);
+
             if (p.depth <= 0)
-                return Eval(move.reversed);
+                return Eval(move.reversed) * p.player;
 
             if (move.moves == 0)
             {
                 ulong opponentMoves = move.reversed.GetMoves(-p.player);
                 if (opponentMoves == 0)
                 {
-                    return EvalFinishedGame(move.reversed);
+                    return EvalFinishedGame(move.reversed) * p.player;
                 }
                 else
                 {
